@@ -1,4 +1,4 @@
-function trials = loadGRF(fileName, varargin)
+function [file, trials] = convertGRF(fileName, varargin)
 % Functiom loadGRF.m loads Knot (*.dat) files for protocol 'GaborRFMap'into matlab *.mat with
 % all the relavant experimental parameters
 % Requires readLLFile.m
@@ -91,8 +91,9 @@ numTrials = file.numberOfTrials;
 
 % Numerical data
 
-for dataTypes = {'trialStart', 'trialEnd', 'trialCertify', 'fixOn', 'fixate', 'instructTrial', 'catchTrial', ...
-    'numStim', 'targetIndex', 'targetOnTimeMS', 'oriChangeIndex', 'oriChangeDeg', 'time', 'saccade'}
+for dataTypes = {'trialStart', 'trialEnd', 'trialCertify', 'eotCode', 'fixOn', 'fixate', 'instructTrial', ...
+      'catchTrial', 'numStim', 'numMap0Stim', 'numMap1Stim', 'photodiodeTime', 'targetIndex', 'targetOnTimeMS', ...
+      'oriChangeIndex', 'oriChangeDeg', 'time', 'saccade'}
   dataT = dataTypes{:};
   trials.(dataT) = nan(numTrials, 1);
 end
@@ -127,12 +128,12 @@ for sides = {'LEye', 'REye'}
 %   end
 end
 
-hWait = waitbar(0, '', 'name', sprintf('Loading %s...', fileName));
+hWait = waitbar(0, '', 'name', sprintf('Converting %s...', fileName));
 
 % 2: trial data-------------
   for tIndex = numTrials:-1:1
-  waitbar((numTrials - tIndex) / numTrials, hWait, sprintf('Loading trial %d of %d', numTrials - tIndex, numTrials));
-  trial = readLLFile('t', tIndex);
+    waitbar((numTrials - tIndex) / numTrials, hWait, sprintf('Loading trial %d of %d', numTrials - tIndex, numTrials));
+    trial = readLLFile('t', tIndex);
     %2-A: time stamps
     trials(tIndex).trialStart = trial.trialStart.timeMS;            % trial start timeStamp
     trials(tIndex).fixOn = trial.fixOn.timeMS;                      % fixation point on timeStamp
@@ -143,14 +144,28 @@ hWait = waitbar(0, '', 'name', sprintf('Loading %s...', fileName));
       trials(tIndex).saccade = trial.saccade.timeMS;                % saccade time stamp
     end
     trials(tIndex).trialEnd = trial.trialEnd.timeMS;                 % trial end timeStamp
+    trials(tIndex).eotCode = trial.trialEnd.data;
+    if isfield(trial, 'numMap0Stim')
+      trials(tIndex).numMap0Stim = trial.numMap0Stim.data;
+    else
+      trials(tIndex).numMap0Stim = 0;
+    end
+    if isfield(trial, 'numMap1Stim')
+      trials(tIndex).numMap1Stim = trial.numMap1Stim.data;
+    else
+      trials(tIndex).numMap1Stim = 0;
+    end
     if isfield(trial, 'trial')
       trials(tIndex).instructTrial = trial.trial.data.instructTrial;
       trials(tIndex).catchTrial = trial.trial.data.catchTrial;
-      trials(tIndex).numStim = trial.trial.data.numStim;
+      trials(tIndex).numTaskStim = trial.trial.data.numTaskStim;
       trials(tIndex).targetIndex = trial.trial.data.targetIndex;
       trials(tIndex).targetOnTimeMS = trial.trial.data.targetOnTimeMS;
       trials(tIndex).orientationChangeIndex = trial.trial.data.orientationChangeIndex;
       trials(tIndex).orientationChangeDeg = trial.trial.data.orientationChangeDeg;
+    end
+    if isfield(trial, 'photodiodeTime')
+      trials(tIndex).photodiodeTime = trial.photodiodeTime.data;
     end
     if isfield(trial, 'spike')
       spikeChannels = [trial.spike.data.channel];
@@ -196,7 +211,7 @@ hWait = waitbar(0, '', 'name', sprintf('Loading %s...', fileName));
 %       trials.pulseTrainData{tIndex} = trial.pulseTrainData.data;   % pulseTrainData
 %     end
 %     
-%     %2-E: response outcoopme
+%     %2-E: response outcome
 %     trials.outcome(tIndex) = trial.signalDetectResult.data; % >0 for completed trials
 %     trials.eotcode(tIndex) = trial.trialEnd.data;
     

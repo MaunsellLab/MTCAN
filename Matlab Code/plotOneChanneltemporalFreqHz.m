@@ -61,7 +61,7 @@ function [] = plotOneChannel(channel, file, trials)
   errorbar(X_units, spikeMean, spikeSD)
 %   plot(X_units, spikeMean + spikeSEM, 'linestyle', '--')
 %   plot(X_units, spikeMean - spikeSEM, 'linestyle', '--')
-  ylim([0 200])
+  
   
   
   % spike histograms

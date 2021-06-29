@@ -51,23 +51,13 @@ function [] = plotOneChannel(channel, file, trials)
 	text(0.00, 0.90, sprintf('Subject: %s\n%s\n\nChannel %d', file.fileName, file.date, channel), 'FontSize', 12, ...
       'horizontalAlignment', 'left',  'verticalAlignment', 'top');
   
-  %% work on this 
   % cartesian plot of speed tuning
-  for i = 1:numGridPoints
-    spikeMean(i) = mean(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
-    spikeSD(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
-    spikeSEM(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS / sqrt(numStim(i));
+  for i = 1:numEle
+    for j = 1:numAzi
+    spikeMean(i,j) = mean(spikeCounts(i,j, 1:numStim(i,j))) * 1000.0 / stimDurMS;
+    end
   end
   subplot(6, 4, [3, 4, 7, 8, 11, 12]);
-  X_units = (2.^(0:numSpeed-1))/file.mapSettings.data.spatialFreqCPD.minValue;
-  plot(X_units, spikeMean)
-  hold on
-%   errorbar(X_units, spikeMean, spikeSD)
-%   plot(X_units, spikeMean + spikeSEM, 'linestyle', '--')
-%   plot(X_units, spikeMean - spikeSEM, 'linestyle', '--')
-  
-  
-  
-  
+  heatmap(spikeMean);
 end
   

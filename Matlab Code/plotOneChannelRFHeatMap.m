@@ -2,7 +2,6 @@ function [] = plotOneChannel(channel, file, trials)
 
   numEle = file.mapSettings.data.elevationDeg.n;
   numAzi = file.mapSettings.data.azimuthDeg.n;
-  numGridPoints = numEle * numAzi;
   stimDurMS = file.mapStimDurationMS.data;
   maxNumStim = 1000;
   histPrePostMS = 50;
@@ -39,7 +38,7 @@ function [] = plotOneChannel(channel, file, trials)
     end
   end
   
-  fH = figure(channel+1);
+  fH = figure;
   set(fH, 'units', 'inches', 'position', [26.5, 7, 8.5, 11]);
   clf;
   
@@ -51,13 +50,29 @@ function [] = plotOneChannel(channel, file, trials)
 	text(0.00, 0.90, sprintf('Subject: %s\n%s\n\nChannel %d', file.fileName, file.date, channel), 'FontSize', 12, ...
       'horizontalAlignment', 'left',  'verticalAlignment', 'top');
   
-  % cartesian plot of speed tuning
+  % Heatmap of RF spatial pref
   for i = 1:numEle
     for j = 1:numAzi
-    spikeMean(i,j) = mean(spikeCounts(i,j, 1:numStim(i,j))) * 1000.0 / stimDurMS;
+      spikeMean(i,j) = mean(spikeCounts(i,j, 1:numStim(i,j))) * 1000.0 / stimDurMS;
     end
   end
   subplot(6, 4, [3, 4, 7, 8, 11, 12]);
   heatmap(spikeMean);
-end
   
+  %% work on this part
+  % Spike Histograms of individual locations
+  numLocTest = numEle * numAzi;
+  count = 1
+  for i = 1:numEle
+    for j = 1:numAzi
+      subplot(12,6, 36+count);
+      spikeHist = spikeHists(i,j,:) * 1000.0 / numStim(i,j);
+      h = plot(smooth(spikeHist, min(0.1, 3000 / sum(spikeHist))));
+      xticks([histPrePostMS, histPrePostMS + stimDurMS]);
+      xticklabels({'0', sprintf('%d', stimDurMS)});
+      count = count + 1;
+    end
+  end
+%   sameAxisScaling('y', 6, 4, 13:12+i);
+end
+   

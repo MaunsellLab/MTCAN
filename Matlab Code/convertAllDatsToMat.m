@@ -18,5 +18,5 @@ for k = 1:length(myFiles)
   end    
 end
 if converted_cnt == 0
-    disp('All files already converted')
+    disp('All files in this folder have already been converted')
 end

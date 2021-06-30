@@ -5,20 +5,18 @@ function convertAllDatsToMat()
 
 myDir = uigetdir; % sets search dir
 myFiles = dir(fullfile(myDir, '*.dat')); 
+converted_cnt = 0;
 
 % scans through files in LLDir, and converts
 % them if they're not converted
 for k = 1:length(myFiles)
-  fileName = erase(myFiles(k).name, '.dat');
-  fileNameMat = append(fileName, '.mat');
-  cd ..
-  cd 'Matlab Data'/
-  if isfile(fileNameMat)
-    % do nothing
-  else
-    cd ..
-    cd 'Matlab Code'/
+  fileNameMat = strrep(myFiles(k).name, '.dat', '.mat');
+  cd '../Matlab Data'/
+  if ~isfile(fileNameMat)
     convertGRF(myFiles(k).name)
+    converted_cnt = converted_cnt + 1;
   end    
 end
+if converted_cnt == 0
+    disp('All files already converted')
 end

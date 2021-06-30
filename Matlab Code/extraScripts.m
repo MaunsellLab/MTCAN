@@ -74,3 +74,29 @@
 %     ylabel('Rate (spikes/s)');
 %   end
 % end
+
+function convertAllDatsToMat()
+
+addpath('../Matlab Code');
+
+% Function will convert unconverted .dat files in 'Lablib Data' folder 
+% to .mat file and save it in 'Matlab Data' folder
+
+myDir = uigetdir; % sets search dir
+myFiles = dir(fullfile(myDir, '*.dat')); 
+
+% scans through files in LLDir, and converts
+% them if they're not converted
+for k = 1:length(myFiles)
+%   fileName = erase(myFiles(k).name, '.dat');
+%   fileNameMat = append(fileName, '.mat');
+  fileNameMat = strrep(myFiles(1).name, '.dat', '.mat');
+%   cd ..
+%   cd '../Matlab Data'/
+  if ~isfile([strrep(myDir, 'Lablib', 'Matlab'), '/', fileNameMat])
+    convertGRF(myFiles(k).name);
+%     cd ..
+%     cd '../Matlab Code'/
+  end    
+end
+end

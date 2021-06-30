@@ -1,4 +1,4 @@
-function [] = plotOneChannel(channel, file, trials)
+function [] = plotOneChannelRFHeatMap(channel, file, trials)
 
   numEle = file.mapSettings.data.elevationDeg.n;
   numAzi = file.mapSettings.data.azimuthDeg.n;
@@ -51,6 +51,7 @@ function [] = plotOneChannel(channel, file, trials)
       'horizontalAlignment', 'left',  'verticalAlignment', 'top');
   
   % Heatmap of RF spatial pref
+  spikeMean = zeros(numEle, numAzi);
   for i = 1:numEle
     for j = 1:numAzi
       spikeMean(i,j) = mean(spikeCounts(i,j, 1:numStim(i,j))) * 1000.0 / stimDurMS;
@@ -59,7 +60,7 @@ function [] = plotOneChannel(channel, file, trials)
   subplot(6, 4, [3, 4, 7, 8, 11, 12]);
   heatmap(spikeMean);
   
-  %% work on this part
+  % work on this part
   % Spike Histograms of individual locations
   numLocTest = numEle * numAzi;
   count = 1;
@@ -67,7 +68,7 @@ function [] = plotOneChannel(channel, file, trials)
     for j = 1:numAzi
       subplot(12,6, 36+count);
       spikeHist = spikeHists(i,j,:) * 1000.0 / numStim(i,j);
-      h = plot(smooth(spikeHist, min(0.1, 3000 / sum(spikeHist))));
+      plot(smooth(spikeHist, min(0.1, 3000 / sum(spikeHist))));
       xticks([histPrePostMS, histPrePostMS + stimDurMS]);
       xticklabels({'0', sprintf('%d', stimDurMS)});
       count = count + 1;

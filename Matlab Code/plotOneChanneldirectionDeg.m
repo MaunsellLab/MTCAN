@@ -1,4 +1,4 @@
-function [] = plotOneChannel(channel, file, trials)
+function [] = plotOneChannelDirectionDeg(channel, file, trials)
 
   numDir = file.mapSettings.data.directionDeg.n;
   stimDurMS = file.mapStimDurationMS.data;
@@ -64,5 +64,5 @@ function [] = plotOneChannel(channel, file, trials)
     ylabel('Rate (spikes/s)');
     end
   end
-  sameAxisScaling('y', 6, 4, 13:12+d);
+  sameAxisScaling('y', 6, 4, 13:12+numDir);
 end

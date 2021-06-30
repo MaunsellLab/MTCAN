@@ -1,4 +1,4 @@
-function [] = plotOneChannel(channel, file, trials)
+function [] = plotOneChannelTemporalFreqHz(channel, file, trials)
 
   numSpeed = file.mapSettings.data.temporalFreqHz.n;
   stimDurMS = file.mapStimDurationMS.data;
@@ -58,7 +58,7 @@ function [] = plotOneChannel(channel, file, trials)
   X_units = (2.^(0:numSpeed-1))/file.mapSettings.data.spatialFreqCPD.minValue;
   plot(X_units, spikeMean)
   hold on
-  errorbar(X_units, spikeMean, spikeSD)
+%   errorbar(X_units, spikeMean, spikeSD)
 %   plot(X_units, spikeMean + spikeSEM, 'linestyle', '--')
 %   plot(X_units, spikeMean - spikeSEM, 'linestyle', '--')
   
@@ -73,7 +73,7 @@ function [] = plotOneChannel(channel, file, trials)
     ylabel('Rate (spikes/s)');
     end
   end
-  sameAxisScaling('y', 6, 4, 13:12+i);
+  sameAxisScaling('y', 6, 4, 13:12+numSpeed);
 end
   
   

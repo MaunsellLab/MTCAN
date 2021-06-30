@@ -1,5 +1,5 @@
 function [file, trials] = convertGRF(fileName, varargin)
-% Functiom loadGRF.m loads Knot (*.dat) files for protocol 'GaborRFMap'into matlab *.mat with
+% Function loadGRF.m loads Knot (*.dat) files for protocol 'GaborRFMap'into matlab *.mat with
 % all the relavant experimental parameters
 % Requires readLLFile.m
 

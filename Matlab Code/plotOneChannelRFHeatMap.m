@@ -62,7 +62,7 @@ function [] = plotOneChannel(channel, file, trials)
   %% work on this part
   % Spike Histograms of individual locations
   numLocTest = numEle * numAzi;
-  count = 1
+  count = 1;
   for i = 1:numEle
     for j = 1:numAzi
       subplot(12,6, 36+count);
@@ -73,6 +73,6 @@ function [] = plotOneChannel(channel, file, trials)
       count = count + 1;
     end
   end
-%   sameAxisScaling('y', 6, 4, 13:12+i);
+  sameAxisScaling('y', 12, 6, 37:36+numLocTest);
 end
    

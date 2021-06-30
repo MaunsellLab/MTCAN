@@ -1,13 +1,12 @@
-function [] = plotOneChannel(channel, file, trials)
+function [] = plotOneChannelDirectionDeg(channel, file, trials)
 
-  numSpeed = file.mapSettings.data.temporalFreqHz.n;
+  numDir = file.mapSettings.data.directionDeg.n;
   stimDurMS = file.mapStimDurationMS.data;
   maxNumStim = 1000;
   histPrePostMS = 50;
-  numStim = zeros(1, numSpeed);
-  spikeCounts = zeros(numSpeed, maxNumStim);
-  spikeHists = zeros(numSpeed, stimDurMS + 2 * histPrePostMS);
-  
+  numStim = zeros(1, numDir);
+  spikeCounts = zeros(numDir, maxNumStim);
+  spikeHists = zeros(numDir, stimDurMS + 2 * histPrePostMS);
   for t = 1:length(trials)
     if channel == 0
       numMapStim = trials(t).numMap0Stim;
@@ -22,20 +21,20 @@ function [] = plotOneChannel(channel, file, trials)
       else
         stimDesc = trials(t).map1StimDesc(s);
       end
-      spdIndex = stimDesc.temporalFreqIndex + 1;
-      numStim(spdIndex) = numStim(spdIndex) + 1;
+      dIndex = stimDesc.directionIndex + 1;
+      numStim(dIndex) = numStim(dIndex) + 1;
       countStartMS = floor(trials(t).photodiodeTime + stimDesc.frameRendered * 1000.0 / stimDesc.frameRateHz);
       countEndMS = countStartMS + stimDurMS;
       numSpikes = sum(spikes >= countStartMS & spikes < countEndMS);
-      spikeCounts(spdIndex, numStim(spdIndex)) = numSpikes;
+      spikeCounts(dIndex, numStim(dIndex)) = numSpikes;
       histStartMS = countStartMS - histPrePostMS;
       histEndMS = countEndMS + histPrePostMS;
       histHitBins = spikes >= histStartMS & spikes < histEndMS;
       histIncBins = spikes(histHitBins) - histStartMS + 1;
-      spikeHists(spdIndex, histIncBins) = spikeHists(spdIndex, histIncBins) + 1;
+      spikeHists(dIndex, histIncBins) = spikeHists(dIndex, histIncBins) + 1;
     end
   end
-  
+    
   fH = figure(channel+1);
   set(fH, 'units', 'inches', 'position', [26.5, 7, 8.5, 11]);
   clf;
@@ -43,37 +42,27 @@ function [] = plotOneChannel(channel, file, trials)
   % header text
   axisHandle =   subplot(6, 4, [1, 2, 5, 6, 9, 10]);
   set(axisHandle, 'visible', 'off');
-	text(0.00, 1.00, 'GaborRFMap Speed Tuning', 'FontWeight', 'bold', 'FontSize', 16, ...
+	text(0.00, 1.00, 'GaborRFMap Direction Tuning', 'FontWeight', 'bold', 'FontSize', 16, ...
     	'horizontalAlignment', 'left',  'verticalAlignment', 'top');
 	text(0.00, 0.90, sprintf('Subject: %s\n%s\n\nChannel %d', file.fileName, file.date, channel), 'FontSize', 12, ...
       'horizontalAlignment', 'left',  'verticalAlignment', 'top');
 
-  % cartesian plot of speed tuning
-  for i = 1:numSpeed
-    spikeMean(i) = mean(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
-    spikeSD(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
-    spikeSEM(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS / sqrt(numStim(i));
+  % polar plot of direction tuning
+  for d = numDir:-1:1
+    spikeMean(d) = mean(spikeCounts(d, 1:numStim(d))) * 1000.0 / stimDurMS;
+    spikeSD(d) = std(spikeCounts(d, 1:numStim(d))) * 1000.0 / stimDurMS / sqrt(numStim(d));
   end
   subplot(6, 4, [3, 4, 7, 8, 11, 12]);
-  X_units = (2.^(0:numSpeed-1))/file.mapSettings.data.spatialFreqCPD.minValue;
-  plot(X_units, spikeMean)
-  hold on
-  errorbar(X_units, spikeMean, spikeSD)
-%   plot(X_units, spikeMean + spikeSEM, 'linestyle', '--')
-%   plot(X_units, spikeMean - spikeSEM, 'linestyle', '--')
-  
-  
+  polarWithErrorBars(0 :  2 * pi / numDir : 2 * pi, [spikeMean, spikeMean(1)], [spikeSD, spikeSD(1)]);
   
   % spike histograms
-  for i = 1:numSpeed
-    plotOneHist(i, spikeHists(i, :) * 1000.0 / numStim(i), stimDurMS, histPrePostMS)
-    title(X_units(i));
-    if i == 5
+  for d = 1:numDir
+    plotOneHist(d, spikeHists(d, :) * 1000.0 / numStim(d), stimDurMS, histPrePostMS)
+    title([sprintf('%d', (d - 1) * 30), char(176)]);
+    if d == 9
     xlabel('Time (ms)');
     ylabel('Rate (spikes/s)');
     end
   end
-  sameAxisScaling('y', 6, 4, 13:12+i);
+  sameAxisScaling('y', 6, 4, 13:12+numDir);
 end
-  
-  

@@ -1,6 +1,6 @@
 function testData()
 
-  fileName = 'testc00.dat';
+  fileName = 'testa00.dat';
 %   convertGRF(fileName);
   
   dirs = targetDirectories();
@@ -9,7 +9,7 @@ function testData()
   
   if file.mapSettings.data.directionDeg.n > 1
     for c = 0:1
-      plotOneChanneldirectionDeg(c, file, trials);
+      plotOneChannelDirectionDeg(c, file, trials);
     end
   else
     fprintf('no direction tuning\n');
@@ -17,7 +17,7 @@ function testData()
   
   if file.mapSettings.data.temporalFreqHz.n > 1
     for c = 0:1
-      plotOneChanneltemporalFreqHz(c, file, trials);
+      plotOneChannelTemporalFreqHz(c, file, trials);
     end
   else
     fprintf('no speed tuning\n');

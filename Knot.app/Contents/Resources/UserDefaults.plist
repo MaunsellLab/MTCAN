@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KNActiveTaskName</key>
+	<string>Fixation</string>
+	<key>KNDoDataDirectory</key>
+	<true/>
+	<key>KNWritingDataFile</key>
+	<false/>
+	<key>KNUseEyeLink</key>
+	<false/>
+	<key>KNUseMatlab</key>
+	<false/>
+	<key>KNUseNE500Pump</key>
+	<false/>
+	<key>KNAO0Calibration</key>
+	<string>/Library/Application Support/Knot/Calibrations/1PCalibration.txt</string>
+	<key>KNAO1Calibration</key>
+	<string>/Library/Application Support/Knot/Calibrations/2PCalibration.txt</string>
+	<key>LLProgStartLagMS</key>
+	<integer>0</integer>
+	<key>LLPhotodiodeStartLagMS</key>
+	<integer>0</integer>
+	<key>LLPhotodiodeOnLeft</key>
+	<true/>
+	<key>LLPhotodiodeOnRight</key>
+	<false/>
+	<key>LLUsePhotodiode</key>
+	<false/>
+	<key>LLUseSocket</key>
+	<false/>
+</dict>
+</plist>

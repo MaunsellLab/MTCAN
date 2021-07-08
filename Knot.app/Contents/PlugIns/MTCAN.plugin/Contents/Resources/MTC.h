@@ -91,7 +91,6 @@ typedef struct BlockStatus {
 } BlockStatus;
 
 // put parameters set in the behavior controller
-
 typedef struct BehaviorSetting {
 	long	blocks;
 	long	intertrialMS;
@@ -109,7 +108,6 @@ typedef struct BehaviorSetting {
 } BehaviorSetting;
 
 // put parameters set in the Stimulus controller
-
 typedef struct StimSetting {
 	long	stimDurationMS;
 	long	stimDurJitterPC;
@@ -125,14 +123,8 @@ typedef struct StimSetting {
 	float	polarAngleDeg;
 	float	driftDirectionDeg;
 	float	contrastPC;
-	short	numberOfSurrounds;
-	long	changeScale;
-	long	orientationChanges;
-	float	maxChangeDeg;
-	float	minChangeDeg;
 	long	changeRemains;
 } StimSetting;
-
 
 #ifndef	NoGlobals
 
@@ -140,7 +132,6 @@ typedef struct StimSetting {
 #define kMTCAcquireMSKey            @"MTCAcquireMS"
 #define kMTCAlphaTargetDetectionTaskKey @"MTCAlphaTargetDetectionTask"
 #define kMTCBlockLimitKey           @"MTCBlockLimit"
-#define kMTCChangeScaleKey          @"MTCChangeScale"
 #define kMTCCatchTrialPCKey         @"MTCCatchTrialPC"
 #define kMTCCatchTrialMaxPCKey      @"MTCCatchTrialMaxPC"
 #define kMTCCueMSKey                @"MTCCueMS"
@@ -174,44 +165,22 @@ typedef struct StimSetting {
 #define kMTCMapStimDurationMSKey    @"MTCMapStimDurationMS"
 #define kMTCStimDurationMSKey       @"MTCStimDurationMS"
 #define kMTCStimJitterPCKey         @"MTCStimJitterPC"
-#define kMTCOrientationChangesKey   @"MTCOrientationChanges"
-#define kMTCMaxDirChangeDegKey      @"MTCMaxDirChangeDeg"
-#define kMTCMinDirChangeDegKey      @"MTCMinDirChangeDeg"
 #define kMTCChangeRemainKey         @"MTCChangeRemain"
 #define kMTCChangeArrayKey          @"MTCChangeArray"
 #define kMTCRelDistContrastKey      @"MTCRelDistContrast"
 #define kMTCStimLeadMSKey           @"MTCStimLeadMS"
-#define kMTCStimRepsPerLocationKey     @"MTCStimRepsPerLocation"
+#define kMTCStimRepsPerLocationKey  @"MTCStimRepsPerLocation"
 #define kMTCStimTablesKey           @"MTCStimTables"
 #define kMTCStimTableCountsKey      @"MTCStimTableCounts"
 #define kMTCMapStimContrastPCKey    @"MTCMapStimContrastPC"
 #define kMTCTargetAlphaKey          @"MTCTargetAlpha"
 #define kMTCTargetRadiusKey         @"MTCTargetRadius"
 
-// Is there an ITC-18 dedicated to outputing digital words (to be Cerebus), or is it also used for controlling
-// juice rewards, etc.
-#define kMTCDedicatedITC18Key       @"MTCDedicatedITC18"
-
-#define kMTCMapTemporalModulationKey @"MTCMapTemporalModulation"
-#define kMTCConvertToPlaidKey       @"MTCConvertToPlaid"
-
-// Visual Stimulus Parameters
-
-#define kMTCSpatialPhaseDegKey      @"MTCSpatialPhaseDeg"
-#define kMTCTemporalFreqHzKey       @"MTCTemporalFreqHz"
-
-// Keys for change array
-
-#define kMTCChangeKey               @"change"
-#define kMTCValidRepsKey            @"validReps"
-#define kMTCInvalidRepsKey          @"invalidReps"
-
 extern long		argRand;
 
 #import "MTCStimuli.h"
 #import "MTCAN.h"
 
-//extern BlockStatus		    blockStatus;
 extern BehaviorSetting	    behaviorSetting;
 extern BOOL				    resetFlag;
 extern MTCAN                *task;

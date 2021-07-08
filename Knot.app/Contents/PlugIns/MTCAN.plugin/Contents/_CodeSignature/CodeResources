@@ -8,13 +8,9 @@
 		<data>
 		MiLKDDnrUKr4EmuvhS5VQwxHGK8=
 		</data>
-		<key>Resources/Base.lproj/MTCAN.nib/keyedobjects-101500.nib</key>
+		<key>Resources/Base.lproj/MTCAN.nib</key>
 		<data>
-		Ytxt3bTT+bYMiQ4I0cTd62+ywaM=
-		</data>
-		<key>Resources/Base.lproj/MTCAN.nib/keyedobjects-110000.nib</key>
-		<data>
-		WdNY8nEI3+TlKO6rTwze8Kp6Q74=
+		aeJJb+5e+kfJ75ubDGTuAVSwh34=
 		</data>
 		<key>Resources/Base.lproj/MTCBehaviorController.nib</key>
 		<data>
@@ -50,7 +46,7 @@
 		</data>
 		<key>Resources/MTC.h</key>
 		<data>
-		wG+bwzh80Swh2CUk1o9D2v1BOm0=
+		1t0r3NG+S1ettinKjr46SROzDDU=
 		</data>
 		<key>Resources/MTCAN.h</key>
 		<data>
@@ -118,7 +114,7 @@
 		</data>
 		<key>Resources/UserDefaults.plist</key>
 		<data>
-		JLyLRaQL7TfuupQSWVuaFlQSz7I=
+		QXnfK9jtjX6MXB+KuJK0zAI6Vds=
 		</data>
 	</dict>
 	<key>files2</key>
@@ -130,18 +126,11 @@
 			Oc8u4Ht7Mz58F50L9NeYpbcq9qTlhPUeZCcDu/pPyCg=
 			</data>
 		</dict>
-		<key>Resources/Base.lproj/MTCAN.nib/keyedobjects-101500.nib</key>
+		<key>Resources/Base.lproj/MTCAN.nib</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			yY2q0ngPcUF3N4TbViBlAm+PU9HPNn0TQJhEQ0XU4Ks=
-			</data>
-		</dict>
-		<key>Resources/Base.lproj/MTCAN.nib/keyedobjects-110000.nib</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			fUcvlWMd+xmjXUlQCST82m5caUUsW2T56XYYNpRFl/U=
+			Z8AkzhKTdiDSDDlWTrRG/6IWJ//ttyWF+htwcRKf/80=
 			</data>
 		</dict>
 		<key>Resources/Base.lproj/MTCBehaviorController.nib</key>
@@ -204,7 +193,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Y55/IDryQhLtHmwdYhuPl/YI/1WGVi4bb0l85brIroA=
+			QE+7+JFANenRXyJ8DLTHdwPG7Ed+lk6Q1HuhAsDsjTE=
 			</data>
 		</dict>
 		<key>Resources/MTCAN.h</key>
@@ -323,7 +312,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			gnutPFw2kZHVQF45yFoe+fqu52w4I0v7yC7Xc/90i64=
+			sqvtADQ9gNOwIrZrBqxr8w9j38iq/krhtFx21tdHVJE=
 			</data>
 		</dict>
 	</dict>

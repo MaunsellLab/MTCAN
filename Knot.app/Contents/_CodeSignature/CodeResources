@@ -171,7 +171,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			KRPoc2EgKC/dlHCv2ZjHx7Dcub4=
+			7hCyeYrnRDLejtIC/HpQKPjgHAY=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.lablib" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -180,7 +180,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			x2AsSb5Tehny0fjHSlQnP6VQd2k=
+			z/Q1znGEiAWCCYFYDLu0Luzq/BA=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.lablibMatlab" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -189,7 +189,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			geU3S789BNL65FUDbifXr5c5R6k=
+			KsfPWu30q4yJek+8TrqXzKmkI8k=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.fixate" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -198,7 +198,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			HOS+5LKzyWdg3blHCtQiEq6IBO8=
+			n6NCvQQTfXwAL+tjusjZaTppzHQ=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.GaborRFMap" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -216,7 +216,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			AR7FgB40uaRsvqiF39rfIh7TitU=
+			hRKb6WwE4auFlae9qDUO9QEG8t0=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.LLMouseDataDevice" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -225,7 +225,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			kTS71xKZBkTbQJmmXC49jBvdEaU=
+			rV4V4DrIUF9vWssfpP/D0szI1ag=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.LLNIDAQPlugin" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -234,7 +234,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			lp5xOYci047gzFoQWrNC59bor6k=
+			jvT7uEO2oTcZmQGtZB20sRyEKZs=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.LLSynthDataDevice" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -243,7 +243,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			W7KIMT39MId6+/zEvWAnCEq/oxs=
+			vxzQueUQFu6g3xNpVnN2nxyIfHU=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.MTCAN" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -252,7 +252,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			8FjD9jOaFNckjJMyDOlNuZHbb4g=
+			rdg1gcxmkxJyR5WyfKlSp5iENWE=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.OKernel" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -261,7 +261,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			Kv4hBzkKf6gUBe6SZOVIwrtUk7E=
+			Y+j2U3uhyiJsj2//KjRoJlIoxmU=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.RFMap" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -270,7 +270,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			2ofICnQOaJigpiJbwBV5cg017aw=
+			nQQDbRAQH4XDpV4RJH0bDMbiYJ0=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.Staircase" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -279,7 +279,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			+mier/oguIoTcrW5J2ik2ImJ2fs=
+			JBEVGOyp0TaGzyDwxLrvfByg9/w=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.StimQuench" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -288,7 +288,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			5XTbrl0gCRQurCcyEVJQv0Lt7/8=
+			e3iTD19Urkz200BZ3OjRFLqkH0s=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.VFMap" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>

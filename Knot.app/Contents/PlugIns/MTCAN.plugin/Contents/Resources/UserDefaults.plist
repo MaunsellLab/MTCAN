@@ -113,10 +113,8 @@
 			<integer>0</integer>
 		</dict>
 	</array>
-	<key>MTCChangeRemain</key>
+	<key>MTCChangePersists</key>
 	<true/>
-	<key>MTCChangeScale</key>
-	<integer>0</integer>
 	<key>MTCContrast</key>
 	<integer>100</integer>
 	<key>MTCContrastFactor</key>
@@ -187,20 +185,14 @@
 	<real>90</real>
 	<key>MTCMaxContrast</key>
 	<integer>100</integer>
-	<key>MTCMaxDirChangeDeg</key>
-	<real>90</real>
 	<key>MTCMaxTargetMS</key>
 	<integer>5000</integer>
 	<key>MTCMeanTargetMS</key>
 	<integer>2500</integer>
-	<key>MTCMinDirChangeDeg</key>
-	<real>5</real>
 	<key>MTCMinTargetMS</key>
 	<integer>200</integer>
 	<key>MTCNumInstructTrials</key>
 	<integer>2</integer>
-	<key>MTCOrientationChanges</key>
-	<integer>8</integer>
 	<key>MTCPrecueMS</key>
 	<integer>250</integer>
 	<key>MTCRandTaskGaborDirection</key>

@@ -49,7 +49,7 @@ function [] = plotOneChannelTemporalFreqHz(channel, file, trials)
       'horizontalAlignment', 'left',  'verticalAlignment', 'top');
 
   % cartesian plot of speed tuning
-  for i = 1:numSpeed
+  for i = numSpeed:-1:1
     spikeMean(i) = mean(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
     spikeSD(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS;
     spikeSEM(i) = std(spikeCounts(i, 1:numStim(i))) * 1000.0 / stimDurMS / sqrt(numStim(i));

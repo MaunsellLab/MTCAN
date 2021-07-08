@@ -1,6 +1,6 @@
 function testData()
 
-  fileName = 'testa00.dat';
+  fileName = 'testc00.dat';
 %   convertGRF(fileName);
   
   dirs = targetDirectories();

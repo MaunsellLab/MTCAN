@@ -22,7 +22,6 @@
 	long				recentComputer;			// Count of trials with computer certification errors
     long				recentEOTs[kEOTTypes];
     long				recentEOTTotal;
-	StimParams			stimParams;
     long 				taskMode;
 
     IBOutlet			LLEOTView *dayPlot;

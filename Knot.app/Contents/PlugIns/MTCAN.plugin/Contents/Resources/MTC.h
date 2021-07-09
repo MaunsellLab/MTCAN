@@ -12,9 +12,6 @@
 
 // The following should be changed to be unique for each application
 
-//typedef enum {kFirstGabor = 0, kTaskGabor = 0, kMapGabor0, kMapGabor1, kGabors} GaborType;
-//typedef enum {kFirstGabor = 0, kTaskGabor = 0, kGabors} GaborType;
-
 typedef NS_ENUM (long, LocType) {kGabor0 = 0, kGabor1, kGaborFar0, kGaborFar1, kNumLocations};
 typedef NS_ENUM (short, ListType)  {kNilStim = 0, kValidStim, kTargetStim, kFrontPadding, kBackPadding, kListTypes};
 typedef NS_ENUM (short, RFStimType) {kNoStim = 0, kNullStim, kPrefStim, kRFStimTypes};
@@ -41,12 +38,6 @@ enum {
 #define kRadiansPerDeg      (kPI / 180.0)
 #define kDegPerRadian       (180.0 / kPI)
 #define kStimPerLocation    (kRFStimTypes * kRFStimTypes)
-
-typedef struct {
-	long	levels;				// number of active stimulus levels
-	float   maxValue;			// maximum stimulus value (i.e., direction change in degree)
-	float   minValue;			// minimum stimulus value
-} StimParams;
 
 typedef struct StimDesc {
     ListType listTypes[kNumLocations];        // list type (valid, target, padding, etc.)
@@ -89,6 +80,12 @@ typedef struct BlockStatus {
     long    locationsDone;                  // number of blocks to complete at one location before moving to another
     long    blocksDone;
 } BlockStatus;
+
+typedef struct {
+    long trials;
+    float threshold;
+    float confidenceInterval;
+} QuestResults;
 
 // put parameters set in the behavior controller
 typedef struct BehaviorSetting {
@@ -154,15 +151,15 @@ typedef struct StimSetting {
 #define kMTCTaskStatusKey           @"MTCTaskStatus"
 
 // Stimulus Parameters
+#define kMTCRFAzimuthDegKey         @"MTCRFAzimuthDeg"
+#define kMTCRFElevationDegKey       @"MTCRFElevationDeg"
 #define kMTCChangePersistsKey       @"MTCChangePersists"
 #define kMTCDirectionDegKey         @"MTCDirectionDeg"
+#define kMTCGaborSepDegKey          @"MTCGaborSepDeg"
 #define kMTCInterstimJitterPCKey    @"MTCInterstimJitterPC"
 #define kMTCInterstimJitterTauMSKey @"kMTCInterstimJitterTauMS"
 #define kMTCInterstimMSKey          @"MTCInterstimMS"
 #define kMTCInvalidTrialPCKey       @"MTCInvalidTrialPC"
-#define kMTCMapInterstimDurationMSKey @"MTCMapInterstimDurationMS"
-#define kMTCMappingBlocksKey        @"MTCMappingBlocks"
-#define kMTCMapStimDurationMSKey    @"MTCMapStimDurationMS"
 #define kMTCStimDurationMSKey       @"MTCStimDurationMS"
 #define kMTCStimJitterPCKey         @"MTCStimJitterPC"
 #define kMTCChangeRemainKey         @"MTCChangeRemain"

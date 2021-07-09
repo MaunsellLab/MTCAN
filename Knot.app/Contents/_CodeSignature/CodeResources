@@ -171,7 +171,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			7hCyeYrnRDLejtIC/HpQKPjgHAY=
+			NiBbsPFbBVJRuE90BKVlHhPBpfw=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.lablib" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -243,7 +243,7 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			vxzQueUQFu6g3xNpVnN2nxyIfHU=
+			MZUZo1N+1ywcKTCAeQEzSK3MBco=
 			</data>
 			<key>requirement</key>
 			<string>identifier "org.lablib.MTCAN" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: John Maunsell (FS48R2XURK)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>

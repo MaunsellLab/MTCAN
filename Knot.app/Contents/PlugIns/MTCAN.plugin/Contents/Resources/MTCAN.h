@@ -12,8 +12,6 @@
 #import "MTCRoundToStimCycle.h"
 #import "MTCStateSystem.h"
 
-@class MTCMapStimTable;
-
 @interface MTCAN:LLTaskPlugIn {
 
     NSWindowController      *behaviorController;

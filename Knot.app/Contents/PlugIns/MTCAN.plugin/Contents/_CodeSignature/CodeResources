@@ -10,7 +10,7 @@
 		</data>
 		<key>Resources/Base.lproj/MTCAN.nib</key>
 		<data>
-		aeJJb+5e+kfJ75ubDGTuAVSwh34=
+		218o3/MiVSS45ShRe8pQSCOxMLE=
 		</data>
 		<key>Resources/Base.lproj/MTCBehaviorController.nib</key>
 		<data>
@@ -32,10 +32,6 @@
 		<data>
 		PUkOztDbeKtRXzbfUP2GLs2FzQY=
 		</data>
-		<key>Resources/Base.lproj/MTCStimulusMapping.nib</key>
-		<data>
-		cmRFJZezuWAV5uKHPVMSG23disk=
-		</data>
 		<key>Resources/Base.lproj/MTCSummaryController.nib/keyedobjects-101500.nib</key>
 		<data>
 		EcD74u+gsqIJlD55icuEzqwKxFA=
@@ -46,11 +42,11 @@
 		</data>
 		<key>Resources/MTC.h</key>
 		<data>
-		1t0r3NG+S1ettinKjr46SROzDDU=
+		pKimbfPjAJ3JKDwLgp6S3yxTVXY=
 		</data>
 		<key>Resources/MTCAN.h</key>
 		<data>
-		SKU3i6bnI7iEpGqKDH6udymsoSQ=
+		cvd6hPwoD/Wp282qWhvr+1Lk/nY=
 		</data>
 		<key>Resources/MTCBehaviorController.h</key>
 		<data>
@@ -82,7 +78,7 @@
 		</data>
 		<key>Resources/MTCSpikeController.h</key>
 		<data>
-		sDynV7bO4BGhdwa+uO71PkKkRHM=
+		wM1brhDAlm/+WZCWnw9SAZV7oww=
 		</data>
 		<key>Resources/MTCStarttrialState.h</key>
 		<data>
@@ -106,7 +102,7 @@
 		</data>
 		<key>Resources/MTCSummaryController.h</key>
 		<data>
-		RAtLDBtZ6WJO1E5RmNaYlj/KFyQ=
+		7DhdKuI0MlzVUQ1Aa4M9idAMzDs=
 		</data>
 		<key>Resources/Read Me.rtf</key>
 		<data>
@@ -114,7 +110,7 @@
 		</data>
 		<key>Resources/UserDefaults.plist</key>
 		<data>
-		QXnfK9jtjX6MXB+KuJK0zAI6Vds=
+		ugyBqIHyFQQynEbNW0YzpzxfPcw=
 		</data>
 	</dict>
 	<key>files2</key>
@@ -130,7 +126,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Z8AkzhKTdiDSDDlWTrRG/6IWJ//ttyWF+htwcRKf/80=
+			ozPvqikoPAGvBGTDN3kqTcd7jScnqCKD1gVW9mue5EU=
 			</data>
 		</dict>
 		<key>Resources/Base.lproj/MTCBehaviorController.nib</key>
@@ -168,13 +164,6 @@
 			LcwrCQ1qg3GbtoUEyjlwFXx8n2mpvXp932JguNgri4g=
 			</data>
 		</dict>
-		<key>Resources/Base.lproj/MTCStimulusMapping.nib</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			t8dBVf12MrhlazjwyITBf8EAEDmsanQNk0oRIOqz6jM=
-			</data>
-		</dict>
 		<key>Resources/Base.lproj/MTCSummaryController.nib/keyedobjects-101500.nib</key>
 		<dict>
 			<key>hash2</key>
@@ -193,14 +182,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			QE+7+JFANenRXyJ8DLTHdwPG7Ed+lk6Q1HuhAsDsjTE=
+			PB//wnhr4C2p73yEOZUmbmFq9LsyRWpB9Mv68Rim5qU=
 			</data>
 		</dict>
 		<key>Resources/MTCAN.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			QZZwNzyVAr9wDb9s98DJ0QBEDCDrQmivu1DZ6M9dtds=
+			MIka86fXkzOCATQF/Mm3opb/zQ5kpiTRpAUWKwIxsnQ=
 			</data>
 		</dict>
 		<key>Resources/MTCBehaviorController.h</key>
@@ -256,7 +245,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			SIyNP+FvYJiXTMFQ0BSdl7RhKXIoitnhdtbywwjMnIQ=
+			79l5SFMhIUVZKGhhZfi9kKIpUtXZxPzSa1Dt6YzqU/M=
 			</data>
 		</dict>
 		<key>Resources/MTCStarttrialState.h</key>
@@ -298,7 +287,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Y6Tfv39xyW+PdMB23iPiuSWeFP0IuCB549SVL83s0M4=
+			vI+59/I3EOeH2mmHPk+CuCzyqHvZxu73iDjhRqkOF7Y=
 			</data>
 		</dict>
 		<key>Resources/Read Me.rtf</key>
@@ -312,7 +301,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			sqvtADQ9gNOwIrZrBqxr8w9j38iq/krhtFx21tdHVJE=
+			K20u31NA3mk9i59uk2iEbTgKTRXZjWtUiVGS7WX6wxw=
 			</data>
 		</dict>
 	</dict>

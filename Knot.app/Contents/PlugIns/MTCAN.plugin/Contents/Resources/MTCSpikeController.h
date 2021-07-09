@@ -24,7 +24,6 @@ enum PlotTypes {kDirectionPlot = 0, kContrastPlot, kTFPlot, kSFPlot, kSigmaPlot,
 //    long			interstimDurMS;
 //    NSMutableArray	*labelArray;
 //	BlockStatus		lastBlockStatus;
-//	StimParams		lastStimParams;
 //    MapSettings     mapSettings[kNumSpikeChannels];
 //    NSMutableArray	*rates[kNumSpikeChannels][kNumPlots];          //  LLNormDist for plotting
 //    LLPlotView		*ratePlots[kNumSpikeChannels][kNumPlots];

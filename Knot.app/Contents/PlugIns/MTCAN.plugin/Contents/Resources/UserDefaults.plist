@@ -14,105 +14,6 @@
 	<real>5</real>
 	<key>MTCCatchTrialMaxPC</key>
 	<real>5</real>
-	<key>MTCChangeArray</key>
-	<array>
-		<dict>
-			<key>change</key>
-			<integer>2</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>4</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>6</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>8</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>10</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>12</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>14</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>16</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>18</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>20</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>22</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>change</key>
-			<integer>24</integer>
-			<key>validReps</key>
-			<integer>1</integer>
-			<key>invalidReps</key>
-			<integer>0</integer>
-		</dict>
-	</array>
 	<key>MTCChangePersists</key>
 	<true/>
 	<key>MTCContrast</key>
@@ -177,8 +78,6 @@
 	<integer>250</integer>
 	<key>MTCInvalidTrialPC</key>
 	<integer>10</integer>
-	<key>New item</key>
-	<string></string>
 	<key>MTCKdlPhiDeg</key>
 	<real>180</real>
 	<key>MTCKdlThetaDeg</key>
@@ -195,6 +94,8 @@
 	<integer>2</integer>
 	<key>MTCPrecueMS</key>
 	<integer>250</integer>
+	<key>MTCRadiusDeg</key>
+	<real>8</real>
 	<key>MTCRandTaskGaborDirection</key>
 	<false/>
 	<key>MTCRelDistractorProb</key>
@@ -203,8 +104,12 @@
 	<real>0.25</real>
 	<key>MTCRespWindowWidthDeg</key>
 	<real>2</real>
-	<key>MTCRadiusDeg</key>
-	<real>8</real>
+	<key>MTCRFAzimuthDeg</key>
+	<real>2</real>
+	<key>MTCRFElevationDeg</key>
+	<integer>-2</integer>
+	<key>MTCGaborSepDeg</key>
+	<integer>30</integer>
 	<key>MTCSaccadeTimeMS</key>
 	<integer>200</integer>
 	<key>MTCSeparationDeg</key>
@@ -269,7 +174,5 @@
 	<true/>
 	<key>MTCTrialWindowZoom</key>
 	<integer>100</integer>
-	<key>MTCTries</key>
-	<integer>1</integer>
 </dict>
 </plist>

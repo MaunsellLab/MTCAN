@@ -5,7 +5,7 @@ import numpy as np
 allTrials = sp.loadmat('xxx.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 
-locLsts = [[],[],[],[]] 
+locDict = {0:{'seq':[],'count':[1]*9},1:{'seq':[],'count':[1]*9},2:{'seq':[],'count':[1]*9},3:{'seq':[],'count':[1]*9}}
 lastStim = [[],[],[],[]] 
 currStim = [[],[],[],[]]
 
@@ -22,6 +22,7 @@ for i in range(0,len(allTrialsData.item()[0])-1):
             for count, d in enumerate(stimDesc.item()['data'].item()['listTypes']):
                 if 2 in d:
                     targetOnsetStim = count
+                    break
             attendLoc = trial.item()['data'].item()['attendLoc'].tolist()
             stimSeqCheck(attendLoc)
 
@@ -37,16 +38,17 @@ def stimSeqCheck(attendLoc):
              print statement if something is out of sequence
     '''
     for d in stimDesc.item()['data'].item()['stimTypes'][1:targetOnsetStim]:
-        if len(locLsts[attendLoc]) < 9:
-            locLsts[attendLoc].append(d[2:4].tolist())
+        if len(locDict[attendLoc]['seq']) < 9:
+            locDict[attendLoc]['seq'].append(d[2:4].tolist())
             lastStim[attendLoc] = d[2:4].tolist()
         else:
-            indexLastStim = [(count,i) for count, i in enumerate(locLsts[attendLoc]) \
+            indexLastStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
                 if i == lastStim[attendLoc]]
             currStim[attendLoc] = d[2:4].tolist()
-            indexCurrStim = [(count,i) for count, i in enumerate(locLsts[attendLoc]) \
+            indexCurrStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
                 if i == currStim[attendLoc]]
-            if indexLastStim[0][0] == len(locLsts[attendLoc]) - 1:
+            locDict[attendLoc]['count'][indexCurrStim[0][0]] += 1
+            if indexLastStim[0][0] == len(locDict[attendLoc]['seq']) - 1:
                 if indexCurrStim[0][0] != 0:
                     print('start sequence not in correct order')
             else:

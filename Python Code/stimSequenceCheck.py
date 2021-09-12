@@ -1,30 +1,10 @@
 import scipy.io as sp
 import numpy as np
 
-#importing mat file with multiple trials
-allTrials = sp.loadmat('xxx.mat', squeeze_me = True)
+# Import .mat file with multiple trials
+allTrials = sp.loadmat('alltrials_testing_2021_0911.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 
-locDict = {0:{'seq':[],'count':[1]*9},1:{'seq':[],'count':[1]*9},2:{'seq':[],'count':[1]*9},3:{'seq':[],'count':[1]*9}}
-lastStim = [[],[],[],[]] 
-currStim = [[],[],[],[]]
-
-#to run through diff trials 
-for i in range(0,len(allTrialsData.item()[0])-1):
-    print(i)
-    currTrial = allTrialsData.item()[0][i]
-    trial = currTrial['trial']
-    trialEnd = currTrial['trialEnd']
-
-    if trialEnd.item()['data'] == 0: 
-        if trial.item()['data'].item()['instructTrial'] == 0:
-            stimDesc = currTrial['stimDesc']
-            for count, d in enumerate(stimDesc.item()['data'].item()['listTypes']):
-                if 2 in d:
-                    targetOnsetStim = count
-                    break
-            attendLoc = trial.item()['data'].item()['attendLoc'].tolist()
-            stimSeqCheck(attendLoc)
 
 def stimSeqCheck(attendLoc):
     '''
@@ -33,8 +13,8 @@ def stimSeqCheck(attendLoc):
     sequence that was generated. 
 
     inputs: attendedLoc (integer)
-    outputs: appends to locLsts (list of lists), where 0,1,2,3 describe 
-             attended loc
+    outputs: appends to locDict (dictionary of dictionaries), where 0,1,2,3 
+             describe the attended location
              print statement if something is out of sequence
     '''
     for d in stimDesc.item()['data'].item()['stimTypes'][1:targetOnsetStim]:
@@ -55,3 +35,23 @@ def stimSeqCheck(attendLoc):
                 if indexCurrStim[0][0] != indexLastStim[0][0] + 1:
                     print('middle sequence not in correct order')
             lastStim[attendLoc] = currStim[attendLoc]
+
+
+locDict = {0:{'seq':[],'count':[1]*9},1:{'seq':[],'count':[1]*9},2:{'seq':[],'count':[1]*9},3:{'seq':[],'count':[1]*9}}
+lastStim = [[],[],[],[]] 
+currStim = [[],[],[],[]]
+
+for i in range(0,len(allTrialsData.item()[0])-1):
+    currTrial = allTrialsData.item()[0][i]
+    trial = currTrial['trial']
+    trialEnd = currTrial['trialEnd']
+
+    if trialEnd.item()['data'] == 0: 
+        if trial.item()['data'].item()['instructTrial'] == 0:
+            stimDesc = currTrial['stimDesc']
+            for count, d in enumerate(stimDesc.item()['data'].item()['listTypes']):
+                if 2 in d:
+                    targetOnsetStim = count
+                    break
+            attendLoc = trial.item()['data'].item()['attendLoc'].tolist()
+            stimSeqCheck(attendLoc)

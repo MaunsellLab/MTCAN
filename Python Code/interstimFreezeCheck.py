@@ -5,14 +5,19 @@ import numpy as np
 # header and all trials saved 
 allTrials = sp.loadmat('alltrials_testing_2021_0912.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
-header = allTrials['header']
-
-frameRateHz = header['frameRateHz'].item()['data'].tolist()
-stimDur = header['stimSetting'].item()['data'].item()['stimDurationMS'].tolist()
 
 
-for i in range(0,len(allTrialsData.item()[0])-1):
-    currTrial = allTrialsData.item()[0][i]
+def interstimFreezeCheck(currTrial):
+    '''
+    takes the current trial and sees if the stimulus presentations have frozen
+    interstim time / compares it to the expected interstim time
+    '''
+
+    frameRateHz = header['frameRateHz'].item()['data'].tolist()
+    stimDur = header['stimSetting'].item()['data'].item()['stimDurationMS'].tolist()
+
+    stimDesc = currTrial['stimDesc']
+    for d in stimDesc.item #### cont. statement for frame on and frame off
 
     # does every trial have a stimDesc field/ sufficient to check 'frozen' 
     # interstim time only on valid trials (i.e. exclude instruction trials?)

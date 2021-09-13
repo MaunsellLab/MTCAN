@@ -4,6 +4,7 @@ import numpy as np
 # Import .mat file with multiple trials
 allTrials = sp.loadmat('alltrials_testing_2021_0912.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
+header = allTrials['header']
 
 
 def stimSeqCheck(attendLoc):

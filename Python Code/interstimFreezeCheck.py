@@ -12,3 +12,8 @@ frameRateHz = header['frameRateHz'].item()['data'].tolist()
 stimDuration = header['stimSetting'].item()['data'].item()['stimDurationMS'].tolist()
 
 
+for i in range(0,len(allTrialsData.item()[0])-1):
+    currTrial = allTrialsData.item()[0][i]
+
+    # does every trial have a stimDesc field/ sufficient to check 'frozen' 
+    # interstim time only on valid trials (i.e. exclude instruction trials?)

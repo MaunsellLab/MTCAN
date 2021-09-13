@@ -1,8 +1,13 @@
-header = readLLFile('i', 'testing_2021_0912.dat');
+clear all
 
-trials = struct()
+fileName = 'Meetz_2021_08_25.dat'
+
+header = readLLFile('i', fileName);
+trials = struct();
 for i = 1:header.numberOfTrials
     trials.trials{i} = readLLFile('t', i);
 end
 
-% trials.trials = reshape(trials.trials, [length(trials.trials),1])
+cd '../Matlab Data'/
+fileName = strrep(fileName, '.dat', '.mat');
+save(fileName, 'trials', 'header');

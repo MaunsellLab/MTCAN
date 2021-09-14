@@ -4,7 +4,7 @@ import numpy as np
 # when importing .mat file, make sure it is the combined file with both the 
 # header and all trials saved 
 # this imports all trials within a .mat file and the accompanying header file
-allTrials = sp.loadmat('alltrials_testing_2021_0912.mat', squeeze_me = True)
+allTrials = sp.loadmat('testing_2021_0912.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 header = allTrials['header']
 
@@ -20,10 +20,18 @@ def stimSeqCheck(attendLoc):
              describe the attended location
              print statement if something is out of sequence
     '''
-    for d in stimDesc.item()['data'].item()['stimTypes'][1:targetOnsetStim]:
+    
+    # for d in stimDesc.item()[1:targetOnsetStim]:
+    #      if len(locDict[attendLoc]['seq']) < 9:
+    #          locDict[attendLoc]['seq'].append(d['stimTypes'][2:4].tolist())
+    #          lastStim[attendLoc] = d['stimTypes'][2:4].tolist()
+
+    for d in stimDesc.item()['stimTypes'][1:targetOnsetStim]:
         if len(locDict[attendLoc]['seq']) < 9:
             locDict[attendLoc]['seq'].append(d[2:4].tolist())
             lastStim[attendLoc] = d[2:4].tolist()
+            # interstim = 
+            # locDict[attendLoc]['interstim'].append
         else:
             indexLastStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
                 if i == lastStim[attendLoc]]
@@ -40,7 +48,10 @@ def stimSeqCheck(attendLoc):
             lastStim[attendLoc] = currStim[attendLoc]
 
 
-locDict = {0:{'seq':[],'count':[1]*9},1:{'seq':[],'count':[1]*9},2:{'seq':[],'count':[1]*9},3:{'seq':[],'count':[1]*9}}
+locDict = {0:{'seq':[],'count':[1]*9},'interstim':[],
+           1:{'seq':[],'count':[1]*9},'interstim':[],
+           2:{'seq':[],'count':[1]*9},'interstim':[],
+           3:{'seq':[],'count':[1]*9},'interstim':[]}
 lastStim = [[],[],[],[]] 
 currStim = [[],[],[],[]]
 
@@ -51,8 +62,8 @@ for i in range(0,len(allTrialsData.item()[0])-1):
 
     if trialEnd.item()['data'] == 0: 
         if trial.item()['data'].item()['instructTrial'] == 0:
-            stimDesc = currTrial['stimDesc']
-            for count, d in enumerate(stimDesc.item()['data'].item()['listTypes']):
+            stimDesc = currTrial['stimDesc'].item()['data']
+            for count, d in enumerate(stimDesc.item()['listTypes']):
                 if 2 in d:
                     targetOnsetStim = count
                     break

@@ -21,21 +21,25 @@ def stimSeqCheck(attendLoc):
              print statement if something is out of sequence
     '''
     
-    # for d in stimDesc.item()[1:targetOnsetStim]:
-    #      if len(locDict[attendLoc]['seq']) < 9:
-    #          locDict[attendLoc]['seq'].append(d['stimTypes'][2:4].tolist())
-    #          lastStim[attendLoc] = d['stimTypes'][2:4].tolist()
 
-    for d in stimDesc.item()['stimTypes'][1:targetOnsetStim]:
-        if len(locDict[attendLoc]['seq']) < 9:
-            locDict[attendLoc]['seq'].append(d[2:4].tolist())
-            lastStim[attendLoc] = d[2:4].tolist()
+    # for d in stimDesc.item()['stimTypes'][1:targetOnsetStim]:
+    #     if len(locDict[attendLoc]['seq']) < 9:
+    #         locDict[attendLoc]['seq'].append(d[2:4].tolist())
+    #         lastStim[attendLoc] = d[2:4].tolist()
             # interstim = 
             # locDict[attendLoc]['interstim'].append
+    frameOff = stimDesc.item()['stimOffFrame'][0]
+    for d in stimDesc.item()[1:targetOnsetStim]:
+        if len(locDict[attendLoc]['seq']) < 9:
+            locDict[attendLoc]['seq'].append(d['stimTypes'][2:4].tolist())
+            lastStim[attendLoc] = d['stimTypes'][2:4].tolist()
+            interstim = d['stimOnFrame'] - frameOff
+            frameOff = d['stimOffFrame']
+            locDict[attendLoc]['interstim'].append(interstim)
         else:
             indexLastStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
                 if i == lastStim[attendLoc]]
-            currStim[attendLoc] = d[2:4].tolist()
+            currStim[attendLoc] = d['stimTypes'][2:4].tolist()
             indexCurrStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
                 if i == currStim[attendLoc]]
             locDict[attendLoc]['count'][indexCurrStim[0][0]] += 1
@@ -48,10 +52,10 @@ def stimSeqCheck(attendLoc):
             lastStim[attendLoc] = currStim[attendLoc]
 
 
-locDict = {0:{'seq':[],'count':[1]*9},'interstim':[],
-           1:{'seq':[],'count':[1]*9},'interstim':[],
-           2:{'seq':[],'count':[1]*9},'interstim':[],
-           3:{'seq':[],'count':[1]*9},'interstim':[]}
+locDict = {0:{'seq':[],'count':[1]*9,'interstim':[]},
+           1:{'seq':[],'count':[1]*9,'interstim':[]},
+           2:{'seq':[],'count':[1]*9,'interstim':[]},
+           3:{'seq':[],'count':[1]*9,'interstim':[]}}
 lastStim = [[],[],[],[]] 
 currStim = [[],[],[],[]]
 

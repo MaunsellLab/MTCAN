@@ -11,17 +11,20 @@ header = allTrials['header']
 
 def stimSeqCheck(attendLoc):
     '''
-    Function to create a stimulus seq based on attended location.
-    Function will also ensure that subsequence trials follow the stimulus
-    sequence that was generated. 
+    Function to create a stimulus seq based on attended location and this 
+    function will also ensure that subsequence trials follow the stimulus
+    sequence that was generated. In addition, the function will generat a list
+    of interstim frames in between each stimulus config and check to see that
+    the list is frozen during entire dataset.
 
     inputs: attendedLoc (integer)
     outputs: appends to locDict (dictionary of dictionaries), where 0,1,2,3 
              describe the attended location
-             print statement if something is out of sequence
+             print statement if something is out of sequence (stim sequence or
+             interstim sequence)
     '''
-    
-    
+
+
     frameOff = stimDesc.item()['stimOffFrame'][0]
     for d in stimDesc.item()[1:targetOnsetStim]:
         if len(locDict[attendLoc]['seq']) < 9:

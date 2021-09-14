@@ -21,13 +21,7 @@ def stimSeqCheck(attendLoc):
              print statement if something is out of sequence
     '''
     
-
-    # for d in stimDesc.item()['stimTypes'][1:targetOnsetStim]:
-    #     if len(locDict[attendLoc]['seq']) < 9:
-    #         locDict[attendLoc]['seq'].append(d[2:4].tolist())
-    #         lastStim[attendLoc] = d[2:4].tolist()
-            # interstim = 
-            # locDict[attendLoc]['interstim'].append
+    
     frameOff = stimDesc.item()['stimOffFrame'][0]
     for d in stimDesc.item()[1:targetOnsetStim]:
         if len(locDict[attendLoc]['seq']) < 9:
@@ -50,6 +44,10 @@ def stimSeqCheck(attendLoc):
                 if indexCurrStim[0][0] != indexLastStim[0][0] + 1:
                     print('middle sequence not in correct order')
             lastStim[attendLoc] = currStim[attendLoc]
+            if d['stimOnFrame'] - frameOff != locDict[attendLoc]['interstim'][indexCurrStim[0][0]]:
+                print('interstim seq not frozen')
+            else:
+                frameOff = d['stimOffFrame']
 
 
 locDict = {0:{'seq':[],'count':[1]*9,'interstim':[]},

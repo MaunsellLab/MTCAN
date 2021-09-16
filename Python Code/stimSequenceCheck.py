@@ -4,9 +4,17 @@ import numpy as np
 # when importing .mat file, make sure it is the combined file with both the 
 # header and all trials saved 
 # this imports all trials within a .mat file and the accompanying header file
-allTrials = sp.loadmat('testing_2021_0912.mat', squeeze_me = True)
+allTrials = sp.loadmat('Meetz_2021_08_25.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 header = allTrials['header']
+
+
+locDict = {0:{'seq':[],'count':[1]*9,'interstim':[]},
+           1:{'seq':[],'count':[1]*9,'interstim':[]},
+           2:{'seq':[],'count':[1]*9,'interstim':[]},
+           3:{'seq':[],'count':[1]*9,'interstim':[]}}
+lastStim = [[],[],[],[]] 
+currStim = [[],[],[],[]]
 
 
 def stimSeqCheck(attendLoc):
@@ -53,24 +61,16 @@ def stimSeqCheck(attendLoc):
                 frameOff = d['stimOffFrame']
 
 
-locDict = {0:{'seq':[],'count':[1]*9,'interstim':[]},
-           1:{'seq':[],'count':[1]*9,'interstim':[]},
-           2:{'seq':[],'count':[1]*9,'interstim':[]},
-           3:{'seq':[],'count':[1]*9,'interstim':[]}}
-lastStim = [[],[],[],[]] 
-currStim = [[],[],[],[]]
+for currTrial in allTrialsData.item()[0]:
+    trial = currTrial['trial'].item()['data'].item()
+    trialEnd = currTrial['trialEnd'].item()['data']
 
-for i in range(0,len(allTrialsData.item()[0])-1):
-    currTrial = allTrialsData.item()[0][i]
-    trial = currTrial['trial']
-    trialEnd = currTrial['trialEnd']
-
-    if trialEnd.item()['data'] == 0: 
-        if trial.item()['data'].item()['instructTrial'] == 0:
+    if trialEnd == 0: 
+        if trial['instructTrial'] == 0:
             stimDesc = currTrial['stimDesc'].item()['data']
             for count, d in enumerate(stimDesc.item()['listTypes']):
                 if 2 in d:
                     targetOnsetStim = count
                     break
-            attendLoc = trial.item()['data'].item()['attendLoc'].tolist()
+            attendLoc = trial['attendLoc'].tolist()
             stimSeqCheck(attendLoc)

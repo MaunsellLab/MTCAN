@@ -42,20 +42,18 @@ def stimSeqCheck(attendLoc):
             frameOff = d['stimOffFrame']
             locDict[attendLoc]['interstim'].append(interstim)
         else:
-            indexLastStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
-                if i == lastStim[attendLoc]]
+            indexLastStim = locDict[attendLoc]['seq'].index(lastStim[attendLoc])
             currStim[attendLoc] = d['stimTypes'][2:4].tolist()
-            indexCurrStim = [(count,i) for count, i in enumerate(locDict[attendLoc]['seq']) \
-                if i == currStim[attendLoc]]
-            locDict[attendLoc]['count'][indexCurrStim[0][0]] += 1
-            if indexLastStim[0][0] == len(locDict[attendLoc]['seq']) - 1:
-                if indexCurrStim[0][0] != 0:
+            indexCurrStim = locDict[attendLoc]['seq'].index(currStim[attendLoc])
+            locDict[attendLoc]['count'][indexCurrStim] += 1
+            if indexLastStim == len(locDict[attendLoc]['seq']) - 1:
+                if indexCurrStim != 0:
                     print('start sequence not in correct order')
             else:
-                if indexCurrStim[0][0] != indexLastStim[0][0] + 1:
+                if indexCurrStim != indexLastStim + 1:
                     print('middle sequence not in correct order')
             lastStim[attendLoc] = currStim[attendLoc]
-            if d['stimOnFrame'] - frameOff != locDict[attendLoc]['interstim'][indexCurrStim[0][0]]:
+            if d['stimOnFrame'] - frameOff != locDict[attendLoc]['interstim'][indexCurrStim]:
                 print('interstim seq not frozen')
             else:
                 frameOff = d['stimOffFrame']

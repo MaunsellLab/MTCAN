@@ -1,6 +1,6 @@
-clear all
+clear 
 
-fileName = 'Meetz_2021_08_25.dat'
+fileName = 'Meetz_2021_1021_4.dat';
 
 header = readLLFile('i', fileName);
 trials = struct();

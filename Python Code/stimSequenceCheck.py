@@ -1,5 +1,6 @@
 import scipy.io as sp
 import numpy as np
+import matplotlib.pyplot as plt
 
 # when importing .mat file, make sure it is the combined file with both the 
 # header and all trials saved 

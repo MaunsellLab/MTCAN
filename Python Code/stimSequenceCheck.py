@@ -34,8 +34,8 @@ def stimSeqCheck(attendLoc):
     '''
 
 
-    frameOff = stimDesc.item()['stimOffFrame'][0]
-    for d in stimDesc.item()[1:targetOnsetStim]:
+    frameOff = stimDesc['stimOffFrame'][0]
+    for d in stimDesc[1:targetOnsetStim]:
         if len(locDict[attendLoc]['seq']) < 9:
             locDict[attendLoc]['seq'].append(d['stimTypes'][2:4].tolist())
             lastStim[attendLoc] = d['stimTypes'][2:4].tolist()
@@ -66,8 +66,8 @@ for currTrial in allTrialsData.item()[0]:
 
     if trialEnd == 0: 
         if trial['instructTrial'] == 0:
-            stimDesc = currTrial['stimDesc'].item()['data']
-            for count, d in enumerate(stimDesc.item()['listTypes']):
+            stimDesc = currTrial['stimDesc'].item()['data'].item()
+            for count, d in enumerate(stimDesc['listTypes']):
                 if 2 in d:
                     targetOnsetStim = count
                     break

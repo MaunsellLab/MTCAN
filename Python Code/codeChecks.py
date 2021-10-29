@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-allTrials = sp.loadmat('Meetz_2021_1021_4.mat', squeeze_me = True)
+allTrials = sp.loadmat('Meetz_2021_1027_1.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 
 # code to check whether valid RT are being rewarded or not
@@ -31,7 +31,7 @@ earlyWithRT = []
 for n, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
     if extendedEOT == 6 and 'targetOn' in currTrial.dtype.names and 'reactTimeMS' in currTrial.dtype.names:
-        earlyWithRT.append(currTrial['reactTimeMS'].item()['data'].item())
+        earlyWithRT.append((n, currTrial['reactTimeMS'].item()['data'].item()))
 
 # Short trials with short RT
 correctShortRT = []
@@ -44,6 +44,7 @@ for n, currTrial in enumerate(allTrialsData.item()[0]):
             correctShortRT.append((n, reactTimeMS))
 
 # convert Left eyeXY to eyePos
+eyePosDurTarget = []
 for i in correctShortRT:
     trialNumber, reactTime = i
     currTrial = allTrialsData.item()[0][trialNumber]
@@ -64,10 +65,10 @@ for i in correctShortRT:
         leftXDeg.append(xDegConvert)
         yDegConvert = (eyeLX[l] * eyeLeftCal['m12'].item()) + (eyeLY[l] * eyeLeftCal['m22'].item()) + eyeLeftCal['tY'].item()
         leftYDeg.append(yDegConvert)
-    for r in range(0, count):
-        xDegConvert = (eyeRX[r] * eyeRightCal['m11'].item()) + (eyeRY[r] * eyeRightCal['m21'].item()) + eyeRightCal['tX'].item()
+    # for r in range(0, count):
+        xDegConvert = (eyeRX[l] * eyeRightCal['m11'].item()) + (eyeRY[l] * eyeRightCal['m21'].item()) + eyeRightCal['tX'].item()
         rightXDeg.append(xDegConvert)
-        yDegConvert = (eyeRX[r] * eyeRightCal['m12'].item()) + (eyeRY[r] * eyeRightCal['m22'].item()) + eyeRightCal['tY'].item()
+        yDegConvert = (eyeRX[l] * eyeRightCal['m12'].item()) + (eyeRY[l] * eyeRightCal['m22'].item()) + eyeRightCal['tY'].item()
         rightYDeg.append(yDegConvert)
 
     fixate = currTrial['fixate'].item()['timeMS'].item()
@@ -83,12 +84,13 @@ for i in correctShortRT:
         else:
             fixateTimeForIndex += 1
     eyePosSacTimeMS = eyePosSac * 2
-    sacFromTrialStart = currTrial['saccade'].item()['timeMS'].item() - trialStart
-    diff = sacFromTrialStart - eyePosSacTimeMS
-    print(trialNumber, diff)
-
+    saccadeTime = currTrial['saccade'].item()['timeMS'].item()
+    diff = (saccadeTime - trialStart) - eyePosSacTimeMS
+    
     targetOn = currTrial['targetOn'].item()['timeMS'].item()
-    trialStart = currTrial['trialStart'].item()['timeMS'].item()
+    eyePosReactTime = eyePosSacTimeMS - (targetOn - trialStart)
+    eyePosDurTarget.append((trialNumber, eyePosReactTime))
+    knotRTSaccTarget = saccadeTime - targetOn
     targetOnTimeEyePos = (targetOn - trialStart)/2
 
     plt.figure()
@@ -97,4 +99,46 @@ for i in correctShortRT:
     plt.plot(rightXDeg, color = 'blue')
     plt.plot(rightYDeg, color = 'red')
     plt.axvline(x = targetOnTimeEyePos)
-    plt.title(reactTime)
+    plt.title(eyePosReactTime)
+
+# scatter plot RTs aligned with targetOnset
+for y,x in eyePosDurTarget:
+    plt.scatter(x,y) 
+plt.axvline(x=0)
+
+# scatter plot of trialOutcomes 
+for n,outcome in enumerate(trialOutcomes):
+    if outcome == 0:
+        color = 'green'
+    elif outcome == 6:
+        color = 'orange'
+    else:
+        color = 'blue'
+    plt.scatter(n, outcome, c = color, s = 0.5)
+for x_axis in catchTrials:
+    plt.axvline(x = x_axis, color = 'pink')
+for x_axis in invalidTrials:
+    plt.axvline(x = x_axis, color = 'black')
+plt.show()
+
+# diff in the len of the stimOn and stimOff list
+stimDiff = []
+for currTrial in allTrialsData.item()[0]:
+    trial = currTrial['trial'].item()['data'].item()
+    if trial['instructTrial'] != 1:
+        if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
+            stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
+            stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
+            if type(stimulusOn) == int:
+                stimDiff.append(0)
+            elif type(stimulusOff) == int:
+                diff = len(stimulusOn) - 1
+                stimDiff.append(diff)
+            else:
+                diff = len(stimulusOn) - len(stimulusOff)
+                stimDiff.append(diff)
+
+dist = {}
+for i in stimDiff:
+    dist[i] = dist.get(i,0)+1
+

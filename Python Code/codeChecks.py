@@ -3,12 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-allTrials = sp.loadmat('Meetz_2021_1027_1.mat', squeeze_me = True)
+allTrials = sp.loadmat('Meetz_2021_1028_1.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
 
 # code to check whether valid RT are being rewarded or not
 # check EOT to make sure that trialEnd is not including 'wrong/distracted' 
-
 correcttNoRwrd = []
 for n,currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
@@ -142,3 +141,30 @@ dist = {}
 for i in stimDiff:
     dist[i] = dist.get(i,0)+1
 
+#hist
+plt.hist(np.array(distRT).flatten(), bins = 20)
+
+#weird Trials
+weirdTrials = []
+for n, currTrial in enumerate(allTrialsData.item()[0]):
+    extendedEOT = currTrial['extendedEOT'].item()['data']
+    if extendedEOT == 6 and 'reactTimeMS' in currTrial.dtype.names:
+        weirdTrials.append(n)
+
+#stim diff for trials preceding the weird trials
+stimDiff = []
+for i in weirdTrials:
+    currTrial = allTrialsData.item()[0][i-1]
+    trial = currTrial['trial'].item()['data'].item()
+    if trial['instructTrial'] != 1:
+        if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
+            stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
+            stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
+            if type(stimulusOn) == int:
+                stimDiff.append(0)
+            elif type(stimulusOff) == int:
+                diff = len(stimulusOn) - 1
+                stimDiff.append(diff)
+            else:
+                diff = len(stimulusOn) - len(stimulusOff)
+                stimDiff.append(diff)

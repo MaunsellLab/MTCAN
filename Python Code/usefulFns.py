@@ -2,26 +2,28 @@ import scipy.io as sp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import os
 from collections import defaultdict
+
 
 def loadMatFile(fileName):
     '''
     Loads the given matfile and assigns variables to access trial data
 
-    Inputs: matfile name, str
-    Outputs: variables, nd. array
+    Inputs: matfile name, (str)
+    Outputs: variables, (nd.array)
     '''
-    
-    global allTrials, allTrialsData, header
 
-    allTrials = sp.loadmat(fileName, squeeze_me = True)
+    global allTrials, allTrialsData, header
+    
+    allTrials = sp.loadmat(f'../Matlab Data/{fileName}', squeeze_me = True)
     allTrialsData = allTrials['trials']
     header = allTrials['header']
 
 
 def fieldInTrial(trial, fieldList):
     '''
-    Function will check whether a field or all fields in the list is in the trial
+    Function will check whether all fields in a list are in the trial
     
     Inputs: trial (data struct from MATLAB)
             list of fields (list)
@@ -33,6 +35,7 @@ def fieldInTrial(trial, fieldList):
             return False
    
     return True
+
 
 def targetOnsetIndexStimDesc(stimDesc):
     '''
@@ -49,6 +52,7 @@ def targetOnsetIndexStimDesc(stimDesc):
                     break
     
     return count
+
 
 def eyePosDurTrial(currTrial):
     '''

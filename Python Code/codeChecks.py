@@ -2,6 +2,7 @@ import scipy.io as sp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import os
 from collections import defaultdict
 
 
@@ -34,7 +35,7 @@ for n, currTrial in enumerate(allTrialsData.item()[0]):
     if extendedEOT == 6 and 'targetOn' in currTrial.dtype.names and 'reactTimeMS' in currTrial.dtype.names:
         earlyWithRT.append((n, currTrial['reactTimeMS'].item()['data'].item()))
 
-# Short trials with short RT
+# correct trials with short RT
 correctShortRT = []
 for n, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
@@ -141,6 +142,19 @@ for x_axis in catchTrials:
     plt.axvline(x = x_axis, color = 'pink')
 for x_axis in invalidTrials:
     plt.axvline(x = x_axis, color = 'black')
+plt.show()
+
+'''
+OR
+'''
+for n,currTrial in enumerate(allTrialsData.item()[0]):
+    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
+    if extendedEOT == 0:
+        plt.scatter(n+1,extendedEOT, color = 'green')
+    elif extendedEOT == 6:
+        plt.scatter(n+1, extendedEOT, color = 'orange')
+    else:
+        plt.scatter(n+1, extendedEOT, color = 'blue')
 plt.show()
 
 # diff in the len of the stimOn and stimOff list

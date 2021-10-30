@@ -1,3 +1,9 @@
+import scipy.io as sp
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+from collections import defaultdict
+
 def loadMatFile(fileName):
     '''
     Loads the given matfile and assigns variables to access trial data
@@ -5,6 +11,9 @@ def loadMatFile(fileName):
     Inputs: matfile name, str
     Outputs: variables, nd. array
     '''
+    
+    global allTrials, allTrialsData, header
+
     allTrials = sp.loadmat(fileName, squeeze_me = True)
     allTrialsData = allTrials['trials']
     header = allTrials['header']
@@ -22,8 +31,8 @@ def fieldInTrial(trial, fieldList):
     for field in fieldList:
         if field not in trial.dtype.names:
             return False
-        else:
-            return True
+   
+    return True
 
 def targetOnsetIndexStimDesc(stimDesc):
     '''
@@ -40,3 +49,31 @@ def targetOnsetIndexStimDesc(stimDesc):
                     break
     
     return count
+
+def eyePosDurTrial(currTrial):
+    '''
+    fn will return a defaultdict with the converted x,y deg for each eye
+
+    Inputs: trial (nd.array)
+    Outputs: defaultdict
+    '''
+    eyesXYDeg = defaultdict(list)
+    eyeLX = currTrial['eyeLXData'].item()['data'].item() 
+    eyeLY = currTrial['eyeLYData'].item()['data'].item()
+    eyeRX = currTrial['eyeRXData'].item()['data'].item()
+    eyeRY = currTrial['eyeRYData'].item()['data'].item()
+    eyeLeftCal = currTrial['eyeLeftCalibrationData'].item()['data'].item()['cal'].item()
+    eyeRightCal = currTrial['eyeRightCalibrationData'].item()['data'].item()['cal'].item()
+    count = min([len(eyeLX), len(eyeLY), len(eyeRX), len(eyeRY)])
+
+    for s in range(0, count):
+        xDegConvert = (eyeLX[s] * eyeLeftCal['m11'].item()) + (eyeLY[s] * eyeLeftCal['m21'].item()) + eyeLeftCal['tX'].item()
+        eyesXYDeg['leftX'].append(xDegConvert)
+        yDegConvert = (eyeLX[s] * eyeLeftCal['m12'].item()) + (eyeLY[s] * eyeLeftCal['m22'].item()) + eyeLeftCal['tY'].item()
+        eyesXYDeg['leftY'].append(yDegConvert)
+        xDegConvert = (eyeRX[s] * eyeRightCal['m11'].item()) + (eyeRY[s] * eyeRightCal['m21'].item()) + eyeRightCal['tX'].item()
+        eyesXYDeg['rightX'].append(xDegConvert)
+        yDegConvert = (eyeRX[s] * eyeRightCal['m12'].item()) + (eyeRY[s] * eyeRightCal['m22'].item()) + eyeRightCal['tY'].item()
+        eyesXYDeg['rightY'].append(yDegConvert)
+
+    return eyesXYDeg

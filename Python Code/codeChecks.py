@@ -2,6 +2,8 @@ import scipy.io as sp
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from collections import defaultdict
+
 
 allTrials = sp.loadmat('Meetz_2021_1028_1.mat', squeeze_me = True)
 allTrialsData = allTrials['trials']
@@ -42,7 +44,28 @@ for n, currTrial in enumerate(allTrialsData.item()[0]):
         if reactTimeMS <100:
             correctShortRT.append((n, reactTimeMS))
 
-# convert Left eyeXY to eyePos
+# EyePos for a trial
+currTrial = allTrialsData.item()[0][i]
+eyesXYDeg = defaultdict(list)
+eyeLX = currTrial['eyeLXData'].item()['data'].item() 
+eyeLY = currTrial['eyeLYData'].item()['data'].item()
+eyeRX = currTrial['eyeRXData'].item()['data'].item()
+eyeRY = currTrial['eyeRYData'].item()['data'].item()
+eyeLeftCal = currTrial['eyeLeftCalibrationData'].item()['data'].item()['cal'].item()
+eyeRightCal = currTrial['eyeRightCalibrationData'].item()['data'].item()['cal'].item()
+count = min([len(eyeLX), len(eyeLY), len(eyeRX), len(eyeRY)])
+
+for s in range(0, count):
+    xDegConvert = (eyeLX[s] * eyeLeftCal['m11'].item()) + (eyeLY[s] * eyeLeftCal['m21'].item()) + eyeLeftCal['tX'].item()
+    eyesXYDeg['leftX'].append(xDegConvert)
+    yDegConvert = (eyeLX[s] * eyeLeftCal['m12'].item()) + (eyeLY[s] * eyeLeftCal['m22'].item()) + eyeLeftCal['tY'].item()
+    eyesXYDeg['leftY'].append(yDegConvert)
+    xDegConvert = (eyeRX[s] * eyeRightCal['m11'].item()) + (eyeRY[s] * eyeRightCal['m21'].item()) + eyeRightCal['tX'].item()
+    eyesXYDeg['rightX'].append(xDegConvert)
+    yDegConvert = (eyeRX[s] * eyeRightCal['m12'].item()) + (eyeRY[s] * eyeRightCal['m22'].item()) + eyeRightCal['tY'].item()
+    eyesXYDeg['rightY'].append(yDegConvert)
+
+# EyePos for a list of trials indexes
 eyePosDurTarget = []
 for i in correctShortRT:
     trialNumber, reactTime = i
@@ -126,16 +149,15 @@ for currTrial in allTrialsData.item()[0]:
     trial = currTrial['trial'].item()['data'].item()
     if trial['instructTrial'] != 1:
         if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
+    #    if fieldInTrial(currTrial, ['stimulusOn', 'stimulusOff']):   
             stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
             stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
             if type(stimulusOn) == int:
                 stimDiff.append(0)
             elif type(stimulusOff) == int:
-                diff = len(stimulusOn) - 1
-                stimDiff.append(diff)
+                stimDiff.append(len(stimulusOn) - 1)
             else:
-                diff = len(stimulusOn) - len(stimulusOff)
-                stimDiff.append(diff)
+                stimDiff.append(len(stimulusOn) - len(stimulusOff))
 
 dist = {}
 for i in stimDiff:
@@ -158,13 +180,12 @@ for i in weirdTrials:
     trial = currTrial['trial'].item()['data'].item()
     if trial['instructTrial'] != 1:
         if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
+    #    if fieldInTrial(currTrial, ['stimulusOn', 'stimulusOff']):   
             stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
             stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
             if type(stimulusOn) == int:
                 stimDiff.append(0)
             elif type(stimulusOff) == int:
-                diff = len(stimulusOn) - 1
-                stimDiff.append(diff)
+                stimDiff.append(len(stimulusOn) - 1)
             else:
-                diff = len(stimulusOn) - len(stimulusOff)
-                stimDiff.append(diff)
+                stimDiff.append(len(stimulusOn) - len(stimulusOff))

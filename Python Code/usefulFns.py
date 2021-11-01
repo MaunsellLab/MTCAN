@@ -13,15 +13,14 @@ def loadMatFile(fileName):
     Inputs: matfile name, (str)
     Outputs: variables, (nd.array)
     '''
-
-    global allTrials, allTrialsData, header
     
     allTrials = sp.loadmat(f'../Matlab Data/{fileName}', squeeze_me = True)
     allTrialsData = allTrials['trials']
     header = allTrials['header']
 
+    return allTrialsData, header
 
-def fieldInTrial(trial, fieldList):
+def fieldInTrial(fieldList, trial):
     '''
     Function will check whether all fields in a list are in the trial
     

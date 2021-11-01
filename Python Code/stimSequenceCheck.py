@@ -1,14 +1,19 @@
 import scipy.io as sp
 import numpy as np
 import matplotlib.pyplot as plt
+from usefulFns import *
 
 # when importing .mat file, make sure it is the combined file with both the 
 # header and all trials saved 
 # this imports all trials within a .mat file and the accompanying header file
-allTrials = sp.loadmat('Meetz_2021_08_25.mat', squeeze_me = True)
-allTrialsData = allTrials['trials']
-header = allTrials['header']
 
+allTrialsData, header = loadMatFile('Meetz_2021_08_25.mat')
+
+# allTrials = sp.loadmat('Meetz_2021_08_25.mat', squeeze_me = True)
+# allTrialsData = allTrials['trials']
+# header = allTrials['header']
+
+global locDict
 
 locDict = {0:{'seq':[],'count':[1]*9,'interstim':[]},
            1:{'seq':[],'count':[1]*9,'interstim':[]},
@@ -72,4 +77,7 @@ for currTrial in allTrialsData.item()[0]:
                     targetOnsetStim = count
                     break
             attendLoc = trial['attendLoc'].tolist()
+
             stimSeqCheck(attendLoc)
+
+print(locDict)

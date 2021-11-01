@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import math
 import os
 from collections import defaultdict
+from usefulFns import *
+
+allTrialsData, header = loadMatFile('Meetz_2021_1028_1.mat')
 
 
-allTrials = sp.loadmat('Meetz_2021_1028_1.mat', squeeze_me = True)
-allTrialsData = allTrials['trials']
 
 # code to check whether valid RT are being rewarded or not
 # check EOT to make sure that trialEnd is not including 'wrong/distracted' 
@@ -15,7 +16,7 @@ correcttNoRwrd = []
 for n,currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
     trial = currTrial['trial'].item()['data'].item()
-    if extendedEOT == 6 and 'reactTimeMS' in currTrial.dtype.names:
+    if extendedEOT == 6 and fieldInTrial(['reactTimeMS'], currTrial):
         reactTimeMS = currTrial['reactTimeMS'].item()['data'].item()
         if reactTimeMS > 0 and reactTimeMS < 500:
             correcttNoRwrd.append(n)
@@ -25,14 +26,14 @@ RTs = []
 for n,currTrial in enumerate(allTrialsData.item()[0]):
     trial = currTrial['trial'].item()['data'].item()
     extendedEOT = currTrial['extendedEOT'].item()['data'].item()
-    if extendedEOT == 6 and 'targetOn' in currTrial.dtype.names:
+    if extendedEOT == 6 and fieldInTrial(['targetOn'], currTrial):
         RTs.append(n)
 
 # trial RTs with early's but Target appears on screen
 earlyWithRT = []
 for n, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
-    if extendedEOT == 6 and 'targetOn' in currTrial.dtype.names and 'reactTimeMS' in currTrial.dtype.names:
+    if extendedEOT == 6 and fieldInTrial(['targetOn', 'reactTimeMS'], currTrial):
         earlyWithRT.append((n, currTrial['reactTimeMS'].item()['data'].item()))
 
 # correct trials with short RT
@@ -162,8 +163,7 @@ stimDiff = []
 for currTrial in allTrialsData.item()[0]:
     trial = currTrial['trial'].item()['data'].item()
     if trial['instructTrial'] != 1:
-        if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
-    #    if fieldInTrial(currTrial, ['stimulusOn', 'stimulusOff']):   
+        if fieldInTrial(['stimulusOn', 'stimulusOff'], currTrial):   
             stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
             stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
             if type(stimulusOn) == int:
@@ -184,7 +184,7 @@ plt.hist(np.array(distRT).flatten(), bins = 20)
 weirdTrials = []
 for n, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data']
-    if extendedEOT == 6 and 'reactTimeMS' in currTrial.dtype.names:
+    if extendedEOT == 6 and fieldInTrial(['reactTimeMS'], currTrial):
         weirdTrials.append(n)
 
 #stim diff for trials preceding the weird trials
@@ -193,8 +193,7 @@ for i in weirdTrials:
     currTrial = allTrialsData.item()[0][i-1]
     trial = currTrial['trial'].item()['data'].item()
     if trial['instructTrial'] != 1:
-        if 'stimulusOn' in currTrial.dtype.names and 'stimulusOff' in currTrial.dtype.names:
-    #    if fieldInTrial(currTrial, ['stimulusOn', 'stimulusOff']):   
+        if fieldInTrial(['stimulusOn', 'stimulusOff'], currTrial):  
             stimulusOn = currTrial['stimulusOn'].item()['timeMS'].item()
             stimulusOff = currTrial['stimulusOff'].item()['timeMS'].item()
             if type(stimulusOn) == int:

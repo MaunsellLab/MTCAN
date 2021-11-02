@@ -20,7 +20,7 @@ def loadMatFile(fileName):
 
     return allTrialsData, header
 
-def fieldInTrial(fieldList, trial):
+def fieldInTrial(fieldList, trial = None):
     '''
     Function will check whether all fields in a list are in the trial
     
@@ -28,6 +28,8 @@ def fieldInTrial(fieldList, trial):
             list of fields (list)
     Outputs: bool
     '''
+    if trial == None:
+        trial = currTrial
 
     for field in fieldList:
         if field not in trial.dtype.names:

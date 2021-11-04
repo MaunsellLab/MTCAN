@@ -20,6 +20,32 @@ def loadMatFile(fileName):
 
     return allTrialsData, header
 
+
+def correctTrialsNotInstruct(currTrial, catch=True):
+    '''
+    Function will return a bool if the current trial is correct and not an 
+    instruction trial. Also has option to exclude catch trials 
+
+    Inputs: trial (nd.array)
+            catch (bool)
+    Outputs: bool
+    '''
+
+    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
+    trial = currTrial['trial'].item()['data'].item()
+
+    if catch == True:
+        if extendedEOT == 0 and trial['instructTrial'] == 0:
+            return True
+        else:
+            return False
+    else:
+        if extendedEOT == 0 and trial['instructTrial'] == 0 and trial['catchTrial'] != 1:
+            return True
+        else:
+            return False
+
+
 def fieldInTrial(fieldList, trial = None):
     '''
     Function will check whether all fields in a list are in the trial

@@ -202,3 +202,46 @@ for i in weirdTrials:
                 stimDiff.append(len(stimulusOn) - 1)
             else:
                 stimDiff.append(len(stimulusOn) - len(stimulusOff))
+
+
+'''
+MTNAN
+'''
+
+#code will generate a list of interstim frame diff for task gabor
+stimDescInterstim = []
+for count, currTrial in enumerate(allTrialsData.item()[0]):
+    print(count)
+    trial = currTrial['trial'].item()['data'].item()
+    stimDesc = currTrial['stimDesc'].item()['data'].item()
+    taskStimCount = 0
+    for stim in stimDesc:
+        if stim['stimLoc'] == 2:
+            if taskStimCount == 0:
+                frameOff = stim['stimOffFrame']
+                taskStimCount += 1
+            else:
+                frameDiff = stim['stimOnFrame'] - frameOff
+                frameOff = stim['stimOffFrame']
+                stimDescInterstim.append(frameDiff)
+
+
+
+targetOnTimes = []
+
+for currTrial in allTrialsData.item()[0]:
+    trial = currTrial['trial'].item()['data'].item()
+    if trial['instructTrial'] != 1 and trial['catchTrial'] != 1:
+        targetOnTimes.append(trial['targetOnTimeMS'].tolist())
+    
+
+
+
+
+# for count, i in enumerate(stimDesc['listType']):
+#     if i == 2:
+#         stimSeqLen = count
+#         break
+# targetOnFrame = stimDesc['stimOnFrame'][stimSeqLen]
+# targetOnTimeMs = targetOnFrame * (1000/75)
+# targetOnTimes.append(targetOnTimeMS)

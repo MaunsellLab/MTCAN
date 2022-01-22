@@ -30,11 +30,48 @@ def randTuningCurve(numNeurons):
     return tuningMat
 
 
+def poissonSpikeTrain(index, sigma):
+    '''
+    this function will generate a poisson spike train and return the normalized
+    response for the RF for a given stimulus configuration
+    Inputs:
+        index: the index of the corresponding stimulus configuration
+        sigma: semisaturation constant from neuron's contrast response function
+    Outputs:
+        RFSpikes: normalized response 
+    '''
+
+    fRateLocO = tc_dict[stimIndexDict[index][0]['direction']]
+    fRateLoc1 = tc_dict[stimIndexDict[index][1]['direction']]
+    C0 = stimIndexDict[index][0]['contrast']
+    C1 = stimIndexDict[index][1]['contrast']
+    spikeTrain0 = []
+    spikeTrain1 = []
+
+    dt = 1/1000
+    for i in range(500):
+        if np.random.uniform(0,1) < fRateLoc0 * dt:
+            spikeTrain0.append(1)
+        if np.random.uniform(0,1) < fRateLoc1 * dt:
+            spikeTrain1.append(1)
+    L0 = len(spikeTrain0)
+    L1 = len(spikeTrain1)
+
+    RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)
+
+    return RFSpikes
+
+
 tuningCurves = randTuningCurve(1)
 tc_dict = {tuningCurves[0,i]: tuningCurves[1,i] for i in range(tuningCurves.shape[1])}
 
 allTrialsData, header = loadMatFile('Meetz_2021_1028_1.mat')
 
+'''
+# for multiple neurons
+spikeCountMat = np.zeros((numNeurons, 30, 169))
+spikeCountMat[:,0,:] = np.arange(0,169)
+'''
 spikeCountMat = np.zeros((30,169))
 spikeCountMat[0] = np.arange(0,169)
 stimIndexCount = {}
@@ -61,6 +98,7 @@ for n,currTrial in enumerate(allTrialsData.item()[0]):
                 index = stim['stimIndex']
                 stimIndexCount[index] = stimIndexCount.get(index, 0) + 1
 
+                #input code to change 3D matrix for multiple neurons
                 fRateLocO = tc_dict[stimIndexDict[index][0]['direction']]
                 fRateLoc1 = tc_dict[stimIndexDict[index][1]['direction']]
                 C0 = stimIndexDict[index][0]['contrast']
@@ -114,23 +152,3 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
 
-#poisson spike train for stimulus, can turn this into a function 
-
-fRateLocO = tc_dict[stimIndexDict[index][0]['direction']]
-fRateLoc1 = tc_dict[stimIndexDict[index][1]['direction']]
-C0 = stimIndexDict[index][0]['contrast']
-C1 = stimIndexDict[index][1]['contrast']
-
-spikeTrain0 = []
-spikeTrain1 = []
-
-dt = 1/1000
-for i in range(500):
-    if np.random.uniform(0,1) < fRateLoc0 * dt:
-        spikeTrain0.append(1)
-    if np.random.uniform(0,1) < fRateLoc1 * dt:
-        spikeTrain1.append(1)
-L0 = len(spikeTrain0)
-L1 = len(spikeTrain1)
-
-RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)

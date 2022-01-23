@@ -160,3 +160,48 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
 
+'''
+backup for old multiple neuron for loop
+'''
+
+for n,currTrial in enumerate(allTrialsData.item()[0]):
+    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
+    trial = currTrial['trial'].item()['data'].item()
+    targetOnFrame = 20000
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        stimDesc = currTrial['stimDesc'].item()['data'].item()
+        for n,stim in enumerate(stimDesc):
+            if stim['listType'] == 2:
+                targetIndex = n
+                break
+        targetOnFrame = stimDesc['stimOnFrame'][targetIndex]
+        stimCount = 0
+        for stim in stimDesc:
+            if stim['stimLoc'] == 0 and stim0Count == 0:
+                stim0Count += 1
+            elif stim['stimLoc'] == 0 and stim0Count != 0 and stim['stimOffFrame'] < targetOnFrame:
+                index = stim['stimIndex']
+                stimIndexCount[index] = stimIndexCount.get(index, 0) + 1
+
+                for x in range(1,numNeurons+1):
+                    spikeCountMat[x-1][stimIndexCount[index]][index] = poissonSpikeTrain(x, index)
+                    # fRateLocO = tcDict[x][stimIndexDict[index][0]['direction']]
+                    # fRateLoc1 = tcDict[x][stimIndexDict[index][1]['direction']]
+                    # C0 = stimIndexDict[index][0]['contrast']
+                    # C1 = stimIndexDict[index][1]['contrast']
+                    # sigma = 0.3
+
+                    # spikeTrain0 = []
+                    # spikeTrain1 = []
+
+                    # dt = 1/1000
+                    # for i in range(500):
+                    #     if np.random.uniform(0,1) < fRateLoc0 * dt:
+                    #         spikeTrain0.append(1)
+                    #     if np.random.uniform(0,1) < fRateLoc1 * dt:
+                    #         spikeTrain1.append(1)
+                    # L0 = len(spikeTrain0)
+                    # L1 = len(spikeTrain1)
+                
+                    # RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)
+                    # spikeCountMat[x-1][stimIndexCount[index]][index] = RFSpikes

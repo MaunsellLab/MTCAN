@@ -30,19 +30,19 @@ def randTuningCurve(numNeurons):
     return tuningMat
 
 
-def poissonSpikeTrain(index, sigma):
+def poissonSpikeTrain(i, index, sigma):
     '''
     this function will generate a poisson spike train and return the normalized
     response for the RF for a given stimulus configuration
     Inputs:
+        i: neuron number
         index: the index of the corresponding stimulus configuration
         sigma: semisaturation constant from neuron's contrast response function
     Outputs:
         RFSpikes: normalized response 
     '''
-
-    fRateLocO = tc_dict[stimIndexDict[index][0]['direction']]
-    fRateLoc1 = tc_dict[stimIndexDict[index][1]['direction']]
+    fRateLocO = tc_dict[i][stimIndexDict[index][0]['direction']]
+    fRateLoc1 = tc_dict[i][stimIndexDict[index][1]['direction']]
     C0 = stimIndexDict[index][0]['contrast']
     C1 = stimIndexDict[index][1]['contrast']
     spikeTrain0 = []
@@ -62,18 +62,40 @@ def poissonSpikeTrain(index, sigma):
     return RFSpikes
 
 
-tuningCurves = randTuningCurve(1)
-tc_dict = {tuningCurves[0,i]: tuningCurves[1,i] for i in range(tuningCurves.shape[1])}
-
 allTrialsData, header = loadMatFile('Meetz_2021_1028_1.mat')
 
-'''
+# generates a dictionary of stim Index and corresponding directions/contrasts
+stimIndexDict = {}
+for currTrial in allTrialsData.item()[0]:
+    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
+    trial = currTrial['trial'].item()['data'].item()
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        stimDesc = currTrial['stimDesc'].item()['data'].item()
+        for stim in stimDesc:
+            if stim['stimLoc'] != 2:
+                index = stim['stimIndex']
+                if index not in stimIndexDict:
+                    stimIndexDict[index] = {}
+                else:
+                    if stim['stimLoc'] not in stimIndexDict[index]:
+                        stimIndexDict[index][stim['stimLoc']] = {'direction': stim['directionDeg'], 'contrast': stim['contrast']}
+
+
+numNeurons = 2
+tuningCurves = randTuningCurve(numNeurons)
+
+#code to iterate through tuning curves to create dict for each neuron 
+tcDict = {}
+for i, neuron in enumerate(tuningCurves[1:,:]):
+    tcDict[i+1] = {}
+    for j, dirResp in enumerate(neuron):
+        tcDict[i+1][tuningCurves[0][j]] = dirResp
+
+
+
 # for multiple neurons
-spikeCountMat = np.zeros((numNeurons, 30, 169))
+spikeCountMat = np.zeros((numNeurons,30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
-'''
-spikeCountMat = np.zeros((30,169))
-spikeCountMat[0] = np.arange(0,169)
 stimIndexCount = {}
 
 # not tested, but code will add stimuli presentations to index matrix, excluding padding
@@ -98,45 +120,31 @@ for n,currTrial in enumerate(allTrialsData.item()[0]):
                 index = stim['stimIndex']
                 stimIndexCount[index] = stimIndexCount.get(index, 0) + 1
 
-                #input code to change 3D matrix for multiple neurons
-                fRateLocO = tc_dict[stimIndexDict[index][0]['direction']]
-                fRateLoc1 = tc_dict[stimIndexDict[index][1]['direction']]
-                C0 = stimIndexDict[index][0]['contrast']
-                C1 = stimIndexDict[index][1]['contrast']
-                sigma = 0.3
+                for x in range(1,numNeurons+1):
+                    fRateLocO = tcDict[x][stimIndexDict[index][0]['direction']]
+                    fRateLoc1 = tcDict[x][stimIndexDict[index][1]['direction']]
+                    C0 = stimIndexDict[index][0]['contrast']
+                    C1 = stimIndexDict[index][1]['contrast']
+                    sigma = 0.3
 
-                spikeTrain0 = []
-                spikeTrain1 = []
+                    spikeTrain0 = []
+                    spikeTrain1 = []
 
-                dt = 1/1000
-                for i in range(500):
-                    if np.random.uniform(0,1) < fRateLoc0 * dt:
-                        spikeTrain0.append(1)
-                    if np.random.uniform(0,1) < fRateLoc1 * dt:
-                        spikeTrain1.append(1)
-                L0 = len(spikeTrain0)
-                L1 = len(spikeTrain1)
-            
-                RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)
+                    dt = 1/1000
+                    for i in range(500):
+                        if np.random.uniform(0,1) < fRateLoc0 * dt:
+                            spikeTrain0.append(1)
+                        if np.random.uniform(0,1) < fRateLoc1 * dt:
+                            spikeTrain1.append(1)
+                    L0 = len(spikeTrain0)
+                    L1 = len(spikeTrain1)
+                
+                    RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)
+                    spikeCountMat[x-1][stimIndexCount[index]][index] = RFSpikes
 
-                spikeCountMat[stimIndexCount[index]][index] = RFSpikes
-
-# generates a dictionary of stim Index and corresponding directions/contrasts
-stimIndexDict = {}
-for currTrial in allTrialsData.item()[0]:
-    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
-    trial = currTrial['trial'].item()['data'].item()
-    if extendedEOT == 0 and trial['instructTrial'] != 1:
-        stimDesc = currTrial['stimDesc'].item()['data'].item()
-        for stim in stimDesc:
-            if stim['stimLoc'] != 2:
-                index = stim['stimIndex']
-                if index not in stimIndexDict:
-                    stimIndexDict[index] = {}
-                else:
-                    if stim['stimLoc'] not in stimIndexDict[index]:
-                        stimIndexDict[index][stim['stimLoc']] = {'direction': stim['directionDeg'], 'contrast': stim['contrast']}
-
+'''
+extra code
+'''
 # will print trial nunmbers that have targets that appear during RF stimulus presentation
 for count, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data'].item()
@@ -152,3 +160,5 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
 
+
+    

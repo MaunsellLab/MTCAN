@@ -30,7 +30,7 @@ def randTuningCurve(numNeurons):
     return tuningMat
 
 
-def poissonSpikeTrain(i, index, sigma):
+def poissonSpikeTrain(x, index):
     '''
     this function will generate a poisson spike train and return the normalized
     response for the RF for a given stimulus configuration
@@ -41,8 +41,8 @@ def poissonSpikeTrain(i, index, sigma):
     Outputs:
         RFSpikes: normalized response 
     '''
-    fRateLocO = tc_dict[i][stimIndexDict[index][0]['direction']]
-    fRateLoc1 = tc_dict[i][stimIndexDict[index][1]['direction']]
+    fRateLocO = tcDict[x][stimIndexDict[index][0]['direction']]
+    fRateLoc1 = tcDict[x][stimIndexDict[index][1]['direction']]
     C0 = stimIndexDict[index][0]['contrast']
     C1 = stimIndexDict[index][1]['contrast']
     spikeTrain0 = []
@@ -84,7 +84,7 @@ for currTrial in allTrialsData.item()[0]:
 numNeurons = 2
 tuningCurves = randTuningCurve(numNeurons)
 
-#code to iterate through tuning curves to create dict for each neuron 
+#code to iterate through tuning curves to create dictionary for each neuron 
 tcDict = {}
 for i, neuron in enumerate(tuningCurves[1:,:]):
     tcDict[i+1] = {}
@@ -92,13 +92,13 @@ for i, neuron in enumerate(tuningCurves[1:,:]):
         tcDict[i+1][tuningCurves[0][j]] = dirResp
 
 
-
-# for multiple neurons
+# creates spike count matrix for multiple neurons, each row is a spike response
+# to a presentation of the stimulus at a specific index 
 spikeCountMat = np.zeros((numNeurons,30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
 stimIndexCount = {}
 
-# not tested, but code will add stimuli presentations to index matrix, excluding padding
+# code will add stimuli presentations to index matrix, excluding padding
 # stimuli and when target appears before RF stimulus turns off
 
 for n,currTrial in enumerate(allTrialsData.item()[0]):
@@ -121,26 +121,8 @@ for n,currTrial in enumerate(allTrialsData.item()[0]):
                 stimIndexCount[index] = stimIndexCount.get(index, 0) + 1
 
                 for x in range(1,numNeurons+1):
-                    fRateLocO = tcDict[x][stimIndexDict[index][0]['direction']]
-                    fRateLoc1 = tcDict[x][stimIndexDict[index][1]['direction']]
-                    C0 = stimIndexDict[index][0]['contrast']
-                    C1 = stimIndexDict[index][1]['contrast']
-                    sigma = 0.3
-
-                    spikeTrain0 = []
-                    spikeTrain1 = []
-
-                    dt = 1/1000
-                    for i in range(500):
-                        if np.random.uniform(0,1) < fRateLoc0 * dt:
-                            spikeTrain0.append(1)
-                        if np.random.uniform(0,1) < fRateLoc1 * dt:
-                            spikeTrain1.append(1)
-                    L0 = len(spikeTrain0)
-                    L1 = len(spikeTrain1)
-                
-                    RFSpikes = ((C0*L0) + (C1*L1))/(C0+C1+sigma)
-                    spikeCountMat[x-1][stimIndexCount[index]][index] = RFSpikes
+                    spikeCountMat[x-1][stimIndexCount[index]][index] = poissonSpikeTrain(x, index)
+                   
 
 '''
 extra code

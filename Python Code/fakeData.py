@@ -80,9 +80,13 @@ for currTrial in allTrialsData.item()[0]:
                     if stim['stimLoc'] not in stimIndexDict[index]:
                         stimIndexDict[index][stim['stimLoc']] = {'direction': stim['directionDeg'], 'contrast': stim['contrast']}
 
-
+'''
+Run these lines after a dictionary of the stimIndex and corresponding directions
+and contrasts have been created for each location
+'''
 numNeurons = 2
 tuningCurves = randTuningCurve(numNeurons)
+
 
 #code to iterate through tuning curves to create dictionary for each neuron 
 tcDict = {}
@@ -98,9 +102,9 @@ spikeCountMat = np.zeros((numNeurons,30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
 stimIndexCount = {}
 
+
 # code will add stimuli presentations to index matrix, excluding padding
 # stimuli and when target appears before RF stimulus turns off
-
 for n,currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data'].item()
     trial = currTrial['trial'].item()['data'].item()
@@ -122,7 +126,7 @@ for n,currTrial in enumerate(allTrialsData.item()[0]):
 
                 for x in range(1,numNeurons+1):
                     spikeCountMat[x-1][stimIndexCount[index]][index] = poissonSpikeTrain(x, index)
-                   
+
 
 '''
 extra code
@@ -141,6 +145,3 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
         for stim in stimDesc:
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
-
-
-    

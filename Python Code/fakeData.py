@@ -176,7 +176,7 @@ for count,i in enumerate(meanSpikeReshaped):
 
 a = meanSpikeReshaped[0]
 b = a.reshape(13,13)
-
+plt.imshow(b, cmap='hot', interpolation='nearest')
     
 '''
 extra code

@@ -58,7 +58,7 @@ def poissonSpikeTrain(x, index):
     C1 = stimIndexDict[index][1]['contrast']
     spikeTrain0 = []
     spikeTrain1 = []
-    sigma = 0.10
+    sigma = 0.3
 
     dt = 1/1000
     for i in range(500):
@@ -195,3 +195,19 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
         for stim in stimDesc:
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
+
+'''
+New FakeData gen
+'''
+
+'''
+7.3 help
+for chan in currTrial.spikeData:
+    print(currTrial.spikeData[chan].shape)
+    
+'''
+targetOnTimeMS = currTrial.trial.data.targetOnTimeMS.tolist()
+spikeData.chan1 = np.zeros((1, int(targetOnTimeMS)))
+
+for currTrial in allTrials:
+    extendedEOT 

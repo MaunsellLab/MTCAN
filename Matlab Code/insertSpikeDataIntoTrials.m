@@ -1,0 +1,32 @@
+% Extracts channel, unit, timestamp from Nev file and inserts into apt
+% trial in the .mat (originally .dat) behavioral file. 
+
+trialsCount = 1
+
+for i = 1:length(NEV)
+    if NEV(i,1) == 0 && NEV(i,2) == 54355  %trialStart event code 
+        trialStartIndex = i;
+        chan0Counter = 0;
+        for j = trialStartIndex+1:(length(NEV)-1)
+            while chan0Counter < 1;
+                if NEV(j,1) == 0
+                    nevTrialCounter = NEV(j,2);
+                    chan0Counter = chan0Counter + 1;
+                end
+            end
+            if NEV(j,1) == 0 && NEV(j,2) == 54341 %trialEnd event code
+                trialEndIndex = j;
+                for t = trialsCount:length(trials)
+                    if trials{1,t}.trialStart.data == nevTrialCounter
+                        trials{1,t}.spikeData = NEV(i:trialEndIndex,:);
+                        trialsCount = trialsCount + 1;
+                    end
+                end
+                break
+            end
+        end
+        % break
+    end
+end
+fileNameNew = strrep(fileName, '.mat', '_withNEV.mat');
+save(fileNameNew, 'trials', 'header', '-v7.3');

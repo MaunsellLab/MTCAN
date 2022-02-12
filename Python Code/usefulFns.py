@@ -4,7 +4,21 @@ import matplotlib.pyplot as plt
 import math
 import os
 from collections import defaultdict
+import mat73
 
+def loadMatFile73(fileName):
+    '''
+    Loads the given matfile and assigns variables to access trial data
+
+    Inputs: matfile name, (str)
+    Outputs: variables, (nd.array)
+    '''
+    
+    allTrials = mat73.loadmat(f'../Matlab Data/{fileName}', use_attrdict = True)
+    allTrialsData = allTrials.trials
+    header = allTrials.header
+
+    return allTrialsData, header
 
 def loadMatFile(fileName):
     '''
@@ -108,3 +122,7 @@ def eyePosDurTrial(currTrial):
         eyesXYDeg['rightY'].append(yDegConvert)
 
     return eyesXYDeg
+
+
+#testing time to open file
+# t0 = time.time(); a = mat73.loadmat('./Documents/Grad School/Maunsell Lab/Analysis/MTCAN/Matlab Data/Meetz_2022_0114_MTNAN_m73.mat', use_attrdict = True); print(time.time() - t0)

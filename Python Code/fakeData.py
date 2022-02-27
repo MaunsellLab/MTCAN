@@ -8,6 +8,74 @@ from collections import defaultdict
 from usefulFns import *
 
 
+'''
+# %% for conda/jupyter notebook
+    
+Fake Data Gen Mat 7.3, with fakeData and spikeData (channel, unit, column) as fields 
+'''
+
+def activeUnits(unitData):
+
+    '''
+    function returns the active units across trials for a session as a list
+
+    Inputs: unitData (str): Are we using fakeData or spikeData
+    Outputs: units (list): active units for a sessioon
+
+    '''
+    units = []
+    for currTrial in allTrials:
+        if unitData in currTrial:
+            uniqueUnits = np.unique(currTrial[unitData]['unit'])
+            for unique in uniqueUnits:
+                if unique not in units:
+                    units.append(unique)
+    
+    return units
+
+
+def insertStimSpikeData(x, index, stimOnTimeSNEV):
+    '''
+    this function will generate a poisson spike train and return the normalized
+    response for the RF for a given stimulus configuration
+    Inputs:
+        x: neuron number
+        index: the index of the corresponding stimulus configuration
+        sigma: semisaturation constant from neuron's contrast response function
+    Outputs:
+        RFSpikes: normalized response 
+    '''
+    
+    unitIdentity = units[x]
+    unitsField = np.array([unitIdentity] * 493)
+    channelIdentity = int(unitIdentity[0:unitIdentity.find('_')])
+    channel = np.array([channelIdentity] * 493)
+
+
+    C0 = stimIndexDict[index][0]['contrast']
+    C1 = stimIndexDict[index][1]['contrast']
+    L0 = (tcDict[x+1][stimIndexDict[index][0]['direction']])/2
+    L1 = (tcDict[x+1][stimIndexDict[index][1]['direction']])/2
+    sigma = 0.1
+
+    expectedNormSpikeRate = int(((C0*L0) + (C1*L1))/(C0 + C1 + sigma))
+    dt = 1/1000
+    baseSpikeTrain = [0] * 493
+    for i in range(len(baseSpikeTrain)):
+        if np.random.uniform(0,1) < expectedNormSpikeRate * dt:
+            baseSpikeTrain[i] = 1
+    spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
+    spikeIndexS = spikeIndex[0]/1000 #[0] for tuple 
+    
+    # add spikes to spikeData
+    currTrial['spikeData']['timeStamp'] = np.append(currTrial \
+    ['spikeData']['timeStamp'], stimOnTimeSNEV + spikeIndexS, 0)
+    currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
+    ['unit'], [unitIdentity] * len(spikeIndexS), 0)
+    currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
+    ['channel'], [channelIdentity] * len(spikeIndexS), 0)
+
+
 def randTuningCurve(numNeurons):
     '''
     Functon will generate random tuning cruves for x number of neurons.
@@ -22,12 +90,12 @@ def randTuningCurve(numNeurons):
         tcDictionary (dictionary): maps each neurons response for a direction onto
                                    a dictionary
     '''
-    
     tuningMat = np.zeros((numNeurons + 1, 6))
     tuningMat[0] = np.arange(0,360,60)
     tcDictionary = {}
 
     for i in range(1, tuningMat.shape[0]):
+        np.random.seed(i)
         amp = np.random.randint(15,30)
         y_translate = np.random.randint(30,50)
         x_translate = np.random.randint(60,120)
@@ -41,12 +109,130 @@ def randTuningCurve(numNeurons):
     return tuningMat, tcDictionary
 
 
+# start here 
+allTrials, header = loadMatFile73('testing_220222_MTN_Spikes.mat')
+
+# generates a dictionary of stim Index and corresponding directions/contrasts
+stimIndexDict = {}
+for currTrial in allTrials:
+    extendedEOT = currTrial['extendedEOT']['data']
+    trial = currTrial['trial']['data']
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        stimDesc = currTrial['stimDesc']['data']
+        for stim in stimDesc:
+            if stim['stimLoc'] != 2:
+                index = int(stim['stimIndex'].tolist())
+                if index not in stimIndexDict:
+                    stimIndexDict[index] = {}
+                    if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
+                        stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
+                        {'direction': int(stim['directionDeg'].tolist()),
+                         'contrast': stim['contrast'].tolist()}
+                else:
+                    if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
+                        stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
+                        {'direction': int(stim['directionDeg'].tolist()),
+                         'contrast': stim['contrast'].tolist()}
+
+# for testing only, Pre-processing, to generate spikeData field similar 
+# to actual spikeData from .nev (will have units as function of channel,
+# 1_1, 2_1 etc.)
+for currTrial in allTrials:
+    if 'spikeData' in currTrial:
+        currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
+        for i in range(0,len(currTrial['spikeData']['channel'])):
+            a = str(int(currTrial['spikeData']['channel'][i]))
+            b = str(int(currTrial['spikeData']['unit'][i]))
+            c = a + '_' + b
+            currTrial['spikeData']['unit'][i] = c
+        currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
+
+# code to insert fake spikes during stimulus presentations 
+units = activeUnits('spikeData')
+tuningMat, tcDict = randTuningCurve(len(units))
+
+for currTrial in allTrials:
+    if 'spikeData' in currTrial:
+        trialStartS = currTrial['taskEvents']['trialStart']['timeS']
+        trialEndS = currTrial['taskEvents']['trialEnd']['timeS']
+        trialLen = int(round(trialEndS - trialStartS, 3) * 1000)
+        # generate underlying firing rate 
+        for count, unit in enumerate(units):
+            channelIdentity = int(unit[0:unit.find('_')])
+            baseFR = 5 # same firing rate for each neuron
+            dt = 1/1000
+            baseSpikeTrain = [0] * trialLen
+            for i in range(trialLen):
+                if np.random.uniform(0,1) < baseFR * dt:
+                    baseSpikeTrain[i] = 1
+            spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
+            spikeIndexS = spikeIndex[0]/1000 #[0] for tuple 
+            if count == 0:
+                currTrial['spikeData']['timeStamp'] = trialStartS + spikeIndexS
+                currTrial['spikeData']['unit'] = [unit] * len(spikeIndexS)
+                currTrial['spikeData']['channel'] = [channelIdentity] * len(spikeIndexS)
+            else:
+                currTrial['spikeData']['timeStamp'] = np.append(currTrial \
+                ['spikeData']['timeStamp'], trialStartS + spikeIndexS, 0)
+                currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
+                ['unit'], [unit] * len(spikeIndexS), 0)
+                currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
+                ['channel'], [channelIdentity] * len(spikeIndexS), 0)
+                # extend the currTrial['spikeData']['timeStamp'] fields
+        stimDesc = currTrial['stimDesc']['data']
+        for count, stim in enumerate(stimDesc):
+            if stim['stimLoc'] == 0:
+                index = int(stim['stimIndex'].tolist())
+                stimOnTimeMS = currTrial['stimDesc']['timeMS'][count] - \
+                currTrial['trialStart']['timeMS']
+                stimOnTimeSNEV = round(currTrial['taskEvents']['trialStart']\
+                ['timeS'].tolist() + (stimOnTimeMS/1000), 3)
+                for j in range(0, len(units)):
+                    insertStimSpikeData(j, index, stimOnTimeSNEV)
+
+
+'''
+old verison pre v7.3
+'''
+stimIndexDict = {}
+for currTrial in allTrialsData.item()[0]:
+    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
+    trial = currTrial['trial'].item()['data'].item()
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        stimDesc = currTrial['stimDesc'].item()['data'].item()
+        for stim in stimDesc:
+            if stim['stimLoc'] != 2:
+                index = stim['stimIndex']
+                if index not in stimIndexDict:
+                    stimIndexDict[index] = {}
+                else:
+                    if stim['stimLoc'] not in stimIndexDict[index]:
+                        stimIndexDict[index][stim['stimLoc']] = \
+                        {'direction': stim['directionDeg'],
+                         'contrast': stim['contrast']}
+
+'''
+backup
+'''
+for currTrial in allTrials:
+    if 'spikeData' in currTrial:
+        currTrial['fakeData'] = currTrial['spikeData'].copy()
+        currTrial['fakeData']['unit'] = currTrial['fakeData']['unit'].tolist()
+        for i in range(0,len(currTrial['spikeData']['channel'])):
+            a = str(int(currTrial['fakeData']['channel'][i]))
+            b = str(int(currTrial['fakeData']['unit'][i]))
+            c = a + '_' + b
+            currTrial['fakeData']['unit'][i] = c
+        currTrial['fakeData']['unit'] = np.array(currTrial['fakeData']['unit'])              
+
+'''
+
 def poissonSpikeTrain(x, index):
     '''
     this function will generate a poisson spike train and return the normalized
     response for the RF for a given stimulus configuration
     Inputs:
-        i: neuron number
+        x: neuron number
         index: the index of the corresponding stimulus configuration
         sigma: semisaturation constant from neuron's contrast response function
     Outputs:
@@ -76,26 +262,11 @@ def poissonSpikeTrain(x, index):
 
 allTrialsData, header = loadMatFile('Meetz_2022_0114_MTNAN3.mat')
 
-# generates a dictionary of stim Index and corresponding directions/contrasts
-stimIndexDict = {}
-for currTrial in allTrialsData.item()[0]:
-    extendedEOT = currTrial['extendedEOT'].item()['data'].item()
-    trial = currTrial['trial'].item()['data'].item()
-    if extendedEOT == 0 and trial['instructTrial'] != 1:
-        stimDesc = currTrial['stimDesc'].item()['data'].item()
-        for stim in stimDesc:
-            if stim['stimLoc'] != 2:
-                index = stim['stimIndex']
-                if index not in stimIndexDict:
-                    stimIndexDict[index] = {}
-                else:
-                    if stim['stimLoc'] not in stimIndexDict[index]:
-                        stimIndexDict[index][stim['stimLoc']] = {'direction': stim['directionDeg'], 'contrast': stim['contrast']}
 
-'''
+
 Run these lines after a dictionary of the stimIndex with corresponding directions
 and contrasts at each location has been created
-'''
+
 numNeurons = 2
 tuningCurves, tcDict = randTuningCurve(numNeurons)
 
@@ -178,9 +349,7 @@ a = meanSpikeReshaped[0]
 b = a.reshape(13,13)
 plt.imshow(b, cmap='hot', interpolation='nearest')
     
-'''
-extra code
-'''
+
 # will print trial nunmbers that have targets that appear during RF stimulus presentation
 for count, currTrial in enumerate(allTrialsData.item()[0]):
     extendedEOT = currTrial['extendedEOT'].item()['data'].item()
@@ -196,18 +365,6 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
             if stim['stimLoc'] == 0 and stim['stimOffFrame'] > targetOnFrame:
                 print(count, 'this trial has target appear before last RF stimuli is off')
 
-'''
-New FakeData gen
-'''
+
 
 '''
-7.3 help
-for chan in currTrial.spikeData:
-    print(currTrial.spikeData[chan].shape)
-    
-'''
-targetOnTimeMS = currTrial.trial.data.targetOnTimeMS.tolist()
-spikeData.chan1 = np.zeros((1, int(targetOnTimeMS)))
-
-for currTrial in allTrials:
-    extendedEOT 

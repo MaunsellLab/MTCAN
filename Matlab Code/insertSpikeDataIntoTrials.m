@@ -2,10 +2,13 @@
 % trial in the .mat (originally .dat) behavioral file. 
 
 % for MTC 
-
-% change code to only include valid trials (corrects)
-
-index = find(contains(taskNames, 'MTC'));
+% only inserts taskEvents and taskSpike into lablib file for correct trials
+% baseFileName = 'testing_220214';
+% fileNameNEV = [baseFileName '_NEV.mat'];
+% 
+% load(fileNameNEV);
+%%
+index = find(contains(taskNames, 'MTN'));
 for i = 1:length(taskEvents{1,index})
     trialNumber = taskEvents{1,index}(i).trialStart.data;
     for j = 1:length(trials)
@@ -17,48 +20,14 @@ for i = 1:length(taskEvents{1,index})
             spikeDataIndex = find(taskSpikes{1,index}(:,3) > trialStartS & taskSpikes{1,index}(:,3) < trialEndS);
             startInd = min(spikeDataIndex);
             endInd = max(spikeDataIndex);
-            trials{1,j}.spikeData = taskSpikes{1,index}(startInd:endInd,:);
+            % trials{1,j}.spikeData = taskSpikes{1,index}(startInd:endInd, :);
+            trials{1,j}.spikeData = struct();
+            trials{1,j}.spikeData.channel = taskSpikes{1,index}(startInd:endInd,1);
+            trials{1,j}.spikeData.unit = taskSpikes{1,index}(startInd:endInd,2);
+            trials{1,j}.spikeData.timeStamp = taskSpikes{1,index}(startInd:endInd,3);
         end
     end
 end
 
-
-
-% eventDict = taskDict();
-% trialsCount = 1;
-% 
-% 
-% for i = 1:length(NEV)
-%     if NEV(i,1) == 0 && NEV(i,2) == 54355  %trialStart event code 
-%         trialStartIndex = i;
-%         chan0Counter = 0;
-%         for j = trialStartIndex+1:length(NEV)
-%             while chan0Counter < 1
-%                 if NEV(j,1) == 0 && ~ismember(NEV(j,2), eventDict.codes)
-%                     nevTrialCounter = NEV(j,2);
-%                     chan0Counter = chan0Counter + 1;
-%                 end
-%             end
-%             if NEV(j,1) == 0 && NEV(j,2) == 54341 %trialEnd event code
-%                 for x = j+1:length(NEV)
-%                     while chan0Counter < 2
-%                         if NEV(x,1) == 0
-%                             trialEndIndex = x;
-%                             for t = 1:length(trials)
-%                                 if trials{1,t}.trialStart.data == nevTrialCounter
-%                                     trials{1,t}.spikeData = NEV(trialStartIndex:trialEndIndex,:);
-%                                     trialsCount = trialsCount + 1;
-%                                 end
-%                             end
-%                             chan0Counter = chan0Counter + 1;
-%                         end 
-%                     end
-%                 end
-%                 break
-%             end
-%         end
-%         % break
-%     end
-% end
 % fileNameNew = strrep(fileName, '.mat', '_withNEV.mat');
 % save(fileNameNew, 'trials', 'header', '-v7.3');

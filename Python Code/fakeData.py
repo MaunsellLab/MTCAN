@@ -34,7 +34,7 @@ def activeUnits(unitData):
     return units
 
 
-def insertStimSpikeData(x, index, stimOnTimeSNEV):
+def insertStimSpikeData(units, index, stimOnTimeSNEV):
     '''
     this function will generate a poisson spike train and return the normalized
     response for the RF for a given stimulus configuration
@@ -44,36 +44,51 @@ def insertStimSpikeData(x, index, stimOnTimeSNEV):
         sigma: semisaturation constant from neuron's contrast response function
     Outputs:
         RFSpikes: normalized response 
-    '''
-    
-    unitIdentity = units[x]
-    unitsField = np.array([unitIdentity] * 493)
-    channelIdentity = int(unitIdentity[0:unitIdentity.find('_')])
-    channel = np.array([channelIdentity] * 493)
 
+    spikes_4rows = np.tile(spikes, (4,1))
+    '''
+
+
+    numNeurons = len(units)
 
     C0 = stimIndexDict[index][0]['contrast']
     C1 = stimIndexDict[index][1]['contrast']
-    L0 = (tcDict[x+1][stimIndexDict[index][0]['direction']])/2
-    L1 = (tcDict[x+1][stimIndexDict[index][1]['direction']])/2
+    L0 = tcDict[1][stimIndexDict[index][0]['direction']]
+    L1 = tcDict[1][stimIndexDict[index][1]['direction']]
     sigma = 0.1
-
     expectedNormSpikeRate = int(((C0*L0) + (C1*L1))/(C0 + C1 + sigma))
-    dt = 1/1000
-    baseSpikeTrain = [0] * 493
-    for i in range(len(baseSpikeTrain)):
-        if np.random.uniform(0,1) < expectedNormSpikeRate * dt:
-            baseSpikeTrain[i] = 1
-    spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
-    spikeIndexS = spikeIndex[0]/1000 #[0] for tuple 
-    
-    # add spikes to spikeData
-    currTrial['spikeData']['timeStamp'] = np.append(currTrial \
-    ['spikeData']['timeStamp'], stimOnTimeSNEV + spikeIndexS, 0)
-    currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
-    ['unit'], [unitIdentity] * len(spikeIndexS), 0)
-    currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
-    ['channel'], [channelIdentity] * len(spikeIndexS), 0)
+    stimDur = 493
+    popMean = expectedNormSpikeRate/(1000/stimDur)
+
+    spikes = popMean + np.random.rand(1,numNeurons)           
+    R = np.zeros((numNeurons,numNeurons))
+    for neuronI in range(numNeurons):
+        for neuronJ in range(numNeurons):
+            if neuronI == neuronJ:
+                R[neuronI,neuronJ] = 1
+            else:
+                R[neuronI, neuronJ] = 0.1
+
+    L = np.linalg.cholesky(R)
+    spikes = np.matmul(spikes,L)   
+    spikes = np.around(spikes) 
+
+    # print(spikes)
+
+
+    for count, i in enumerate(spikes[0]):
+        if i != 0:
+            unit = units[count]
+            channelIdentity = int(unit[0:unit.find('_')])
+            channel = np.array([channelIdentity] * stimDur)
+            spikeTimeMS = (np.sort(np.random.choice(np.arange(stimDur), int(i),
+            replace = False)))/1000
+            currTrial['spikeData']['timeStamp'] = np.append(currTrial['spikeData'] \
+            ['timeStamp'], stimOnTimeSNEV + spikeTimeMS, 0)
+            currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
+            ['unit'], [unit] * len(spikeTimeMS), 0)
+            currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
+            ['channel'], [channelIdentity] * len(spikeTimeMS), 0)
 
 
 def randTuningCurve(numNeurons):
@@ -95,11 +110,11 @@ def randTuningCurve(numNeurons):
     tcDictionary = {}
 
     for i in range(1, tuningMat.shape[0]):
-        np.random.seed(i)
+        np.random.seed(2)
         amp = np.random.randint(15,30)
         y_translate = np.random.randint(30,50)
         x_translate = np.random.randint(60,120)
-        tuningMat[i,:] = (amp * np.sin((tuningMat[0,:] * np.pi / 180) + x_translate)) + y_translate
+        tuningMat[i,:] = (amp * np.sin((tuningMat[0,:] * (np.pi / 180)) + x_translate)) + y_translate
 
     for i, neuron in enumerate(tuningMat[1:,:]):
         tcDictionary[i+1] = {}
@@ -110,7 +125,7 @@ def randTuningCurve(numNeurons):
 
 
 # start here 
-allTrials, header = loadMatFile73('testing_220222_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('testing_220304_MTN_Spikes.mat')
 
 # generates a dictionary of stim Index and corresponding directions/contrasts
 stimIndexDict = {}
@@ -134,6 +149,15 @@ for currTrial in allTrials:
                         {'direction': int(stim['directionDeg'].tolist()),
                          'contrast': stim['contrast'].tolist()}
 
+# trials that should have spikeData but don't
+noSpikeData = []
+for count, currTrial in enumerate(allTrials):
+    extendedEOT = currTrial['extendedEOT']['data']
+    trial = currTrial['trial']['data']
+    if trial['instructTrial'] != 1 and extendedEOT == 0:
+        if 'spikeData' not in currTrial:
+            noSpikeData.append(count)
+
 # for testing only, Pre-processing, to generate spikeData field similar 
 # to actual spikeData from .nev (will have units as function of channel,
 # 1_1, 2_1 etc.)
@@ -153,42 +177,18 @@ tuningMat, tcDict = randTuningCurve(len(units))
 
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
-        trialStartS = currTrial['taskEvents']['trialStart']['timeS']
-        trialEndS = currTrial['taskEvents']['trialEnd']['timeS']
-        trialLen = int(round(trialEndS - trialStartS, 3) * 1000)
-        # generate underlying firing rate 
-        for count, unit in enumerate(units):
-            channelIdentity = int(unit[0:unit.find('_')])
-            baseFR = 5 # same firing rate for each neuron
-            dt = 1/1000
-            baseSpikeTrain = [0] * trialLen
-            for i in range(trialLen):
-                if np.random.uniform(0,1) < baseFR * dt:
-                    baseSpikeTrain[i] = 1
-            spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
-            spikeIndexS = spikeIndex[0]/1000 #[0] for tuple 
-            if count == 0:
-                currTrial['spikeData']['timeStamp'] = trialStartS + spikeIndexS
-                currTrial['spikeData']['unit'] = [unit] * len(spikeIndexS)
-                currTrial['spikeData']['channel'] = [channelIdentity] * len(spikeIndexS)
-            else:
-                currTrial['spikeData']['timeStamp'] = np.append(currTrial \
-                ['spikeData']['timeStamp'], trialStartS + spikeIndexS, 0)
-                currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
-                ['unit'], [unit] * len(spikeIndexS), 0)
-                currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
-                ['channel'], [channelIdentity] * len(spikeIndexS), 0)
-                # extend the currTrial['spikeData']['timeStamp'] fields
+        currTrial['spikeData']['channel'] = []
+        currTrial['spikeData']['unit'] = []
+        currTrial['spikeData']['timeStamp'] = []
         stimDesc = currTrial['stimDesc']['data']
         for count, stim in enumerate(stimDesc):
-            if stim['stimLoc'] == 0:
+            if stim['stimLoc'] == 0 and stim['listType'] == 1:
                 index = int(stim['stimIndex'].tolist())
                 stimOnTimeMS = currTrial['stimDesc']['timeMS'][count] - \
                 currTrial['trialStart']['timeMS']
                 stimOnTimeSNEV = round(currTrial['taskEvents']['trialStart']\
                 ['timeS'].tolist() + (stimOnTimeMS/1000), 3)
-                for j in range(0, len(units)):
-                    insertStimSpikeData(j, index, stimOnTimeSNEV)
+                insertStimSpikeData(units, index, stimOnTimeSNEV)
 
 
 '''
@@ -226,7 +226,8 @@ for currTrial in allTrials:
         currTrial['fakeData']['unit'] = np.array(currTrial['fakeData']['unit'])              
 
 '''
-
+57.085
+58.212
 def poissonSpikeTrain(x, index):
     '''
     this function will generate a poisson spike train and return the normalized
@@ -277,6 +278,88 @@ spikeCountMat[:,0,:] = np.arange(0,169)
 spikeCountMat[:,1:,:] = np.nan
 stimIndexCount = {}
 
+def insertStimSpikeData(x, index, stimOnTimeSNEV):
+    '''
+    this function will generate a poisson spike train and return the normalized
+    response for the RF for a given stimulus configuration
+    Inputs:
+        x: neuron number
+        index: the index of the corresponding stimulus configuration
+        sigma: semisaturation constant from neuron's contrast response function
+    Outputs:
+        RFSpikes: normalized response 
+    '''
+    
+    unitIdentity = units[x]
+    unitsField = np.array([unitIdentity] * 493)
+    channelIdentity = int(unitIdentity[0:unitIdentity.find('_')])
+    channel = np.array([channelIdentity] * 493)
+
+
+    C0 = stimIndexDict[index][0]['contrast']
+    C1 = stimIndexDict[index][1]['contrast']
+    L0 = tcDict[x+1][stimIndexDict[index][0]['direction']]
+    L1 = tcDict[x+1][stimIndexDict[index][1]['direction']]
+    sigma = 0.1
+
+    expectedNormSpikeRate = int(((C0*L0) + (C1*L1))/(C0 + C1 + sigma))
+    dt = 1/1000
+    baseSpikeTrain = [0] * 493
+    for i in range(len(baseSpikeTrain)):
+        if np.random.uniform(0,1) < expectedNormSpikeRate * dt:
+            baseSpikeTrain[i] = 1
+    spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
+     
+    # add spikes to spikeData
+    if len(spikeIndex[0]) != 0:
+        spikeIndexS = spikeIndex[0]/1000 #[0] for tuple
+        currTrial['spikeData']['timeStamp'] = np.append(currTrial \
+        ['spikeData']['timeStamp'], stimOnTimeSNEV + spikeIndexS, 0)
+        currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
+        ['unit'], [unitIdentity] * len(spikeIndexS), 0)
+        currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
+        ['channel'], [channelIdentity] * len(spikeIndexS), 0)
+
+# for generating underlying base firing rate
+for currTrial in allTrials:
+    if 'spikeData' in currTrial:
+        trialStartS = currTrial['taskEvents']['trialStart']['timeS']
+        trialEndS = currTrial['taskEvents']['trialEnd']['timeS']
+        trialLen = int(round(trialEndS - trialStartS, 3) * 1000)
+        # generate underlying firing rate 
+        for count, unit in enumerate(units):
+            channelIdentity = int(unit[0:unit.find('_')])
+            baseFR = 5 # same firing rate for each neuron
+            dt = 1/1000
+            baseSpikeTrain = [0] * trialLen
+            for i in range(trialLen):
+                if np.random.uniform(0,1) < baseFR * dt:
+                    baseSpikeTrain[i] = 1
+            spikeIndex = np.where(np.array(baseSpikeTrain) == 1)
+            spikeIndexS = spikeIndex[0]/1000 #[0] for tuple 
+            if count == 0:
+                currTrial['spikeData']['timeStamp'] = trialStartS + spikeIndexS
+                currTrial['spikeData']['unit'] = [unit] * len(spikeIndexS)
+                currTrial['spikeData']['channel'] = [channelIdentity] * len(spikeIndexS)
+            else:
+                currTrial['spikeData']['timeStamp'] = np.append(currTrial \
+                ['spikeData']['timeStamp'], trialStartS + spikeIndexS, 0)
+                currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
+                ['unit'], [unit] * len(spikeIndexS), 0)
+                currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
+                ['channel'], [channelIdentity] * len(spikeIndexS), 0)
+                # extend the currTrial['spikeData']['timeStamp'] fields
+        stimDesc = currTrial['stimDesc']['data']
+        for count, stim in enumerate(stimDesc):
+            if stim['stimLoc'] == 0 and stim['listType'] == 1:
+                index = int(stim['stimIndex'].tolist())
+                stimOnTimeMS = currTrial['stimDesc']['timeMS'][count] - \
+                currTrial['trialStart']['timeMS']
+                stimOnTimeSNEV = round(currTrial['taskEvents']['trialStart']\
+                ['timeS'].tolist() + (stimOnTimeMS/1000), 3)
+                for j in range(0, len(units)):
+                    insertStimSpikeData(j, index, stimOnTimeSNEV)
+
 # code will add stimuli presentations to index matrix, excluding padding
 # stimuli and when target appears before RF stimulus turns off
 for n,currTrial in enumerate(allTrialsData.item()[0]):
@@ -304,7 +387,7 @@ for n,currTrial in enumerate(allTrialsData.item()[0]):
 
 meanSpike = np.nanmean(spikeCountMat[:,1:,:], axis = 1)
 
-meanSpikeReshaped = np.zeros((numNeurons,1,169))
+meanSpikeReshaped = np.zeros((len(units),1,169))
 for count,i in enumerate(meanSpikeReshaped):
     i[:,0:6] = meanSpike[count][0:6]
     i[:,6:12] = meanSpike[count][36:42]

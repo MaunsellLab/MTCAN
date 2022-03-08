@@ -124,5 +124,24 @@ def eyePosDurTrial(currTrial):
     return eyesXYDeg
 
 
+
+def activeUnits(spikeData):
+
+    '''
+    function returns the active units across trials for a session as a list
+
+    Inputs: unitData (str): spikeData
+    Outputs: units (list): active units for a sessioon
+
+    '''
+    units = []
+    for currTrial in allTrials:
+        if spikeData in currTrial:
+            uniqueUnits = np.unique(currTrial[spikeData]['unit'])
+            for unique in uniqueUnits:
+                if unique not in units:
+                    units.append(unique)
+    
+    return units
 #testing time to open file
 # t0 = time.time(); a = mat73.loadmat('./Documents/Grad School/Maunsell Lab/Analysis/MTCAN/Matlab Data/Meetz_2022_0114_MTNAN_m73.mat', use_attrdict = True); print(time.time() - t0)

@@ -15,7 +15,7 @@ addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NPMK/');
 addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
   % for testing
   if nargin < 1
-    nevFile = 'testing_220225001';                          % .nev file (no file extension)
+    nevFile = 'testing_220304001';                          % .nev file (no file extension)
     directory = '/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/';  % directory for .nev file
     NEV = readNEV([directory, nevFile, '.nev']);          	                      % read .nev file
   end

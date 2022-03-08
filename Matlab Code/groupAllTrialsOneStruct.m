@@ -1,6 +1,6 @@
 clear
 
-baseFileName = 'testing_220225';
+baseFileName = 'testing_220304';
 
 directory = '/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/Lablib Data/';
 

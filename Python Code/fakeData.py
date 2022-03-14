@@ -59,8 +59,10 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
     expectedNormSpikeRate = int(((C0*L0) + (C1*L1))/(C0 + C1 + sigma))
     stimDur = 493
     popMean = expectedNormSpikeRate/(1000/stimDur)
+    popSTD = math.sqrt(popMean)
 
-    spikes = popMean + np.random.rand(1,numNeurons)           
+    spikes = popMean + np.random.rand(1,numNeurons)     
+    # spikes = popMean + popSTD*np.random.rand(1,numNeurons)      
     R = np.zeros((numNeurons,numNeurons))
     for neuronI in range(numNeurons):
         for neuronJ in range(numNeurons):
@@ -72,9 +74,6 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
     L = np.linalg.cholesky(R)
     spikes = np.matmul(spikes,L)   
     spikes = np.around(spikes) 
-
-    # print(spikes)
-
 
     for count, i in enumerate(spikes[0]):
         if i != 0:

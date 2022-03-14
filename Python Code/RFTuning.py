@@ -3,6 +3,7 @@ import scipy.io as sp
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
@@ -84,14 +85,52 @@ for currTrial in allTrials:
                             spikeHists[histCount][eleIndex][aziIndex] += 1
 
 
-
-
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 
-heatMap = plt.imshow(spikeCountMean, cmap='hot', interpolation='nearest')
+#plot figure
+fig = plt.figure()
+fig.set_size_inches(6,8)
+
+date = header['date']
+text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13)
+text.set_path_effects([path_effects.Normal()])
+
+ax_row1 = []
+ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
+ax_row1[0].imshow(spikeCountMean, cmap='hot', interpolation='nearest')
+ax_row1[0].set_xlabel('azimuth (deg ˚)')
+ax_row1[0].set_ylabel('elevation (deg ˚)')
+ax_row1[0].set_title('Heatmap of Neuron Activity', fontsize = 10)
+
+ax_row2 = []
+for i in range(4, 10):
+    ax = []
+    for j in range(0, 6):
+        ax.append(plt.subplot2grid((10,6), (i,j)))
+    ax_row2.append(np.array(ax))
+
+ax_row2 = np.array(ax_row2) # 6 x 6
+
+for i in range(numEle):
+    for j in range(numAzi):
+        spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
+        histSmooth = smooth(spikeHist,75)
+        ax_row2[i,j].plot(histSmooth)
+        ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
+        ax_row2[i,j].set_ylim([0, 70])
+        ax_row2[i,j].set_yticks([0,35,70])
+        ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
+        ax_row2[i,j].set_xticks([50,250])
+        ax_row2[i,j].set_xticklabels([50,20], fontsize=5)
+        if i == 5 and j == 0:
+            ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
+            ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+            ax_row2[i,j].yaxis.set_label_coords(-0.5,1.50)
+plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
 plt.show()
 
 
+'''
 smoothHist = savgol_filter(spikeHist, 100,3)
 plt.plot(smoothHist)
 plt.show()
@@ -102,64 +141,9 @@ def smooth(y, box_pts):
     y_smooth = np.convolve(y, box, mode='same')
     return y_smooth
 
-histSmooth = smooth(spikeHist,5)
+spikeHist = spikeHists[:,1,1] * 1000/ stimCount[1,1]
+histSmooth = smooth(spikeHist,75)
 plt.plot(histSmooth)
 plt.show()
+'''
 
-
-
-
-#insert fake spikes for heatmap
-
-#values for fakespikes
-fakeAzi = np.random.randint(numAzi)
-fakeEle = np.random.randint(numEle)
-fakeSpikes = 50 #spikes/sec
-baseFR = 10 #spikes/sec
-dt = 1/1000
-
-for currTrial in allTrials:
-    trial = currTrial['trial']['data']
-    trialEnd = currTrial['trialEnd']['data']
-    if trial['instructTrial'] != 1 and trialEnd == 0:
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = currTrial['taskEvents']['trialStart']['timeS']
-        trialEndSNEV = currTrial['taskEvents']['trialEnd']['timeS']
-        trialLen = trialEndSNEV - trialStartSNEV
-        stimDesc = currTrial['stimDesc']
-        spikeData = currTrial['spikeData']
-        spikeData['channel'] = []
-        spikeData['unit'] = []
-        spikeData['timeStamp'] = []
-        for unit in units:
-            channelIdentity = int(unit[0:unit.find('_')])
-            spikes = np.random.poisson(trialLen*baseFR)
-            spikeTimeS = (np.sort(np.random.choice(np.arange(trialLen * 1000),\
-                           spikes, replace = False)))/1000
-            spikeData['timeStamp'] = np.append(spikeData['timeStamp'], \
-                                     trialStartSNEV + spikeTimeS, 0)
-            spikeData['unit'] = np.append(spikeData['unit'], \
-                                [unit] * len(spikeTimeS), 0)
-            spikeData['channel'] = np.append(spikeData['channel'], \
-                                   [channelIdentity] * len(spikeTimeS), 0)
-        for count, stim in enumerate(stimDesc['data']):
-            if stim['stimType'] == 2:
-                break
-            if stim['gaborIndex'] == 1:
-                aziIndex = int(stim['azimuthIndex'])
-                eleIndex = int(stim['elevationIndex'])
-                stimOnTimeMS = stimDesc['timeMS'][count]
-                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                stimOnSNEV = trialStartSNEV + stimDiffS
-                if aziIndex == fakeAzi and eleIndex == fakeEle:
-                    for unit in units:
-                        channelIdentity = int(unit[0:unit.find('_')])
-                        spikeTimeS = (np.sort(np.random.choice(np.arange(stimDurMS),\
-                                    int(np.round(fakeSpikes/(1000/stimDurMS))),\
-                                    replace = False)))/1000
-                        spikeData['timeStamp'] = np.append(spikeData['timeStamp'],\
-                                                stimOnSNEV + spikeTimeS, 0)
-                        spikeData['unit'] = np.append(spikeData['unit'], \
-                                            [unit] * len(spikeTimeS), 0)
-                        spikeData['channel'] = np.append(spikeData['channel'], \
-                                               [channelIdentity] * len(spikeTimeS), 0)

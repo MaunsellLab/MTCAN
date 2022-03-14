@@ -7,6 +7,7 @@ import matplotlib.patheffects as path_effects
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
+# for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
         currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
@@ -73,7 +74,7 @@ for currTrial in allTrials:
                     unitIndex = np.where(spikeData['unit'] == unit)
                     unitTimeStamps = spikeData['timeStamp'][unitIndex]
                     stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + 200/1000))
+                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
                     spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
                     stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
                     
@@ -98,9 +99,9 @@ text.set_path_effects([path_effects.Normal()])
 ax_row1 = []
 ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
 ax_row1[0].imshow(spikeCountMean, cmap='hot', interpolation='nearest')
-ax_row1[0].set_xlabel('azimuth (deg ˚)')
-ax_row1[0].set_ylabel('elevation (deg ˚)')
-ax_row1[0].set_title('Heatmap of Neuron Activity', fontsize = 10)
+ax_row1[0].set_xlabel('azimuth (deg˚)', fontsize = 8)
+ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
+ax_row1[0].set_title('Heatmap of Neuron Activity', fontsize = 9)
 
 ax_row2 = []
 for i in range(4, 10):

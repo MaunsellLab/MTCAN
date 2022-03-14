@@ -189,6 +189,59 @@ for currTrial in allTrials:
                 ['timeS'].tolist() + (stimOnTimeMS/1000), 3)
                 insertStimSpikeData(units, index, stimOnTimeSNEV)
 
+# Fake data for GaborRF heatmap generation 
+# Values for fakespikes
+fakeAzi = np.random.randint(numAzi)
+fakeEle = np.random.randint(numEle)
+fakeSpikes = 50 #spikes/sec
+baseFR = 10 #spikes/sec
+dt = 1/1000
+
+for currTrial in allTrials:
+    trial = currTrial['trial']['data']
+    trialEnd = currTrial['trialEnd']['data']
+    if trial['instructTrial'] != 1 and trialEnd == 0:
+        trialStartMS = currTrial['trialStart']['timeMS']
+        trialStartSNEV = currTrial['taskEvents']['trialStart']['timeS']
+        trialEndSNEV = currTrial['taskEvents']['trialEnd']['timeS']
+        trialLen = trialEndSNEV - trialStartSNEV
+        stimDesc = currTrial['stimDesc']
+        spikeData = currTrial['spikeData']
+        spikeData['channel'] = []
+        spikeData['unit'] = []
+        spikeData['timeStamp'] = []
+        for unit in units:
+            channelIdentity = int(unit[0:unit.find('_')])
+            spikes = np.random.poisson(trialLen*baseFR)
+            spikeTimeS = (np.sort(np.random.choice(np.arange(trialLen * 1000),\
+                           spikes, replace = False)))/1000
+            spikeData['timeStamp'] = np.append(spikeData['timeStamp'], \
+                                     trialStartSNEV + spikeTimeS, 0)
+            spikeData['unit'] = np.append(spikeData['unit'], \
+                                [unit] * len(spikeTimeS), 0)
+            spikeData['channel'] = np.append(spikeData['channel'], \
+                                   [channelIdentity] * len(spikeTimeS), 0)
+        for count, stim in enumerate(stimDesc['data']):
+            if stim['stimType'] == 2:
+                break
+            if stim['gaborIndex'] == 1:
+                aziIndex = int(stim['azimuthIndex'])
+                eleIndex = int(stim['elevationIndex'])
+                stimOnTimeMS = stimDesc['timeMS'][count]
+                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                stimOnSNEV = trialStartSNEV + stimDiffS
+                if aziIndex == fakeAzi and eleIndex == fakeEle:
+                    for unit in units:
+                        channelIdentity = int(unit[0:unit.find('_')])
+                        spikeTimeS = (np.sort(np.random.choice(np.arange(stimDurMS),\
+                                    int(np.round(fakeSpikes/(1000/stimDurMS))),\
+                                    replace = False)))/1000
+                        spikeData['timeStamp'] = np.append(spikeData['timeStamp'],\
+                                                stimOnSNEV + spikeTimeS, 0)
+                        spikeData['unit'] = np.append(spikeData['unit'], \
+                                            [unit] * len(spikeTimeS), 0)
+                        spikeData['channel'] = np.append(spikeData['channel'], \
+                                               [channelIdentity] * len(spikeTimeS), 0)
 
 '''
 old verison pre v7.3

@@ -3,11 +3,26 @@ MTN Analysis Script
  - heatmap of Norm responses
  - potentially some correlations
 '''
-
+import seaborn as sns
 import numpy as np
+import numpy.ma as ma
 from usefulFns import *
+from itertools import combinations
+from scipy import stats
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 # load my file 
+
+# are there correct trials without spikeData
+noSpikeData = []
+for trialCount, currTrial in enumerate(allTrials):
+    trial = currTrial['trial']['data']
+    extendedEOT = currTrial['extendedEOT']['data']
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        if spikeData not in currTrial:
+            noSpikeData.append(trialCount)
+
 
 def activeUnits(spikeData):
 
@@ -33,18 +48,9 @@ def activeUnits(spikeData):
 units = activeUnits('spikeData')
 
 spikeCountMat = np.zeros((len(units),30,169))
-spikeCountMat[:,0,:] np.arange(0,169)
+spikeCountMat[:,0,:] = np.arange(0,169)
 spikeCountMat[:,1:,:] = np.nan
 stimIndexCount = {}
-
-# are there correct trials without spikeData
-noSpikeData = []
-for trialCount, currTrial in enumerate(allTrials):
-    trial = currTrial['trial']['data']
-    extendedEOT = currTrial['extendedEOT']['data']
-    if extendedEOT == 0 and trial['instructTrial'] != 1:
-        if spikeData not in currTrial:
-            noSpikeData.append(trialCount)
 
 for currTrial in allTrials: 
     trial = currTrial['trial']['data']
@@ -66,7 +72,8 @@ for currTrial in allTrials:
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
                                     (unitTimeStamps <= stimOnSNEV + 493/1000))
-                        spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] = len(stimSpikes[0])
+                        spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
+                        = len(stimSpikes[0])
 
 meanSpike = np.nanmean(spikeCountMat[:,1:,:], axis = 1)
 
@@ -113,12 +120,44 @@ for count,i in enumerate(meanSpikeReshaped):
 
 a = meanSpikeReshaped[0]
 b = a.reshape(13,13)
+
 plt.imshow(b, cmap='hot', interpolation='nearest')
+plt.show()
+
+
+
+#using seaborn
+ax = sns.heatmap(b)
+ax.set_xticks(np.arange(13)+0.5)
+ax.set_xticklabels(['0','60','120','180','240','300','0','60','120','180','240','300','blank'], rotation = 45)
+ax.xaxis.set_ticks_position("top")
+
+ax.set_yticks(np.arange(13)+0.5)
+ax.set_yticklabels(['0','60','120','180','240','300','0','60','120','180','240','300','blank'], rotation = 0)
 plt.show()
 
 
 
 
 
+#correlations
+combs = [i for i in combinations(units, 2)]
+corrMat = np.zeros((len(combs),1,169))
+
+for count, i in enumerate(combs):
+    n1 = units.index(i[0])
+    n2 = units.index(i[1])
+    for j in range(np.shape(spikeCountMat)[2]):
+        stimCorr = ma.corrcoef(ma.masked_invalid(spikeCountMat[n1,1:,j]),\
+                               ma.masked_invalid(spikeCountMat[n2,1:,j]))
+        corrMat[count][0][j] = stimCorr[0][1]
 
 
+b = stats.zscore(corrMatMean, axis=0, nan_policy='omit')
+
+corrMatMean = np.mean(corrMat, axis = (1,0))
+popCorrMean = ma.mean(ma.masked_invalid(corrMatMean))
+
+print(ma.mean(ma.masked_invalid(corrMat[0][0])))
+print(ma.mean(ma.masked_invalid(corrMat[1][0])))
+print(ma.mean(ma.masked_invalid(corrMat[2][0])))

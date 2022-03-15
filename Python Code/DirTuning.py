@@ -1,12 +1,9 @@
-
-
 from usefulFns import *
 import scipy.io as sp
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
-import seaborn as sns
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
@@ -88,3 +85,48 @@ for currTrial in allTrials:
 
 
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+
+#plot figure
+fig = plt.figure()
+fig.set_size_inches(6,8)
+
+date = header['date']
+text = fig.text(0.05, 0.9, f'Direction tuning for unit {unit}\n{date}', size=13)
+text.set_path_effects([path_effects.Normal()])
+
+ax_row1 = []
+ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
+# ax_row1[0] = sns.heatmap(spikeCountMean)
+# ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
+# ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
+# ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
+# polar plot needs to go here
+
+spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
+stimCountRS = np.reshape(stimCount, (2,3))
+
+ax_row2 = []
+for countI, i in enumerate(range(4, 10, 3)):
+    ax = []
+    for countJ, j in enumerate(range(0, 6, 2)):
+        ax.append(plt.subplot2grid((10,6), (i,j), colspan = 2, rowspan = 3))
+    ax_row2.append(np.array(ax))
+ax_row2 = np.array(ax_row2) # 2 x 3
+
+for i in range(2):
+    for j in range(3):
+        spikeHist = spikeHistsRS[:,i,j] * 1000/stimCountRS[i,j]
+        histSmooth = smooth(spikeHist,75)
+        ax_row2[i,j].plot(histSmooth)
+        ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
+        ax_row2[i,j].set_ylim([0, 70])
+        ax_row2[i,j].set_yticks([0,35,70])
+        ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
+        ax_row2[i,j].set_xticks([50,250])
+        ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
+        if i == 1 and j == 0:
+            ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
+            ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+            ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
+plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
+plt.show()

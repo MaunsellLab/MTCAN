@@ -1,9 +1,16 @@
+'''
+things to do
+1. change heatmap axis to include min and max azi/ele used
+2. ^for PSTHs
+'''
+
 from usefulFns import *
 import scipy.io as sp
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
+import seaborn as sns
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
@@ -98,10 +105,10 @@ text.set_path_effects([path_effects.Normal()])
 
 ax_row1 = []
 ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
-ax_row1[0].imshow(spikeCountMean, cmap='hot', interpolation='nearest')
-ax_row1[0].set_xlabel('azimuth (deg˚)', fontsize = 8)
+ax_row1[0] = sns.heatmap(spikeCountMean)
+ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
 ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
-ax_row1[0].set_title('Heatmap of Neuron Activity', fontsize = 9)
+ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
 
 ax_row2 = []
 for i in range(4, 10):
@@ -122,11 +129,11 @@ for i in range(numEle):
         ax_row2[i,j].set_yticks([0,35,70])
         ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
         ax_row2[i,j].set_xticks([50,250])
-        ax_row2[i,j].set_xticklabels([50,20], fontsize=5)
+        ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
         if i == 5 and j == 0:
             ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
             ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-            ax_row2[i,j].yaxis.set_label_coords(-0.5,1.50)
+            ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
 plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
 plt.show()
 

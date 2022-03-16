@@ -46,96 +46,98 @@ def activeUnits(spikeData):
 
 units = activeUnits('spikeData')
 
+for unit in units:
 
-numAzi = int(header['mapSettings']['data']['azimuthDeg']['n'].tolist())
-numEle = int(header['mapSettings']['data']['elevationDeg']['n'].tolist())
-stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
-histPrePostMS = 50
+    numAzi = int(header['mapSettings']['data']['azimuthDeg']['n'].tolist())
+    numEle = int(header['mapSettings']['data']['elevationDeg']['n'].tolist())
+    stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
+    histPrePostMS = 50
 
-stimCount = np.zeros((numEle,numAzi))
-spikeCountMat = np.zeros((50,numEle, numAzi))
-spikeCountMat[:,:,:] = np.nan
-spikeHists = np.zeros((stimDurMS + 2*histPrePostMS, numEle, numAzi))
-
-
-for currTrial in allTrials:
-    trial = currTrial['trial']['data']
-    trialEnd = currTrial['trialEnd']['data']
-    if trial['instructTrial'] != 1 and trialEnd == 0:
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
-        stimDesc = currTrial['stimDesc']
-        spikeData = currTrial['spikeData']
-        for sCount, stim in enumerate(stimDesc['data']):
-            if stim['stimType'] == 2:
-                break
-            if stim['gaborIndex'] == 1:
-                aziIndex = int(stim['azimuthIndex'])
-                eleIndex = int(stim['elevationIndex'])
-                stCount = int(stimCount[eleIndex][aziIndex])
-                stimOnTimeMS = stimDesc['timeMS'][sCount]
-                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                stimOnSNEV = trialStartSNEV + stimDiffS
-                if unit in spikeData['unit']:
-                    spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                    unitIndex = np.where(spikeData['unit'] == unit)
-                    unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                    stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
-                    spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
-                    stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
-                    
-                    #histograms
-                    histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
-                                          (stimDurMS+49)/1000, 0.001)
-                    for histCount, i in enumerate(range(len(histSpikes))):
-                        if np.around(histSpikes[i],3) in unitTimeStamps:
-                            spikeHists[histCount][eleIndex][aziIndex] += 1
+    stimCount = np.zeros((numEle,numAzi))
+    spikeCountMat = np.zeros((50,numEle, numAzi))
+    spikeCountMat[:,:,:] = np.nan
+    spikeHists = np.zeros((stimDurMS + 2*histPrePostMS, numEle, numAzi))
 
 
-spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+    for currTrial in allTrials:
+        trial = currTrial['trial']['data']
+        trialEnd = currTrial['trialEnd']['data']
+        if trial['instructTrial'] != 1 and trialEnd == 0:
+            trialStartMS = currTrial['trialStart']['timeMS']
+            trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
+            stimDesc = currTrial['stimDesc']
+            spikeData = currTrial['spikeData']
+            for sCount, stim in enumerate(stimDesc['data']):
+                if stim['stimType'] == 2:
+                    break
+                if stim['gaborIndex'] == 1:
+                    aziIndex = int(stim['azimuthIndex'])
+                    eleIndex = int(stim['elevationIndex'])
+                    stCount = int(stimCount[eleIndex][aziIndex])
+                    stimOnTimeMS = stimDesc['timeMS'][sCount]
+                    stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                    stimOnSNEV = trialStartSNEV + stimDiffS
+                    if unit in spikeData['unit']:
+                        spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
+                        unitIndex = np.where(spikeData['unit'] == unit)
+                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
+                                        (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
+                        stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
+                        
+                        #histograms
+                        histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
+                                            (stimDurMS+49)/1000, 0.001)
+                        for histCount, i in enumerate(range(len(histSpikes))):
+                            if np.around(histSpikes[i],3) in unitTimeStamps:
+                                spikeHists[histCount][eleIndex][aziIndex] += 1
 
-#plot figure
-fig = plt.figure()
-fig.set_size_inches(6,8)
 
-date = header['date']
-text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13)
-text.set_path_effects([path_effects.Normal()])
+    spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 
-ax_row1 = []
-ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
-ax_row1[0] = sns.heatmap(spikeCountMean)
-ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
-ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
-ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
+    #plot figure
+    fig = plt.figure()
+    fig.set_size_inches(6,8)
 
-ax_row2 = []
-for i in range(4, 10):
-    ax = []
-    for j in range(0, 6):
-        ax.append(plt.subplot2grid((10,6), (i,j)))
-    ax_row2.append(np.array(ax))
+    date = header['date']
+    text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13)
+    text.set_path_effects([path_effects.Normal()])
 
-ax_row2 = np.array(ax_row2) # 6 x 6
+    ax_row1 = []
+    ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
+    ax_row1[0] = sns.heatmap(spikeCountMean)
+    ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
+    ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
+    ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
 
-for i in range(numEle):
-    for j in range(numAzi):
-        spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
-        histSmooth = smooth(spikeHist,75)
-        ax_row2[i,j].plot(histSmooth)
-        ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
-        ax_row2[i,j].set_ylim([0, 70])
-        ax_row2[i,j].set_yticks([0,35,70])
-        ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
-        ax_row2[i,j].set_xticks([50,250])
-        ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
-        if i == 5 and j == 0:
-            ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
-            ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-            ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
-plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
-plt.show()
+    ax_row2 = []
+    for i in range(4, 10):
+        ax = []
+        for j in range(0, 6):
+            ax.append(plt.subplot2grid((10,6), (i,j)))
+        ax_row2.append(np.array(ax))
+
+    ax_row2 = np.array(ax_row2) # 6 x 6
+
+    for i in range(numEle):
+        for j in range(numAzi):
+            spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
+            histSmooth = smooth(spikeHist,75)
+            ax_row2[i,j].plot(histSmooth)
+            ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
+            ax_row2[i,j].set_ylim([0, 70])
+            ax_row2[i,j].set_yticks([0,35,70])
+            ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
+            ax_row2[i,j].set_xticks([50,250])
+            ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
+            if i == 5 and j == 0:
+                ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
+                ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+                ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
+    plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
+    plt.show() 
+    #plt save as pdf
 
 
 '''

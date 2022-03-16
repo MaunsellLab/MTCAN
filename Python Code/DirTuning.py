@@ -71,8 +71,6 @@ for currTrial in allTrials:
                     unitTimeStamps = spikeData['timeStamp'][unitIndex]
                     stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
                                     (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
-
-
                     spikeCountMat[stCount][0][dirIndex] = len(stimSpikes[0])
                     stimCount[0][dirIndex] += 1
                     
@@ -94,13 +92,12 @@ date = header['date']
 text = fig.text(0.05, 0.9, f'Direction tuning for unit {unit}\n{date}', size=13)
 text.set_path_effects([path_effects.Normal()])
 
-ax_row1 = []
-ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
-# ax_row1[0] = sns.heatmap(spikeCountMean)
-# ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
-# ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
-# ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
-# polar plot needs to go here
+ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
+theta = np.radians(np.arange(0,420,360/numDir))
+r = np.append(spikeCountMean, spikeCountMean[0])
+ax_row1.plot(theta,r)
+
+plt.show()
 
 spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
 stimCountRS = np.reshape(stimCount, (2,3))

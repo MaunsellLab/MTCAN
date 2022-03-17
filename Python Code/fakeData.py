@@ -243,6 +243,56 @@ for currTrial in allTrials:
                         spikeData['channel'] = np.append(spikeData['channel'], \
                                                [channelIdentity] * len(spikeTimeS), 0)
 
+
+# fake spikes for dir tuning
+tuningMat, tcDict = randTuningCurve(len(units))
+baseFR = 10 #spikes/sec
+dt = 1/1000
+
+for currTrial in allTrials:
+    trial = currTrial['trial']['data']
+    trialEnd = currTrial['trialEnd']['data']
+    if trial['instructTrial'] != 1 and trialEnd == 0:
+        trialStartMS = currTrial['trialStart']['timeMS']
+        trialStartSNEV = currTrial['taskEvents']['trialStart']['timeS']
+        trialEndSNEV = currTrial['taskEvents']['trialEnd']['timeS']
+        trialLen = trialEndSNEV - trialStartSNEV
+        stimDesc = currTrial['stimDesc']
+        spikeData = currTrial['spikeData']
+        spikeData['channel'] = []
+        spikeData['unit'] = []
+        spikeData['timeStamp'] = []
+        for unit in units:
+            channelIdentity = int(unit[0:unit.find('_')])
+            spikes = np.random.poisson(trialLen*baseFR)
+            spikeTimeS = (np.sort(np.random.choice(np.arange(trialLen * 1000),\
+                           spikes, replace = False)))/1000
+            spikeData['timeStamp'] = np.append(spikeData['timeStamp'], \
+                                     trialStartSNEV + spikeTimeS, 0)
+            spikeData['unit'] = np.append(spikeData['unit'], \
+                                [unit] * len(spikeTimeS), 0)
+            spikeData['channel'] = np.append(spikeData['channel'], \
+                                   [channelIdentity] * len(spikeTimeS), 0)
+        for count, stim in enumerate(stimDesc['data']):
+            if stim['stimType'] == 2:
+                break
+            if stim['gaborIndex'] == 1:
+                dirIndex = int(stim['directionIndex'])
+                stimOnTimeMS = stimDesc['timeMS'][count]
+                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                stimOnSNEV = trialStartSNEV + stimDiffS
+                for unitCount, unit in enumerate(units):
+                    expectedSpikes = np.random.poisson(tuningMat[unitCount+1][dirIndex]*stimDurMS/1000)
+                    channelIdentity = int(unit[0:unit.find('_')])
+                    spikeTimeS = (np.sort(np.random.choice(np.arange(stimDurMS),\
+                    expectedSpikes, replace=False)))/1000
+                    spikeData['timeStamp'] = np.append(spikeData['timeStamp'],\
+                                            stimOnSNEV + spikeTimeS, 0)
+                    spikeData['unit'] = np.append(spikeData['unit'], \
+                                        [unit] * len(spikeTimeS), 0)
+                    spikeData['channel'] = np.append(spikeData['channel'], \
+                                            [channelIdentity] * len(spikeTimeS), 0)
+
 '''
 old verison pre v7.3
 '''

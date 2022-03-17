@@ -101,10 +101,10 @@ theta = np.radians(np.arange(0,420,360/numDir))
 r = np.append(spikeCountMean, spikeCountMean[0])
 err = np.append(spikeCountSD, spikeCountSD[0])
 ax_row1.plot(theta,r)
-ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'cyan', color='black')
+ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
 ax_row1.set_theta_zero_location("N")
 ax_row1.set_rmax(100)
-ax_row1.set_title('Direction tuning polar plot', fontsize=7)
+ax_row1.set_title('Direction tuning polar plot', fontsize=8)
 
 # hists
 spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))

@@ -83,22 +83,30 @@ for currTrial in allTrials:
 
 
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
 
 #plot figure
+#polar
+date = header['date']
+
 fig = plt.figure()
 fig.set_size_inches(6,8)
 
-date = header['date']
-text = fig.text(0.05, 0.9, f'Direction tuning for unit {unit}\n{date}', size=13)
+text = fig.text(0.05, 0.9, f'Direction tuning for unit {unit}\n{date}',\
+                size=13, fontweight='bold')
 text.set_path_effects([path_effects.Normal()])
 
 ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
 theta = np.radians(np.arange(0,420,360/numDir))
 r = np.append(spikeCountMean, spikeCountMean[0])
+err = np.append(spikeCountSD, spikeCountSD[0])
 ax_row1.plot(theta,r)
+ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'cyan', color='black')
+ax_row1.set_theta_zero_location("N")
+ax_row1.set_rmax(100)
+ax_row1.set_title('Direction tuning polar plot', fontsize=7)
 
-plt.show()
-
+# hists
 spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
 stimCountRS = np.reshape(stimCount, (2,3))
 

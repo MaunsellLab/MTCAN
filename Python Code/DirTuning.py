@@ -5,7 +5,7 @@ import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 
-allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
+allTrials, header = loadMatFile73('testing_220317_Dir_GRF_Spikes.mat')
 
 # for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
@@ -79,7 +79,7 @@ for currTrial in allTrials:
                                           (stimDurMS+49)/1000, 0.001)
                     for histCount, i in enumerate(range(len(histSpikes))):
                         if np.around(histSpikes[i],3) in unitTimeStamps:
-                            spikeHists[histCount][0][directionIndex] += 1
+                            spikeHists[histCount][0][dirIndex] += 1
 
 
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
@@ -98,8 +98,8 @@ text.set_path_effects([path_effects.Normal()])
 
 ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
 theta = np.radians(np.arange(0,420,360/numDir))
-r = np.append(spikeCountMean, spikeCountMean[0])
-err = np.append(spikeCountSD, spikeCountSD[0])
+r = (np.append(spikeCountMean, spikeCountMean[0][0]))*1000/stimDurMS
+err = (np.append(spikeCountSD, spikeCountSD[0][0]))*1000/stimDurMS
 ax_row1.plot(theta,r)
 ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
 ax_row1.set_theta_zero_location("N")
@@ -109,6 +109,7 @@ ax_row1.set_title('Direction tuning polar plot', fontsize=8)
 # hists
 spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
 stimCountRS = np.reshape(stimCount, (2,3))
+titleArr = np.reshape(np.arange(0,360,60),(2,3))
 
 ax_row2 = []
 for countI, i in enumerate(range(4, 10, 3)):
@@ -121,12 +122,13 @@ ax_row2 = np.array(ax_row2) # 2 x 3
 for i in range(2):
     for j in range(3):
         spikeHist = spikeHistsRS[:,i,j] * 1000/stimCountRS[i,j]
-        histSmooth = smooth(spikeHist,75)
+        histSmooth = smooth(spikeHist,100)
         ax_row2[i,j].plot(histSmooth)
-        ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
-        ax_row2[i,j].set_ylim([0, 70])
-        ax_row2[i,j].set_yticks([0,35,70])
-        ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
+        histTitle = titleArr[i][j]
+        ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)
+        ax_row2[i,j].set_ylim([0, 100])
+        ax_row2[i,j].set_yticks([0,50,100])
+        ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
         ax_row2[i,j].set_xticks([50,250])
         ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
         if i == 1 and j == 0:

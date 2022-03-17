@@ -101,7 +101,8 @@ for unit in units:
     fig.set_size_inches(6,8)
 
     date = header['date']
-    text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13)
+    text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13,\
+            fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
     ax_row1 = []

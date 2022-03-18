@@ -39,7 +39,7 @@ def activeUnits(spikeData):
 
 units = activeUnits('spikeData')
 
-numDir = int(header['mapSettings']['data']['directionDeg']['n'].tolist())
+numDir = int(header['map0Settings']['data']['directionDeg']['n'].tolist())
 stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
 histPrePostMS = 50
 
@@ -104,7 +104,7 @@ ax_row1.plot(theta,r)
 ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
 ax_row1.set_theta_zero_location("N")
 ax_row1.set_rmax(100)
-ax_row1.set_title('Direction tuning polar plot', fontsize=8)
+ax_row1.set_title('Direction Tuning Plot', fontsize=8)
 
 # hists
 spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
@@ -122,7 +122,7 @@ ax_row2 = np.array(ax_row2) # 2 x 3
 for i in range(2):
     for j in range(3):
         spikeHist = spikeHistsRS[:,i,j] * 1000/stimCountRS[i,j]
-        histSmooth = smooth(spikeHist,100)
+        histSmooth = smooth(spikeHist,75)
         ax_row2[i,j].plot(histSmooth)
         histTitle = titleArr[i][j]
         ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)

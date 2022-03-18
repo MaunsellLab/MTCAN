@@ -48,10 +48,11 @@ units = activeUnits('spikeData')
 
 for unit in units:
 
-    numAzi = int(header['mapSettings']['data']['azimuthDeg']['n'].tolist())
-    numEle = int(header['mapSettings']['data']['elevationDeg']['n'].tolist())
+    numAzi = int(header['map0Settings']['data']['azimuthDeg']['n'].tolist())
+    numEle = int(header['map0Settings']['data']['elevationDeg']['n'].tolist())
     stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
     histPrePostMS = 50
+    
 
     stimCount = np.zeros((numEle,numAzi))
     spikeCountMat = np.zeros((50,numEle, numAzi))

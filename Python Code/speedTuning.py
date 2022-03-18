@@ -81,11 +81,18 @@ for currTrial in allTrials:
                     stimCount[0][speedIndex] += 1
                     
                     #histograms
-                    histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
-                                          (stimDurMS+49)/1000, 0.001)
-                    for histCount, i in enumerate(range(len(histSpikes))):
-                        if np.around(histSpikes[i],3) in unitTimeStamps:
-                            spikeHists[histCount][0][speedIndex] += 1
+                    # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
+                    #                       (stimDurMS+49)/1000, 0.001)
+                    # for histCount, i in enumerate(range(len(histSpikes))):
+                    #     if np.around(histSpikes[i],3) in unitTimeStamps:
+                    #         spikeHists[histCount][0][speedIndex] += 1
+
+                    stimOnPreSNEV = stimOnSNEV - 0.050
+                    stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                    histStimSpikes = np.round((unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
+                                        & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV),3)
+                    for i in histStimSpikes:
+                        spikeHists[int(i*1000)][0][speedIndex] += 1
 
 
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)

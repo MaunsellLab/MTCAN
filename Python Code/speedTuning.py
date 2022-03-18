@@ -1,3 +1,7 @@
+'''
+to do: add hists (depends on number of speeds I want to test for)
+'''
+
 from usefulFns import *
 import scipy.io as sp
 import numpy as np
@@ -39,7 +43,9 @@ def activeUnits(spikeData):
 
 units = activeUnits('spikeData')
 
-numSpeeds = int(header['mapSettings']['data']['temporalFreqHz']['n'].tolist())
+numSpeeds = int(header['map0Settings']['data']['temporalFreqHz']['n'].tolist())
+minSpeed = int(header['map0Settings']['data']['temporalFreqHz']['minValue'].tolist())
+maxSpeed = int(header['map0Settings']['data']['temporalFreqHz']['maxValue'].tolist())
 stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
 histPrePostMS = 50
 
@@ -86,7 +92,6 @@ spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
 
 #plot figure
-#polar
 date = header['date']
 
 fig = plt.figure()
@@ -96,18 +101,17 @@ text = fig.text(0.05, 0.9, f'Speed tuning for unit {unit}\n{date}',\
                 size=13, fontweight='bold')
 text.set_path_effects([path_effects.Normal()])
 
-ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
-theta = np.radians(np.arange(0,420,360/numDir))
-r = np.append(spikeCountMean, spikeCountMean[0])
-err = np.append(spikeCountSD, spikeCountSD[0])
-ax_row1.plot(theta,r)
-ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
-ax_row1.set_theta_zero_location("N")
-ax_row1.set_rmax(100)
-ax_row1.set_title('Direction tuning polar plot', fontsize=8)
+ax_row1 = plt.subplot2grid((10,6), (0,3), colspan=3, rowspan=4)
+x = np.linspace(minSpeed,maxSpeed, numSpeeds)
+ax_row1.plot(x,spikeCountMean[0]*1000/stimDurMS)
+ax_row1.errorbar(x, spikeCountMean[0]*1000/stimDurMS, yerr = spikeCountSD[0]*1000/stimDurMS,fmt='o', ecolor = 'black', color='black')
+ax_row1.set_title('Speed Tuning Plot', fontsize=8)
+ax_row1.set_xlabel('Temporal Frequency (Hz)', fontsize = 8)
+ax_row1.set_ylabel('Firing Rate (spikes/sec)', fontsize = 8)
+plt.show()
 
 # hists
-spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,3))
+spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 2*histPrePostMS,2,2))
 stimCountRS = np.reshape(stimCount, (2,3))
 
 ax_row2 = []

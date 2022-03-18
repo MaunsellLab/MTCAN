@@ -2,21 +2,10 @@ from usefulFns import *
 import scipy.io as sp
 import numpy as np
 import numpy.ma as ma
+import time
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 
-allTrials, header = loadMatFile73('testing_220317_Dir_GRF_Spikes.mat')
-
-# for testing purposes, to make unit field similar to real data
-for currTrial in allTrials:
-    if 'spikeData' in currTrial:
-        currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
-        for i in range(0,len(currTrial['spikeData']['channel'])):
-            a = str(int(currTrial['spikeData']['channel'][i]))
-            b = str(int(currTrial['spikeData']['unit'][i]))
-            c = a + '_' + b
-            currTrial['spikeData']['unit'][i] = c
-        currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
 def activeUnits(spikeData):
 
@@ -36,6 +25,20 @@ def activeUnits(spikeData):
                     units.append(unique)
     
     return units
+
+
+allTrials, header = loadMatFile73('testing_220317_Dir_GRF_Spikes.mat')
+
+# for testing purposes, to make unit field similar to real data
+for currTrial in allTrials:
+    if 'spikeData' in currTrial:
+        currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
+        for i in range(0,len(currTrial['spikeData']['channel'])):
+            a = str(int(currTrial['spikeData']['channel'][i]))
+            b = str(int(currTrial['spikeData']['unit'][i]))
+            c = a + '_' + b
+            currTrial['spikeData']['unit'][i] = c
+        currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
 units = activeUnits('spikeData')
 
@@ -75,12 +78,17 @@ for currTrial in allTrials:
                     stimCount[0][dirIndex] += 1
                     
                     #histograms
-                    histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
-                                          (stimDurMS+49)/1000, 0.001)
-                    for histCount, i in enumerate(range(len(histSpikes))):
-                        if np.around(histSpikes[i],3) in unitTimeStamps:
-                            spikeHists[histCount][0][dirIndex] += 1
-
+                    # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
+                    #                       (stimDurMS+49)/1000, 0.001)
+                    # for histCount, i in enumerate(range(len(histSpikes))):
+                    #     if np.around(histSpikes[i],3) in unitTimeStamps:
+                    #         spikeHists[histCount][0][dirIndex] += 1
+                    stimOnPreSNEV = stimOnSNEV - 0.050
+                    stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                    histStimSpikes = np.round((unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
+                                        & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV),3)
+                    for i in histStimSpikes:
+                        spikeHists[int(i*1000)][0][dirIndex] += 1
 
 spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)

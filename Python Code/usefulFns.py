@@ -34,6 +34,21 @@ def loadMatFile(fileName):
 
     return allTrialsData, header
 
+def correctTrialsGRF(allTrials):
+    '''
+    fn that will filter for correct non-instruct trials (valid) in GRF
+
+    inputs: allTrials (list of trials)
+    outputs: correctTrials (list): index of valid trials from allTrials
+    '''
+    correctTrials = []
+    for trialCount, currTrial in enumerate(allTrials):
+        trial = currTrial['trial']['data']
+        trialEnd = currTrial['trialEnd']['data']
+        if trial['instructTrial'] != 1 and trialEnd == 0:
+            correctTrials.append(trialCount)
+    
+    return correctTrials
 
 def correctTrialsNotInstruct(currTrial, catch=True):
     '''

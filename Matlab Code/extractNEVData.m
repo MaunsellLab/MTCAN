@@ -3,21 +3,22 @@ function [taskNames, taskEvents, taskSpikes] = extractNEVData(NEV)
 % function extractNEVData:
 % Extracts Lablib events and spikes from NEV array returned by readNEV
 % Breaks the data into chunks associated with different Lablib task plugins
-% Those chunks are returned in taskNames, taskEvents, and taskSpikes, which are the same length,
-%  and have one entry each for each run of a Lablib task.
-%%-------------------------------------------------------------------------------------------------
-%Inputs:    NEV, NEV structure from readNEV
-%Outputs:   taskName: cell array of the letter code for each plugin run
+%  Distinguishes chucks associated with different task IDs for a given task plugin
+% Chunks are returned in taskNames, taskEvents, and taskSpikes, which are the same length,
+%  and have one entry each for each run of a Lablib task/ID.
+%-------------------------------------------------------------------------------------------------
+% Inputs:    NEV, NEV structure from readNEV
+% Outputs:   taskName: cell array of the letter code for each plugin run
 %           taskEvents: cell array of cell arrays of event from each plugin run
 %           taskSpikes: cell arrray of array of spike events associated with each plugin run
-%%-------------------------------------------------------------------------------------------------
-addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NPMK/');
-addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
+%-------------------------------------------------------------------------------------------------
+% addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NPMK/');
+% addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
   % for testing
   if nargin < 1
-    nevFile = 'testing_220304001';                          % .nev file (no file extension)
+    nevFile = 'testing_220408';                        % .nev file (no file extension)
     directory = '/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/';  % directory for .nev file
-    NEV = readNEV([directory, nevFile, '.nev']);          	                      % read .nev file
+    NEV = readNEV([directory, nevFile, '.nev']);              % read .nev file
   end
 
   % extract events
@@ -34,16 +35,16 @@ addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
   startIndices = find(codes == startCode);                    % get the trial starts
   events = struct([]);
   for t = 1:length(startIndices)                              % for each trial...
-    index = startIndices(t);                                % event for trial start
+    index = startIndices(t);                                  % event for trial start
     eventCounts = zeros(1, length(codes));
     events(t).trialStart.timeS = timeS(index);
     events(t).trialStart.data = data(index);
     while true
-      index = index + 1;                                  % advance to next event
-      if index > size(data, 1)                            % end of data, we're done;
+      index = index + 1;                                      % advance to next event
+      if index > size(data, 1)                                % end of data, we're done;
         break;
       end
-      if codes(index) == endCode                          % end of trial, process & quit            
+      if codes(index) == endCode                              % end of trial, process & go to next trial            
         events(t).trialEnd.timeS = timeS(index);
         events(t).trialEnd.data = data(index);
         break;
@@ -57,9 +58,9 @@ addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
       eventCounts(index) = eventCounts(index) + 1;
       event.time = timeS(index);
       event.data = data(index);
-      if ~isfield(events(t), eventName)                   % first occurrence this trial
+      if ~isfield(events(t), eventName)                       % first occurrence this trial
         events(t).(eventName{1}) = event;
-      else                                                % multiple occurrences this trial
+      else                                                    % multiple occurrences this trial
        	events(t).(eventName{1}) = [events(t).(eventName{1}) event];
       end
     end
@@ -73,22 +74,57 @@ addpath('/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/NEV/');
   % Now that we've extracted the sequence of events, we need to split it into data from different plugins
   taskCodesStruct = [events(:).taskCode];                   	% all the taskCode structs
   taskCodes = [taskCodesStruct(:).data];                  	  % all the taskCodes
-  taskEnds = [find(diff(taskCodes) ~= 0), length(taskCodes)]; % indices for trial of each task
-  taskNames = cell(1, length(taskEnds));
-  taskEvents = cell(1, length(taskEnds));
-  taskSpikes = cell(1, length(taskEnds));
-  taskStart = 1;                                              % start of first task run
-  for t = 1:length(taskEnds)
-    taskNames{t} = dict.taskNames{taskCodes(taskStart)};   	% name of task
-    taskEvents{t} = events(taskStart:taskEnds(t));           % extract the events for this task run
-    startTime = taskCodesStruct(taskStart).time;             % startTime of taskRun
-    if t < length(taskEnds)
-      endTime = taskCodesStruct(taskEnds(t) + 1).time;
-    else
-      endTime = inf;
+  taskSet = unique(taskCodes);                                % unique codes
+  cases = 0;                                                  % number of setting-tasks
+  if (isfield(events, 'settingsCode'))
+    settingsCodesStruct = [events(:).settingsCode];           % all the settingCode structs
+    settingsCodes = [settingsCodesStruct(:).data];            % all the settingCodes
+    settingsSet = unique(settingsCodes);                      % unique codes
+    taskSettings = cell(length(settingsSet), length(taskSet));  % logical arrays of all possible setting-tasks
+    taskNames = cell(1, length(taskSet) * length(settingsSet)); % names of existing setting-tasks, in order
+    for t = 1:length(taskSet)
+      for s = 1:length(settingsSet)
+        taskSettings{s, t} = taskCodes == taskSet(t) & settingsCodes == settingsSet(s);
+        if sum(taskSettings{s, t}) > 0                        % existing setting-task, save a name for it
+          cases = cases + 1;
+          taskNames{cases} = sprintf('%s%d', dict.taskNames{taskSet(t)}, settingsSet(s));
+        end
+      end
     end
-    taskSpikes{t} = spikes(spikes(:,3) >= startTime & spikes(:,3) < endTime, :);
-    taskStart = taskEnds(t) + 1;                             % advance to start of next task run
+  else
+    settingsSet = 0;                                          % no separate settings, just task.
+    taskSettings = cell(1, length(taskSet));
+    taskNames = cell(1, length(taskSet));
+    for t = 1:length(taskSet)
+        taskSettings{t} = taskCodes == taskSet(t);
+        if sum(taskSettings(t) > 0)                           % existing task, save a name for it
+          cases = cases + 1;
+          taskNames{cases} = dict.taskNames{taskSet(t)};
+        end
+    end
+  end
+
+  % Now we've sorted out the setting-tasks, bundle the trial events and spikes for each.
+  taskEvents = cell(1, cases);
+  taskSpikes = cell(1, cases);
+  taskIndex = 1;
+  for t = 1:length(taskSet)
+    for s = 1:length(settingsSet)
+      if sum(taskSettings{s, t}) == 0                         % not an existing settings-task combination
+        continue;
+      end
+      taskEvents{taskIndex} = events(taskSettings{s, t});             % extract the events for this settings-task combination
+      firstTrialIndex = find(taskSettings{s, t} > 0, 1, 'first');
+      lastTrialIndex = find(taskSettings{s, t} > 0, 1, 'last');
+      startTime = taskCodesStruct(firstTrialIndex).time;       % startTime of settings-task run
+      if lastTrialIndex < length(taskCodesStruct) 
+        endTime = taskCodesStruct(lastTrialIndex + 1).time;    % endTime of settings-task run
+      else
+        endTime = inf;
+      end
+      taskSpikes{taskIndex} = spikes(spikes(:,3) >= startTime & spikes(:,3) < endTime, :);    % get the settings-task spikes
+      taskIndex = taskIndex + 1;
+    end
   end
     
 %% Saving the NEV file .mat
@@ -107,31 +143,10 @@ function [data, codes, timeS] = parseEvents(dEvents, dict)
 
     [codes, data, timeS] = validateData(dEvents, dict);     % get the codes, data and timestamps
     validateCodes(codes, dict);                             % make sure all codes are known
-%     letterCodes = sort(unique(codes));                      % all codes used
-%     factors = zeros(1, length(letterCodes));
-%     for i = 1:length(letterCodes)
-%         code = dec2bin(letterCodes(i));
-%         letterCode = [char(bin2dec(code(2:8))), char(bin2dec(code(10:16)))];
-% %         index = find(ismember(taskLetters, letterCode), 1);         % get the index for the code
-% %         index = find(sum(ismember(taskLetters, letterCode), 2) == 2);
-%         for index = 1:size(dict.letters, 1)
-%             if dict.letters(index,:) == letterCode
-%                 break;
-%             end
-%         end
-%         if index > size(dict.letters, 1)                  	% no match?
-%             error('defineEvents: failed to find name for code ''%s''', letterCode);
-%         end
-%         names(i) = dict.names(index);                      	%#ok<AGROW> % load the name into the dictionary
-%         factors(i) = dict.multipliers(index);               % save the sorted factors (temporarily)
-%     end
     % convert all data words by bit shifting and multiplying as needed
     for i = 1:length(dict.multipliers)
         if dict.multipliers(i) ~= 1.0
             data(codes == dict.codes(i)) = data(codes == dict.codes(i)) .* dict.multipliers(i);
-%             factor = factors(find(letterCodes == codes(i), 1));
-%             dataWord = dec2bin(data(i), 16);
-%             data(i) = bin2dec(dataWord(2:15)) * factor;
         end
     end
 end
@@ -145,8 +160,14 @@ function [codes, data, timeS] = validateData(dEvents, dict)
   timeS = dEvents(1:2:end - 1, 3);
   index = find(codes <= 2^15, 1);
   if ~isempty(index)                                              % trouble: code words with MSB set
-    %showTrouble(index, codes, data);                            % for debugging
-    if data(index - 1) > 2^15                                   % spurious code word
+%     showTrouble(index, codes, data);                             % for debugging
+    if (index == 1)                                               % first code is malformed
+      codes(1) = [];
+      data(1) = []; %#ok<NASGU> 
+      timeS(1) = []; %#ok<NASGU> 
+      fprintf('Warning: Spurious code word at index 1 of %d\n', 1, length(codes));
+      fprintf(' Corrected by deleting code and data''\n');
+    elseif index > 1 && data(index - 1) > 2^15                    % spurious code word
       firstCode = codes(index - 1);                               % get the last (presumably) valid code
       [firstLetters, ~] = convertCode(firstCode);
       firstCodeValid = ismember(firstLetters, dict.letters);
@@ -164,7 +185,7 @@ function [codes, data, timeS] = validateData(dEvents, dict)
       elseif firstCodeValid && secondCodeValid
         preCode = codes(index - 2);                             % valid code immediately preceding the suspects
         indices = find(codes(1:index-3) == preCode);            % all occurrences of preceding code
-        followers = codes(indices + 1);                         % the set of codes follwing the preceding code
+        followers = codes(indices + 1);                         % the set of codes following the preceding code
         firstProb = length(find(followers == firstCode)) / length(followers);
         secondProb = length(find(followers == secondCode)) / length(followers);
         if firstProb >= secondProb
@@ -172,25 +193,35 @@ function [codes, data, timeS] = validateData(dEvents, dict)
         else
             dEvents(index * 2 - 3, :) = [];                     % delete the first
         end
-        fprintf('Warning: Two valid codes in sequence at index %d: ''%s'', ''%s''.', index - 1, firstLetters,...
-            secondLetters);
-        fprintf(' Corrected by deleting the less probable (%.3f versus %.3f)\n', firstProb, secondProb);
+        if firstCode == secondCode
+          fprintf('Warning: Repeated code at index %d: ''%s''.', index - 1, firstLetters);
+          fprintf(' Duplicate deleted.\n');
+        else
+          fprintf('Warning: Two valid codes in sequence at index %d: ''%s'', ''%s''.', index - 1, firstLetters,...
+              secondLetters);
+          fprintf(' Deleted the less probable (%.3f versus %.3f)\n', firstProb, secondProb);
+        end
       else
         error('extractNEVData:validateData: Two invalid codes in a row\n');
       end
-    else                                                % two data words in a row
-      preCode = codes(index - 1);                     % valid code immediately preceding the suspects
-      indices = codes(1:index-3) == preCode;    % all occurrences of that code
-      followers = data(indices);                      % the set of data following the code
+    % two data words in a row
+    elseif codes(index) == data(index - 1)                      % repeated data word
+      dEvents(index * 2 - 2, :) = [];                           % delete the first data word(index - 1)
+      fprintf('Warning: Repeated data at index %d: (%d).', index, codes(index));
+      fprintf(' Duplicate deleted.\n');
+    else
+      preCode = codes(index - 1);                               % valid code immediately preceding the suspects
+      indices = codes(1:index-3) == preCode;                    % all occurrences of that code
+      followers = data(indices);                                % the set of data words following the code
       firstProb = length(find(followers == data(index - 1))) / length(followers);
       secondProb = length(find(followers == codes(index))) / length(followers);
       if firstProb < secondProb
-        dEvents(index * 2 - 2, :) = [];             % delete the first data word
+        dEvents(index * 2 - 2, :) = [];                         % delete the first data word
       else
-        dEvents(index * 2 - 1, :) = [];         	% delete the second data word
+        dEvents(index * 2 - 1, :) = [];         	              % delete the second data word
       end
-      fprintf('Warning: Spurious data word at index %d of %d.', index, length(codes));
-      fprintf(' Corrected by deleting the less probable (%.3f versus %.3f)\n', firstProb, secondProb);
+      fprintf('Warning: Spurious data at index %d.', index);
+      fprintf(' Deleted the less probable (%.3f versus %.3f)\n', firstProb, secondProb);
    end
    [codes, data, timeS] = validateData(dEvents, dict);	% reload and check cleaned up data
   end
@@ -206,14 +237,18 @@ function validateCodes(codes, dict)
   codesFromNEV = unique(codes);
   knownCodes = ismember(codesFromNEV, dict.codes);
   if sum(knownCodes) ~= length(codesFromNEV)
-    error('Error: NEV contains unknown codes.  This is a serious error.');
+    unknownCodes = codesFromNEV(~ismember(codesFromNEV, dict.codes));
+    fprintf('Error: NEV contains unknown codes: ');
+    for c = 1:length(unknownCodes)
+      charCode = convertCode(unknownCodes(c));
+      fprintf('''%s''', charCode);
+    end
+    error('\nUpdate taskDict.m?  Quitting.');
   end
 end
 
-%%
 function showTrouble(troubleIndex, codes, data) %#ok<*DEFNU>
 % Debugging information.  Displays the values and bit patterns around a trouble spot in the event sequence.
-
   offset = 2;
   startIndex = max(1, troubleIndex - offset);
   endIndex = min(length(codes), troubleIndex + offset);
@@ -229,10 +264,8 @@ function showTrouble(troubleIndex, codes, data) %#ok<*DEFNU>
  end
 end
 
-%% charsFromCode -- convert an event code into two letters for the code
-
+% charsFromCode -- convert an event code into two letters for the code
 function [charCode, binaryCode] = convertCode(code)
-
   binaryCode = dec2bin(code, 16);
   charCode = [char(bin2dec(binaryCode(2:8))), char(bin2dec(binaryCode(10:16)))];
 end

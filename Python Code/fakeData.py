@@ -14,26 +14,6 @@ from usefulFns import *
 Fake Data Gen Mat 7.3, with fakeData and spikeData (channel, unit, column) as fields 
 '''
 
-def activeUnits(unitData):
-
-    '''
-    function returns the active units across trials for a session as a list
-
-    Inputs: unitData (str): Are we using fakeData or spikeData
-    Outputs: units (list): active units for a sessioon
-
-    '''
-    units = []
-    for currTrial in allTrials:
-        if unitData in currTrial:
-            uniqueUnits = np.unique(currTrial[unitData]['unit'])
-            for unique in uniqueUnits:
-                if unique not in units:
-                    units.append(unique)
-    
-    return units
-
-
 def insertStimSpikeData(units, index, stimOnTimeSNEV):
     '''
     this function will generate a poisson spike train and return the normalized
@@ -171,7 +151,7 @@ for currTrial in allTrials:
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
 # code to insert fake spikes during stimulus presentations 
-units = activeUnits('spikeData')
+units = activeUnits('spikeData', allTrials)
 tuningMat, tcDict = randTuningCurve(len(units))
 
 for currTrial in allTrials:

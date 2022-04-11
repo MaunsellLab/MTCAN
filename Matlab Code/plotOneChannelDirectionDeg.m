@@ -54,7 +54,7 @@ function [] = plotOneChannelDirectionDeg(channel, file, trials)
   end
   subplot(6, 4, [3, 4, 7, 8, 11, 12]);
   polarWithErrorBars(0 :  2 * pi / numDir : 2 * pi, [spikeMean, spikeMean(1)], [spikeSD, spikeSD(1)]);
-  
+
   % spike histograms
   for d = 1:numDir
     plotOneHist(d, spikeHists(d, :) * 1000.0 / numStim(d), stimDurMS, histPrePostMS)

@@ -1,26 +1,55 @@
 clear
 
-baseFileName = 'testing_220304';
+baseFileName = 'testing_220317';
 
 directory = '/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN/Lablib Data/';
 
 fileNameMTC = [baseFileName '_MTC.dat'];
 fileNameMTN = [baseFileName '_MTN.dat'];
-fileNameGRF = [baseFileName '_GRF.dat'];
+fileNameRFGRF = [baseFileName '_RF_GRF.dat'];
+fileNameDirGRF = [baseFileName '_Dir_GRF.dat'];
+fileNameSpeedGRF = [baseFileName '_Speed_GRF.dat'];
 
-if isfile(fileNameGRF)
-%     to convert GRF to same format as MTC/MTN
-%     header = readLLFile('i', fileNameGRF);
-%     trials = cell(1,header.numberOfTrials);
-%     for i = 1:header.numberOfTrials
-%         trials{i} = readLLFile('t', i);
-%     end
-%     
-%     cd '../Matlab Data'/
-%     fileNameGRF = strrep(fileNameGRF, '.dat', '.mat');
-%     save(fileNameGRF, 'trials', 'header')
-    convertGRF(fileNameGRF);
-    cd '..'/'Lablib Data'/
+if isfile(fileNameRFGRF)
+% to convert GRF to same format as MTC/MTN
+     header = readLLFile('i', fileNameRFGRF);
+     trials = cell(1,header.numberOfTrials);
+     for i = 1:header.numberOfTrials
+         trials{i} = readLLFile('t', i);
+     end
+     
+     cd '../Matlab Data'/
+     fileNameRFGRF = strrep(fileNameRFGRF, '.dat', '.mat');
+     save(fileNameRFGRF, 'trials', 'header')
+     cd '..'/'Lablib Data'/
+end
+
+if isfile(fileNameDirGRF)
+% to convert GRF to same format as MTC/MTN
+     header = readLLFile('i', fileNameDirGRF);
+     trials = cell(1,header.numberOfTrials);
+     for i = 1:header.numberOfTrials
+         trials{i} = readLLFile('t', i);
+     end
+     
+     cd '../Matlab Data'/
+     fileNameDirGRF = strrep(fileNameDirGRF, '.dat', '.mat');
+     save(fileNameDirGRF, 'trials', 'header')
+     cd '..'/'Lablib Data'/
+end
+
+if isfile(fileNameSpeedGRF)
+% to convert GRF to same format as MTC/MTN
+     header = readLLFile('i', fileNameSpeedGRF);
+     trials = cell(1,header.numberOfTrials);
+     for i = 1:header.numberOfTrials
+         trials{i} = readLLFile('t', i);
+     end
+     
+     cd '../Matlab Data'/
+     fileNameSpeedGRF = strrep(fileNameSpeedGRF, '.dat', '.mat');
+     save(fileNameSpeedGRF, 'trials', 'header')
+     cd '..'/'Lablib Data'/
 end
 
 if isfile(fileNameMTC)
@@ -50,6 +79,21 @@ if isfile(fileNameMTN)
 end
 
 
+% 
+% if isfile(fileNameGRF)
+% %     to convert GRF to same format as MTC/MTN
+% %     header = readLLFile('i', fileNameGRF);
+% %     trials = cell(1,header.numberOfTrials);
+% %     for i = 1:header.numberOfTrials
+% %         trials{i} = readLLFile('t', i);
+% %     end
+% %     
+% %     cd '../Matlab Data'/
+% %     fileNameGRF = strrep(fileNameGRF, '.dat', '.mat');
+% %     save(fileNameGRF, 'trials', 'header')
+%     convertGRF(fileNameGRF);
+%     cd '..'/'Lablib Data'/
+% end
 
 
 % fileName = 'testing_220214_MTC.dat';

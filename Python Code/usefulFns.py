@@ -20,6 +20,7 @@ def loadMatFile73(fileName):
 
     return allTrialsData, header
 
+
 def loadMatFile(fileName):
     '''
     Loads the given matfile and assigns variables to access trial data
@@ -33,6 +34,7 @@ def loadMatFile(fileName):
     header = allTrials['header']
 
     return allTrialsData, header
+
 
 def correctTrialsGRF(allTrials):
     '''
@@ -49,6 +51,7 @@ def correctTrialsGRF(allTrials):
             correctTrials.append(trialCount)
     
     return correctTrials
+
 
 def correctTrialsNotInstruct(currTrial, catch=True):
     '''
@@ -139,7 +142,7 @@ def eyePosDurTrial(currTrial):
     return eyesXYDeg
 
 
-def activeUnits(unitData):
+def activeUnits(unitData, allTrials):
 
     '''
     function returns the active units across trials for a session as a list

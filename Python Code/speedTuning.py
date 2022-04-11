@@ -1,5 +1,8 @@
 '''
-to do: add hists (depends on number of speeds I want to test for)
+to do: 
+add hists (depends on number of speeds I want to test for)
+trial certify
+incorp frame render to align spikes
 '''
 
 from usefulFns import *
@@ -8,26 +11,6 @@ import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
-
-def activeUnits(spikeData):
-
-    '''
-    function returns the active units across trials for a session as a list
-
-    Inputs: unitData (str): spikeData
-    Outputs: units (list): active units for a sessioon
-
-    '''
-    units = []
-    for currTrial in allTrials:
-        if spikeData in currTrial:
-            uniqueUnits = np.unique(currTrial[spikeData]['unit'])
-            for unique in uniqueUnits:
-                if unique not in units:
-                    units.append(unique)
-    
-    return units
-
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
@@ -42,13 +25,15 @@ for currTrial in allTrials:
             currTrial['spikeData']['unit'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
-units = activeUnits('spikeData')
+
+# Tuning code
+units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
-numSpeeds = int(header['map0Settings']['data']['temporalFreqHz']['n'].tolist())
-minSpeed = int(header['map0Settings']['data']['temporalFreqHz']['minValue'].tolist())
-maxSpeed = int(header['map0Settings']['data']['temporalFreqHz']['maxValue'].tolist())
-stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
+numSpeeds = np.int32(header['map0Settings']['data']['temporalFreqHz']['n'])
+minSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['minValue'])
+maxSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
+stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
 
 for unit in units

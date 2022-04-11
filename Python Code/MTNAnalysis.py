@@ -2,6 +2,10 @@
 MTN Analysis Script
  - heatmap of Norm responses
  - potentially some correlations
+
+to do:
+trial certify
+incorp frame render to align spikes
 '''
 import seaborn as sns
 import numpy as np
@@ -11,6 +15,8 @@ from itertools import combinations
 from scipy import stats
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import time
+
 
 # load my file 
 
@@ -24,28 +30,8 @@ for trialCount, currTrial in enumerate(allTrials):
             noSpikeData.append(trialCount)
 
 
-def activeUnits(spikeData):
-
-    '''
-    function returns the active units across trials for a session as a list
-
-    Inputs: unitData (str): spikeData
-    Outputs: units (list): active units for a sessioon
-
-    '''
-    units = []
-    for currTrial in allTrials:
-        if spikeData in currTrial:
-            uniqueUnits = np.unique(currTrial[spikeData]['unit'])
-            for unique in uniqueUnits:
-                if unique not in units:
-                    units.append(unique)
-    
-    return units
-
-
 # generate list of unique active units
-units = activeUnits('spikeData')
+units = activeUnits('spikeData', allTrials)
 
 spikeCountMat = np.zeros((len(units),30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
@@ -64,7 +50,7 @@ for currTrial in allTrials:
                 stimOnTimeMS = currTrial['stimDesc']['timeMS'][stimCount]
                 stimDiffMS = stimOnTimeMS - trialStartMS
                 stimOnSNEV = trialStartSNEV + (stimDiffMS / 1000)
-                stimIndex = int(stim['stimIndex'].tolist())
+                stimIndex = np.int32(stim['stimIndex'])
                 stimIndexCount[stimIndex] = stimIndexCount.get(stimIndex, 0) + 1
                 for unitCount, unit in enumerate(units):
                     if unit in currTrial['spikeData']['unit']:
@@ -74,6 +60,7 @@ for currTrial in allTrials:
                                     (unitTimeStamps <= stimOnSNEV + 493/1000))
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
                         = len(stimSpikes[0])
+
 
 meanSpike = np.nanmean(spikeCountMat[:,1:,:], axis = 1)
 
@@ -118,23 +105,21 @@ for count,i in enumerate(meanSpikeReshaped):
     i[:,156:168] = meanSpike[count][144:156]
     i[:,168] = meanSpike[count][168]
 
-a = meanSpikeReshaped[0]
-b = a.reshape(13,13)
+for unitCount in range(len(units)):
+    a = meanSpikeReshaped[unitCount]
+    b = a.reshape(13,13)
 
-plt.imshow(b, cmap='hot', interpolation='nearest')
-plt.show()
+    #using seaborn
+    ax = sns.heatmap(b)
+    ax.set_xticks(np.arange(13)+0.5)
+    ax.set_xticklabels(['0','60','120','180','240','300','0','60','120',
+                        '180','240','300','blank'], rotation = 45)
+    ax.xaxis.set_ticks_position("top")
 
-
-
-#using seaborn
-ax = sns.heatmap(b)
-ax.set_xticks(np.arange(13)+0.5)
-ax.set_xticklabels(['0','60','120','180','240','300','0','60','120','180','240','300','blank'], rotation = 45)
-ax.xaxis.set_ticks_position("top")
-
-ax.set_yticks(np.arange(13)+0.5)
-ax.set_yticklabels(['0','60','120','180','240','300','0','60','120','180','240','300','blank'], rotation = 0)
-plt.show()
+    ax.set_yticks(np.arange(13)+0.5)
+    ax.set_yticklabels(['0','60','120','180','240','300','0','60','120',
+                        '180','240','300','blank'], rotation = 0)
+    plt.show()
 
 
 

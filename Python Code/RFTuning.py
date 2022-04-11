@@ -1,7 +1,13 @@
 '''
-things to do
-1. change heatmap axis to include min and max azi/ele used
-2. ^for PSTHs
+RFTuning generates heatmaps and histogram of each unit's RF location.
+The script will save the plots for each unit as a PDF in a folder specific
+to the day's dataset. 
+
+to do:
+trial certify
+incorp frame render to align spikes
+
+Chery March 2022
 '''
 
 from usefulFns import *
@@ -12,24 +18,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import seaborn as sns
 
-def activeUnits(spikeData):
-
-    '''
-    function returns the active units across trials for a session as a list
-
-    Inputs: unitData (str): spikeData
-    Outputs: units (list): active units for a sessioon
-
-    '''
-    units = []
-    for currTrial in allTrials:
-        if spikeData in currTrial:
-            uniqueUnits = np.unique(currTrial[spikeData]['unit'])
-            for unique in uniqueUnits:
-                if unique not in units:
-                    units.append(unique)
-    
-    return units
 
 allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
 
@@ -44,12 +32,17 @@ for currTrial in allTrials:
             currTrial['spikeData']['unit'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
-units = activeUnits('spikeData')
+# Tuning code
+units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
-numAzi = int(header['map0Settings']['data']['azimuthDeg']['n'].tolist())
-numEle = int(header['map0Settings']['data']['elevationDeg']['n'].tolist())
-stimDurMS = int(header['mapStimDurationMS']['data'].tolist())
+numAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['n'])
+minAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['minValue'])
+maxAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['maxValue'])
+numEle = np.int32(header['map0Settings']['data']['elevationDeg']['n'])
+minEle = np.int32(header['map0Settings']['data']['elevationDeg']['minValue'])
+maxEle = np.int32(header['map0Settings']['data']['elevationDeg']['maxValue'])
+stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
 
 for unit in units:
@@ -99,11 +92,14 @@ for unit in units:
                     spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
 
 
+
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 
     #plot figure
     fig = plt.figure()
     fig.set_size_inches(6,8)
+    aziLabel = np.linspace(minAzi,maxAzi, numAzi)
+    eleLabel = np.linspace(minEle,maxEle,numEle)
 
     date = header['date']
     text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13,\
@@ -111,17 +107,19 @@ for unit in units:
     text.set_path_effects([path_effects.Normal()])
 
     ax_row1 = []
-    ax_row1.append(plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4)) # ax2
+    ax_row1.append(plt.subplot2grid((9,6), (0,3), colspan = 3, rowspan = 3)) # ax2
     ax_row1[0] = sns.heatmap(spikeCountMean)
     ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
     ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
     ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
+    ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
+    ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
 
     ax_row2 = []
-    for i in range(4, 10):
+    for i in range(3, 9):
         ax = []
         for j in range(0, 6):
-            ax.append(plt.subplot2grid((10,6), (i,j)))
+            ax.append(plt.subplot2grid((9,6), (i,j)))
         ax_row2.append(np.array(ax))
 
     ax_row2 = np.array(ax_row2) # 6 x 6
@@ -131,18 +129,20 @@ for unit in units:
             spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
             histSmooth = smooth(spikeHist,75)
             ax_row2[i,j].plot(histSmooth)
-            ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
+            ax_row2[i,j].set_title(f"{eleLabel[i]},{aziLabel[j]}", fontsize=4)
             ax_row2[i,j].set_ylim([0, 70])
             ax_row2[i,j].set_yticks([0,35,70])
             ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
             ax_row2[i,j].set_xticks([50,250])
+            # ax_row2[i,j].set_xticklabels([])
             ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
             if i == 5 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
-    plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
+    plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0)
     plt.show() 
+
     #plt save as pdf
 
 

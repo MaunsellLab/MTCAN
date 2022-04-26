@@ -4,10 +4,12 @@ The script will save the plots for each unit as a PDF in a folder specific
 to the day's dataset. 
 
 to do:
-trial certify
 incorp frame render to align spikes
 
 Chery March 2022
+
+Modified to save plots as pngs and incorporated changes to track stimCounts
+on 04/26/22
 '''
 
 from usefulFns import *
@@ -54,42 +56,47 @@ for unit in units:
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
-        stimDesc = currTrial['stimDesc']
-        spikeData = currTrial['spikeData']
-        for sCount, stim in enumerate(stimDesc['data']):
-            if stim['stimType'] == 2:
-                break
-            if stim['gaborIndex'] == 1:
-                aziIndex = int(stim['azimuthIndex'])
-                eleIndex = int(stim['elevationIndex'])
-                stCount = int(stimCount[eleIndex][aziIndex])
-                stimOnTimeMS = stimDesc['timeMS'][sCount]
-                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                stimOnSNEV = trialStartSNEV + stimDiffS
-                if unit in spikeData['unit']:
-                    spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                    unitIndex = np.where(spikeData['unit'] == unit)
-                    unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                    stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
-                    spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
-                    stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
-                    
-                    #histograms
-                    # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
-                    #                     (stimDurMS+49)/1000, 0.001)
-                    # for histCount, i in enumerate(range(len(histSpikes))):
-                    #     if np.around(histSpikes[i],3) in unitTimeStamps:
-                    #         spikeHists[histCount][eleIndex][aziIndex] += 1
-                    
-                    stimOnPreSNEV = stimOnSNEV - 0.050
-                    stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
-                    histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
-                                        & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
-                    histStimSpikes = np.int32(histStimSpikes*1000)
-                    spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
+        
+        # stimCount verify 
+        if 'numMap0Stim' in currTrial:
+            map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+            map0Count = 0
+
+            trialStartMS = currTrial['trialStart']['timeMS']
+            trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
+            stimDesc = currTrial['stimDesc']
+            spikeData = currTrial['spikeData']
+            for sCount, stim in enumerate(stimDesc['data']):
+                if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+                    aziIndex = int(stim['azimuthIndex'])
+                    eleIndex = int(stim['elevationIndex'])
+                    stCount = int(stimCount[eleIndex][aziIndex])
+                    stimOnTimeMS = stimDesc['timeMS'][sCount]
+                    stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                    stimOnSNEV = trialStartSNEV + stimDiffS
+                    map0Count += 1
+                    if unit in spikeData['unit']:
+                        spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
+                        unitIndex = np.where(spikeData['unit'] == unit)
+                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
+                                        (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
+                        stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
+                        
+                        #histograms
+                        # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
+                        #                     (stimDurMS+49)/1000, 0.001)
+                        # for histCount, i in enumerate(range(len(histSpikes))):
+                        #     if np.around(histSpikes[i],3) in unitTimeStamps:
+                        #         spikeHists[histCount][eleIndex][aziIndex] += 1
+                        
+                        stimOnPreSNEV = stimOnSNEV - 0.050
+                        stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
+                                            & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
+                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
 
 
 
@@ -141,9 +148,13 @@ for unit in units:
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0)
-    plt.show() 
 
-    #plt save as pdf
+    # saves plot as png 
+    os.makedirs('RFLoc Tuning PNGs')
+    os.chdir('RFLoc Tuning PNGs/')
+    plt.savefig(f'{unit}.png')
+    
+
 
 
 '''

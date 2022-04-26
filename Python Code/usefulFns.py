@@ -6,15 +6,15 @@ import os
 from collections import defaultdict
 import mat73
 
-def loadMatFile73(fileName):
+def loadMatFile73(NHP, date, fileName):
     '''
     Loads the given matfile and assigns variables to access trial data
 
     Inputs: matfile name, (str)
     Outputs: variables, (nd.array)
     '''
-    
-    allTrials = mat73.loadmat(f'../Matlab Data/{fileName}', use_attrdict = True)
+    os.chdir(f'../{NHP}/{date}/')
+    allTrials = mat73.loadmat(f'{fileName}', use_attrdict = True)
     allTrialsData = allTrials.trials
     header = allTrials.header
 

@@ -125,4 +125,8 @@ for unit in units
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
-    plt.show()
+    
+    # saves plot as png 
+    os.makedirs('Speed Tuning PNGs')
+    os.chdir('Speed Tuning PNGs/')
+    plt.savefig(f'{unit}.png')

@@ -202,7 +202,7 @@ for uCount, unit in enumerate(units):
 # tuning similarity b/w neurons 
 dirTuningMat = np.load('unitsDirTuningMat.npy') #load from directions folder
 extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
-                            dirTuningMat[:,:3], axis=1))
+                            dirTuningMat[:,:3]), axis=1)
 angleMat = np.arange(180,900,60)
 
 combs = [i for i in combinations(units, 2)]
@@ -216,7 +216,7 @@ for pairCount, pair in enumerate(combs):
     params = gauss_fit(n1X, n1Y)
     # n1YFull = gauss(n1XFull, *params)
     m1 = params[2] # mean neuron 1
-    v1 = params[3] # var neuron 1
+    v1 = params[3]**2 # var neuron 1
     n1TrueMean = m1 - 360
     
     n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0] + 3)
@@ -226,8 +226,14 @@ for pairCount, pair in enumerate(combs):
     params = gauss_fit(n2X, n2Y)
     # n2YFull = gauss(n2XFull, *params)
     m2 = params[2]
-    v2 = params[3]
+    v2 = params[3]**2
     n2TrueMean = m2 - 360
+
+    if abs(m1-m2) > 180:
+        if m1 > m2:
+            m1 = m2-(360-(m1-m2))
+        else:
+            m2 = m1-(360-(m2-m1))
 
     # bhattacharyya similarity score 
     BC = bhattCoef(m1, m2, v1, v2)

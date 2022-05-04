@@ -61,7 +61,6 @@ for unit in units:
         if 'numMap0Stim' in currTrial:
             map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
             map0Count = 0
-
             trialStartMS = currTrial['trialStart']['timeMS']
             trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
             stimDesc = currTrial['stimDesc']

@@ -212,26 +212,26 @@ for pairCount, pair in enumerate(combs):
     n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0] + 3)
     n1X = angleMat[n1Max-3:n1Max+4]
     n1Y = extTunMat[n1][n1Max-3:n1Max+4]
-
-
-
+    n1XFull = np.linspace(n1X[0],n1X[-1],1000)
+    params = gauss_fit(n1X, n1Y)
+    # n1YFull = gauss(n1XFull, *params)
+    m1 = params[2] # mean neuron 1
+    v1 = params[3] # var neuron 1
+    n1TrueMean = m1 - 360
+    
     n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0] + 3)
     n2X = angleMat[n2Max-3:n2Max+4]
     n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+    n2XFull = np.linspace(n2X[0], n2X[-1],1000)
+    params = gauss_fit(n2X, n2Y)
+    # n2YFull = gauss(n2XFull, *params)
+    m2 = params[2]
+    v2 = params[3]
+    n2TrueMean = m2 - 360
 
-
-
-
-
-tc = np.array([10,23,45,80,37,16,12])
-x = np.array([0,60,120,180,240,300,360])
-x_full = np.linspace(0, 360, 1000)
-params = gauss_fit(x, tcNorm)
-y_full_fit = gauss(x_full, *params)
-
-plt.plot(x_full, y_full_fit, '--r', label='fit')
-plt.scatter(x, tcNorm, label= 'not fit')
-plt.legend()
+    # bhattacharyya similarity score 
+    BC = bhattCoef(m1, m2, v1, v2)
+    pairSimScore[pairCount] = BC
 
 
 

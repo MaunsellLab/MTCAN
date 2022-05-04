@@ -1,9 +1,7 @@
 '''
 to do:
-trial certify
 incorp frame render to align spikes
 '''
-
 
 from usefulFns import *
 import scipy.io as sp
@@ -15,10 +13,10 @@ import matplotlib.patheffects as path_effects
 
 
 # load data
-allTrials, header = loadMatFile73('testing_220317_Dir_GRF_Spikes.mat')
+allTrials, header = loadMatFile73('Testing', 'testing_220317', 'testing_220317_Dir_GRF_Spikes.mat')
 
 
-# for testing purposes, to make unit field similar to real data
+### for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
         currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
@@ -37,8 +35,9 @@ correctTrials = correctTrialsGRF(allTrials)
 numDir = np.int32(header['map0Settings']['data']['directionDeg']['n'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
+allTuningMat = np.zeros((len(units),numDir))
 
-for unit in units:
+for uCount, unit in enumerate(units):
 
     stimCount = np.zeros((1,numDir))
     spikeCountMat = np.zeros((50,1, numDir))
@@ -47,39 +46,41 @@ for unit in units:
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
-        stimDesc = currTrial['stimDesc']
-        spikeData = currTrial['spikeData']
-        for sCount, stim in enumerate(stimDesc['data']):
-            if stim['stimType'] == 2:
-                break
-            if stim['gaborIndex'] == 1:
-                dirIndex = int(stim['directionIndex'])
-                stCount = int(stimCount[0][dirIndex])
-                stimOnTimeMS = stimDesc['timeMS'][sCount]
-                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                stimOnSNEV = trialStartSNEV + stimDiffS
-                if unit in spikeData['unit']:
-                    spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                    unitIndex = np.where(spikeData['unit'] == unit)
-                    unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                    stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
-                    spikeCountMat[stCount][0][dirIndex] = len(stimSpikes[0])
-                    stimCount[0][dirIndex] += 1
-                    
-                    #histograms
-                    stimOnPreSNEV = stimOnSNEV - 0.050
-                    stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
-                    histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
-                                        & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
-                    histStimSpikes = np.int32(histStimSpikes*1000)
-                    spikeHists[histStimSpikes, 0, dirIndex] += 1
+        if 'numMap0Stim' in currTrial:
+            map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+            map0Count = 0
+            trialStartMS = currTrial['trialStart']['timeMS']
+            trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
+            stimDesc = currTrial['stimDesc']
+            spikeData = currTrial['spikeData']
+            for sCount, stim in enumerate(stimDesc['data']):
+                if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+                    dirIndex = int(stim['directionIndex'])
+                    stCount = int(stimCount[0][dirIndex])
+                    stimOnTimeMS = stimDesc['timeMS'][sCount]
+                    stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                    stimOnSNEV = trialStartSNEV + stimDiffS
+                    if unit in spikeData['unit']:
+                        spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
+                        unitIndex = np.where(spikeData['unit'] == unit)
+                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
+                                        (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        spikeCountMat[stCount][0][dirIndex] = len(stimSpikes[0])
+                        stimCount[0][dirIndex] += 1
+                        
+                        #histograms
+                        stimOnPreSNEV = stimOnSNEV - 0.050
+                        stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
+                                            & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
+                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        spikeHists[histStimSpikes, 0, dirIndex] += 1
 
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
+    allTuningMat[uCount] = spikeCountMean
 
     #plot figure
     #polar
@@ -132,8 +133,37 @@ for unit in units:
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
-    plt.show()
+    
     # saves plot as png 
-    os.makedirs('Direction Tuning PNGs')
-    os.chdir('Direction Tuning PNGs/')
+    os.makedirs('Direction Tuning')
+    os.chdir('Direction Tuning/')
     plt.savefig(f'{unit}.png')
+
+np.save('unitsDirTuningMat', allTuningMat)
+
+
+
+
+#gauss fit
+
+def gauss(x, H, A, x0, sigma):
+    return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
+def gauss_fit(x, y):
+    mean = sum(x * y) / sum(y)
+    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
+    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
+    return popt
+
+%matplotlib notebook
+
+tc = np.array([10,23,45,80,37,16,12])
+x = np.array([0,60,120,180,240,300,360])
+x_full = np.linspace(0, 360, 1000)
+params = gauss_fit(x, tcNorm)
+y_full_fit = gauss(x_full, *params)
+
+plt.plot(x_full, y_full_fit, '--r', label='fit')
+plt.scatter(x, tcNorm, label= 'not fit')
+plt.legend()
+

@@ -1,8 +1,7 @@
 '''
 to do: 
 add hists (depends on number of speeds I want to test for)
-trial certify
-incorp frame render to align spikes
+incorp frame render to align spikes 
 '''
 
 from usefulFns import *
@@ -35,8 +34,9 @@ minSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['minValue']
 maxSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
+allTuningMat = np.zeros((len(units),numDir))
 
-for unit in units
+for uCount, unit in enumerate(units):
 
     stimCount = np.zeros((1,numSpeeds))
     spikeCountMat = np.zeros((50,1, numSpeeds))
@@ -45,38 +45,40 @@ for unit in units
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
-        stimDesc = currTrial['stimDesc']
-        spikeData = currTrial['spikeData']
-        for sCount, stim in enumerate(stimDesc['data']):
-            if stim['stimType'] == 2:
-                break
-            if stim['gaborIndex'] == 1:
-                speedIndex = int(stim['temporalFreqIndex'])
-                stCount = int(stimCount[0][speedIndex])
-                stimOnTimeMS = stimDesc['timeMS'][sCount]
-                stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                stimOnSNEV = trialStartSNEV + stimDiffS
-                if unit in spikeData['unit']:
-                    spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                    unitIndex = np.where(spikeData['unit'] == unit)
-                    unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                    stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
-                    spikeCountMat[stCount][0][speedIndex] = len(stimSpikes[0])
-                    stimCount[0][speedIndex] += 1
-                    
-                    #histograms
-                    stimOnPreSNEV = stimOnSNEV - 0.050
-                    stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
-                    histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
-                                    & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
-                    histStimSpikes = np.int32(histStimSpikes*1000)
-                    spikeHists[histStimSpikes, 0, speedIndex] += 1
+        if 'numMap0Stim' in currTrial:
+            map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+            map0Count = 0
+            trialStartMS = currTrial['trialStart']['timeMS']
+            trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
+            stimDesc = currTrial['stimDesc']
+            spikeData = currTrial['spikeData']
+            for sCount, stim in enumerate(stimDesc['data']):
+                if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+                    speedIndex = int(stim['temporalFreqIndex'])
+                    stCount = int(stimCount[0][speedIndex])
+                    stimOnTimeMS = stimDesc['timeMS'][sCount]
+                    stimDiffS = (stimOnTimeMS - trialStartMS)/1000
+                    stimOnSNEV = trialStartSNEV + stimDiffS
+                    if unit in spikeData['unit']:
+                        spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
+                        unitIndex = np.where(spikeData['unit'] == unit)
+                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
+                                        (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        spikeCountMat[stCount][0][speedIndex] = len(stimSpikes[0])
+                        stimCount[0][speedIndex] += 1
+                        
+                        #histograms
+                        stimOnPreSNEV = stimOnSNEV - 0.050
+                        stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
+                                        & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
+                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        spikeHists[histStimSpikes, 0, speedIndex] += 1
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
+    allTuningMat[uCount] = spikeCountMean
 
     #plot figure
     date = header['date']
@@ -127,6 +129,8 @@ for unit in units
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
     
     # saves plot as png 
-    os.makedirs('Speed Tuning PNGs')
-    os.chdir('Speed Tuning PNGs/')
+    os.makedirs('Speed Tuning')
+    os.chdir('Speed Tuning/')
     plt.savefig(f'{unit}.png')
+
+np.save('unitsSpeedTuningMat', allTuningMat)

@@ -18,7 +18,40 @@ import matplotlib.ticker as ticker
 import time
 
 
-# load my file 
+# load relevant file 
+allTrials, header = loadMatFile73('Meetz', '220509', 'Meetz_220509_MTN_Spikes.mat')
+
+
+# generates a dictionary of stim Index and corresponding directions/contrasts
+stimIndexDict = {}
+for currTrial in allTrials:
+    extendedEOT = currTrial['extendedEOT']['data']
+    trial = currTrial['trial']['data']
+    if extendedEOT == 0 and trial['instructTrial'] != 1:
+        stimDesc = currTrial['stimDesc']['data']
+        for stim in stimDesc:
+            if stim['stimLoc'] != 2:
+                index = int(stim['stimIndex'].tolist())
+                if index not in stimIndexDict:
+                    stimIndexDict[index] = {}
+                    if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
+                        stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
+                        {'direction': int(stim['directionDeg'].tolist()),
+                         'contrast': stim['contrast'].tolist()}
+                else:
+                    if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
+                        stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
+                        {'direction': int(stim['directionDeg'].tolist()),
+                         'contrast': stim['contrast'].tolist()}
+
+
+# numpy array of stimIndexDict
+stimIndexArray = np.zeros((169,4))
+for i in range(len(stimIndexDict)):
+    stimIndexArray[i][0] = stimIndexDict[i][0]['direction']
+    stimIndexArray[i][1] = stimIndexDict[i][0]['contrast']
+    stimIndexArray[i][2] = stimIndexDict[i][1]['direction']
+    stimIndexArray[i][3] = stimIndexDict[i][1]['contrast']
 
 # are there correct trials without spikeData
 noSpikeData = []
@@ -33,15 +66,17 @@ for trialCount, currTrial in enumerate(allTrials):
 # generate list of unique active units
 units = activeUnits('spikeData', allTrials)
 
+# list of indices of correctTrials (non-instruct, valid trialCertify)
+corrTrials = correctTrialsMTX(allTrials)
+
+# insert spike counts into matrix of unique stimulus sets
 spikeCountMat = np.zeros((len(units),30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
 spikeCountMat[:,1:,:] = np.nan
 stimIndexCount = {}
-
-for currTrial in allTrials: 
-    trial = currTrial['trial']['data']
-    extendedEOT = currTrial['extendedEOT']['data']
-    if trial['instructTrial'] != 1 and 'spikeData' in currTrial and extendedEOT == 0:
+for corrTrial in corrTrials:
+    currTrial = allTrials[corrTrial]
+    if 'spikeData' in currTrial:
         trialStartMS = currTrial['trialStart']['timeMS']
         trialStartSNEV = currTrial['taskEvents']['trialStart']['timeS']
         stimDesc = currTrial['stimDesc']['data']
@@ -60,7 +95,6 @@ for currTrial in allTrials:
                                     (unitTimeStamps <= stimOnSNEV + 493/1000))
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
                         = len(stimSpikes[0])
-
 
 meanSpike = np.nanmean(spikeCountMat[:,1:,:], axis = 1)
 
@@ -105,6 +139,7 @@ for count,i in enumerate(meanSpikeReshaped):
     i[:,156:168] = meanSpike[count][144:156]
     i[:,168] = meanSpike[count][168]
 
+# heatmap of correlations
 for unitCount in range(len(units)):
     a = meanSpikeReshaped[unitCount]
     b = a.reshape(13,13)
@@ -120,9 +155,6 @@ for unitCount in range(len(units)):
     ax.set_yticklabels(['0','60','120','180','240','300','0','60','120',
                         '180','240','300','blank'], rotation = 0)
     plt.show()
-
-
-
 
 
 #correlations
@@ -146,3 +178,61 @@ popCorrMean = ma.mean(ma.masked_invalid(corrMatMean))
 print(ma.mean(ma.masked_invalid(corrMat[0][0])))
 print(ma.mean(ma.masked_invalid(corrMat[1][0])))
 print(ma.mean(ma.masked_invalid(corrMat[2][0])))
+
+# selectivity for direction (similar to Bram)
+unitSelectivity = np.zeros((len(units),169)) 
+unitSelectivity[:,:] = np.nan
+for uCount, unit in enumerate(units):
+    for stim in range(169):
+        loc0Contrast = stimIndexDict[stim][0]['contrast']
+        loc1Contrast = stimIndexDict[stim][1]['contrast']
+        if loc0Contrast != 0 and loc0Contrast != 0:
+            dir1 = stimIndexDict[stim][0]['direction']
+            con1 = stimIndexDict[stim][0]['contrast']
+            l1Index = np.where((stimIndexArray[:,0]== dir1) & (stimIndexArray[:,1] == con1)
+                              & (stimIndexArray[:,3]==0))
+            l1 = meanSpike[uCount][l1Index[0]]
+            dir2 = stimIndexDict[stim][1]['direction']
+            con2 = stimIndexDict[stim][1]['contrast']
+            l2Index = np.where((stimIndexArray[:,2]== dir2) & (stimIndexArray[:,3] == con2)
+                              & (stimIndexArray[:,1]==0))
+            l2 = meanSpike[uCount][l2Index[0]]
+            unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
+
+# tuning similarity b/w neurons 
+dirTuningMat = np.load('unitsDirTuningMat.npy') #load from directions folder
+extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
+                            dirTuningMat[:,:3], axis=1))
+angleMat = np.arange(180,900,60)
+
+combs = [i for i in combinations(units, 2)]
+pairSimScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1, n2 = units.index(pair[0]), units.index(pair[1])
+    n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0] + 3)
+    n1X = angleMat[n1Max-3:n1Max+4]
+    n1Y = extTunMat[n1][n1Max-3:n1Max+4]
+
+
+
+    n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0] + 3)
+    n2X = angleMat[n2Max-3:n2Max+4]
+    n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+
+
+
+
+
+tc = np.array([10,23,45,80,37,16,12])
+x = np.array([0,60,120,180,240,300,360])
+x_full = np.linspace(0, 360, 1000)
+params = gauss_fit(x, tcNorm)
+y_full_fit = gauss(x_full, *params)
+
+plt.plot(x_full, y_full_fit, '--r', label='fit')
+plt.scatter(x, tcNorm, label= 'not fit')
+plt.legend()
+
+
+
+

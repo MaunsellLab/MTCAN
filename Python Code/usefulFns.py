@@ -111,10 +111,10 @@ def bhattCoef(m1, m2, v1, v2):
         BC (float) - a value b/w 0 and 1 that defines how similar the curves are.
     '''
 
-    BD = (1/4*np.log(1/4*((v1**2/v2**2) + (v2**2/v1**2) +2))) + \
+    BD = (1/4*np.log(1/4*((v1/v2) + (v2/v1) + 2))) + \
          (1/4*(((m1-m2)**2)/(v1+v2)))
     BC = np.exp(-BD)
-    
+
     return BC
 
 

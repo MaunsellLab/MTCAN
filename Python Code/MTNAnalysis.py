@@ -139,7 +139,7 @@ for count,i in enumerate(meanSpikeReshaped):
     i[:,156:168] = meanSpike[count][144:156]
     i[:,168] = meanSpike[count][168]
 
-# heatmap of correlations
+## heatmap of correlations
 for unitCount in range(len(units)):
     a = meanSpikeReshaped[unitCount]
     b = a.reshape(13,13)
@@ -157,29 +157,23 @@ for unitCount in range(len(units)):
     plt.show()
 
 
-#correlations
+## correlations incomplete 
 combs = [i for i in combinations(units, 2)]
 corrMat = np.zeros((len(combs),1,169))
+blocks = int(header['blockStats']['data']['blocksDone'].tolist())  #john needs to fix
 
 for count, i in enumerate(combs):
     n1 = units.index(i[0])
     n2 = units.index(i[1])
     for j in range(np.shape(spikeCountMat)[2]):
-        stimCorr = ma.corrcoef(ma.masked_invalid(spikeCountMat[n1,1:,j]),\
-                               ma.masked_invalid(spikeCountMat[n2,1:,j]))
+        stimCorr = stats.pearonr(spikeCountMat[n1,1:blocks+1,j],
+                                 spikeCountMat[n2,1:blocks+1,j])
         corrMat[count][0][j] = stimCorr[0][1]
 
+pairZScore = stats.zscore(corrMat, axis=2) # nan_policy='omit'
+popZMean = np.mean(axis=0)
 
-b = stats.zscore(corrMatMean, axis=0, nan_policy='omit')
-
-corrMatMean = np.mean(corrMat, axis = (1,0))
-popCorrMean = ma.mean(ma.masked_invalid(corrMatMean))
-
-print(ma.mean(ma.masked_invalid(corrMat[0][0])))
-print(ma.mean(ma.masked_invalid(corrMat[1][0])))
-print(ma.mean(ma.masked_invalid(corrMat[2][0])))
-
-# selectivity for direction (similar to Bram)
+## selectivity for direction (similar to Bram)
 unitSelectivity = np.zeros((len(units),169)) 
 unitSelectivity[:,:] = np.nan
 for uCount, unit in enumerate(units):
@@ -199,7 +193,8 @@ for uCount, unit in enumerate(units):
             l2 = meanSpike[uCount][l2Index[0]]
             unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
 
-# tuning similarity b/w neurons 
+
+## direction tuning similarity b/w neurons 
 dirTuningMat = np.load('unitsDirTuningMat.npy') #load from directions folder
 extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
                             dirTuningMat[:,:3]), axis=1)
@@ -211,7 +206,8 @@ for pairCount, pair in enumerate(combs):
     n1, n2 = units.index(pair[0]), units.index(pair[1])
     n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0] + 3)
     n1X = angleMat[n1Max-3:n1Max+4]
-    n1Y = extTunMat[n1][n1Max-3:n1Max+4]
+    # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
+    n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
     n1XFull = np.linspace(n1X[0],n1X[-1],1000)
     params = gauss_fit(n1X, n1Y)
     # n1YFull = gauss(n1XFull, *params)
@@ -221,7 +217,8 @@ for pairCount, pair in enumerate(combs):
     
     n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0] + 3)
     n2X = angleMat[n2Max-3:n2Max+4]
-    n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+    # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+    n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
     n2XFull = np.linspace(n2X[0], n2X[-1],1000)
     params = gauss_fit(n2X, n2Y)
     # n2YFull = gauss(n2XFull, *params)
@@ -238,7 +235,3 @@ for pairCount, pair in enumerate(combs):
     # bhattacharyya similarity score 
     BC = bhattCoef(m1, m2, v1, v2)
     pairSimScore[pairCount] = BC
-
-
-
-

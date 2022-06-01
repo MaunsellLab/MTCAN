@@ -3,6 +3,7 @@ from scipy.optimize import curve_fit
 from scipy import stats
 from itertools import combinations
 import numpy as np
+import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import math
@@ -116,6 +117,15 @@ def bhattCoef(m1, m2, v1, v2):
     BC = np.exp(-BD)
 
     return BC
+
+
+def smooth(y, box_pts):
+    '''
+    moving point average
+    '''
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
 
 
 def fieldInTrial(fieldList, trial = None):
@@ -291,6 +301,21 @@ def randTuningCurve(numNeurons):
 
     return tuningMat, tcDictionary
 
+
+# stimCount test
+# correctTrials = correctTrialsGRF(allTrials)
+# for corrTrial in correctTrials:
+#     currTrial = allTrials[corrTrial]
+#         if 'numMap0Stim' in currTrial:
+    #         map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+    #         map0Count = 0
+    #         stimDesc = currTrial['stimDesc']
+    #         for sCount, stim in enumerate(stimDesc['data']):
+    #             if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+    #                 aziIndex = int(stim['azimuthIndex'])
+    #                 eleIndex = int(stim['elevationIndex'])
+    #                 stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
+    #                 map0Count += 1
 
 
 #testing time to open file

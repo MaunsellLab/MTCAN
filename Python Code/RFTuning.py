@@ -21,7 +21,7 @@ import matplotlib.patheffects as path_effects
 import seaborn as sns
 
 
-allTrials, header = loadMatFile73('testing_220310_Heatmap_GRF_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220527', 'Meetz_220527_GRF1_Spikes.mat')
 
 # for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
@@ -46,6 +46,9 @@ minEle = np.int32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.int32(header['map0Settings']['data']['elevationDeg']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
+
+os.makedirs('RFLoc Tuning PNGs')
+os.chdir('RFLoc Tuning PNGs/')
 
 for unit in units:
     
@@ -73,15 +76,22 @@ for unit in units:
                     stimOnTimeMS = stimDesc['timeMS'][sCount]
                     stimDiffS = (stimOnTimeMS - trialStartMS)/1000
                     stimOnSNEV = trialStartSNEV + stimDiffS
+                    '''
+                    CHECK THIS
+                    '''
+                    stimCount[eleIndex][aziIndex] += 1 #check this
                     map0Count += 1
                     if unit in spikeData['unit']:
                         spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
                         unitIndex = np.where(spikeData['unit'] == unit)
-                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        if len(unitIndex) == 1:
+                            unitTimeStamps = spikeData['timeStamp']
+                        else:
+                            unitTimeStamps = spikeData['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
                                         (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
                         spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
-                        stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
+                        
                         
                         #histograms
                         # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
@@ -133,28 +143,24 @@ for unit in units:
     for i in range(numEle):
         for j in range(numAzi):
             spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
-            histSmooth = smooth(spikeHist,75)
+            histSmooth = smooth(spikeHist,20)
             ax_row2[i,j].plot(histSmooth)
             ax_row2[i,j].set_title(f"{eleLabel[i]},{aziLabel[j]}", fontsize=4)
             ax_row2[i,j].set_ylim([0, 70])
             ax_row2[i,j].set_yticks([0,35,70])
             ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
-            ax_row2[i,j].set_xticks([50,250])
+            ax_row2[i,j].set_xticks([50,50+stimDurMS])
             # ax_row2[i,j].set_xticklabels([])
-            ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
+            ax_row2[i,j].set_xticklabels([50,50+stimDurMS], fontsize=5)
             if i == 5 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0)
 
-    # saves plot as png 
-    os.makedirs('RFLoc Tuning PNGs')
-    os.chdir('RFLoc Tuning PNGs/')
-    plt.savefig(f'{unit}.png')
+    # saves plot as png
+    plt.savefig(f'{unit}.pdf')
     
-
-
 
 '''
 smoothHist = savgol_filter(spikeHist, 100,3)

@@ -13,7 +13,7 @@ import matplotlib.patheffects as path_effects
 
 
 # load data
-allTrials, header = loadMatFile73('Testing', 'testing_220317', 'testing_220317_Dir_GRF_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220527', 'Meetz_220527_GRF2_Spikes.mat')
 
 
 ### for testing purposes, to make unit field similar to real data
@@ -36,6 +36,9 @@ numDir = np.int32(header['map0Settings']['data']['directionDeg']['n'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 50
 allTuningMat = np.zeros((len(units),numDir))
+
+os.makedirs('Direction Tuning PDFs')
+os.chdir('Direction Tuning PDFs/')
 
 for uCount, unit in enumerate(units):
 
@@ -60,14 +63,19 @@ for uCount, unit in enumerate(units):
                     stimOnTimeMS = stimDesc['timeMS'][sCount]
                     stimDiffS = (stimOnTimeMS - trialStartMS)/1000
                     stimOnSNEV = trialStartSNEV + stimDiffS
+                    stimCount[0][dirIndex] += 1
+                    map0Count += 1
                     if unit in spikeData['unit']:
                         spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
                         unitIndex = np.where(spikeData['unit'] == unit)
+                        if len(unitIndex) == 1:
+                            unitTimeStamps = spikeData['timeStamp']
+                        else:
+                            unitTimeStamps = spikeData['timeStamp'][unitIndex]
                         unitTimeStamps = spikeData['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
                                         (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
                         spikeCountMat[stCount][0][dirIndex] = len(stimSpikes[0])
-                        stimCount[0][dirIndex] += 1
                         
                         #histograms
                         stimOnPreSNEV = stimOnSNEV - 0.050
@@ -119,31 +127,28 @@ for uCount, unit in enumerate(units):
     for i in range(2):
         for j in range(3):
             spikeHist = spikeHistsRS[:,i,j] * 1000/stimCountRS[i,j]
-            histSmooth = smooth(spikeHist,75)
+            histSmooth = smooth(spikeHist,100)
             ax_row2[i,j].plot(histSmooth)
             histTitle = titleArr[i][j]
             ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)
             ax_row2[i,j].set_ylim([0, 100])
             ax_row2[i,j].set_yticks([0,50,100])
             ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
-            ax_row2[i,j].set_xticks([50,250])
-            ax_row2[i,j].set_xticklabels([50,250], fontsize=5)
+            ax_row2[i,j].set_xticks([50,50+stimDurMS])
+            ax_row2[i,j].set_xticklabels([50,50+stimDurMS], fontsize=5)
             if i == 1 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
     
-    # saves plot as png 
-    os.makedirs('Direction Tuning')
-    os.chdir('Direction Tuning/')
-    plt.savefig(f'{unit}.png')
+    # saves plot as pdf 
+    plt.savefig(f'{unit}.pdf')
 
-np.save('unitsDirTuningMat', allTuningMat)
+# np.save('unitsDirTuningMat', allTuningMat)
 
 
-
-
+'''
 #gauss fit
 
 def gauss(x, H, A, x0, sigma):
@@ -167,3 +172,4 @@ plt.plot(x_full, y_full_fit, '--r', label='fit')
 plt.scatter(x, tcNorm, label= 'not fit')
 plt.legend()
 
+'''

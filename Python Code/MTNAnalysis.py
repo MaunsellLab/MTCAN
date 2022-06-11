@@ -19,7 +19,7 @@ import time
 
 
 # load relevant file 
-allTrials, header = loadMatFile73('Meetz', '220509', 'Meetz_220509_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_MTN_Spikes.mat')
 
 
 # generates a dictionary of stim Index and corresponding directions/contrasts
@@ -59,7 +59,7 @@ for trialCount, currTrial in enumerate(allTrials):
     trial = currTrial['trial']['data']
     extendedEOT = currTrial['extendedEOT']['data']
     if extendedEOT == 0 and trial['instructTrial'] != 1:
-        if spikeData not in currTrial:
+        if 'spikeData' not in currTrial:
             noSpikeData.append(trialCount)
 
 
@@ -70,6 +70,7 @@ units = activeUnits('spikeData', allTrials)
 corrTrials = correctTrialsMTX(allTrials)
 
 # insert spike counts into matrix of unique stimulus sets
+stimDurMS = int(header['stimDurationMS']['data'].tolist())
 spikeCountMat = np.zeros((len(units),30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
 spikeCountMat[:,1:,:] = np.nan
@@ -92,7 +93,7 @@ for corrTrial in corrTrials:
                         unitIndex = np.where(currTrial['spikeData']['unit'] == unit)
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + 493/1000))
+                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
                         = len(stimSpikes[0])
 

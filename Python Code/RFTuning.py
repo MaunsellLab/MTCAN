@@ -21,8 +21,6 @@ import matplotlib.patheffects as path_effects
 import seaborn as sns
 
 
-allTrials, header = loadMatFile73('Meetz', '220527', 'Meetz_220527_GRF1_Spikes.mat')
-
 # for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
@@ -34,10 +32,14 @@ for currTrial in allTrials:
             currTrial['spikeData']['unit'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
+# load data
+allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_GRF1_Spikes.mat')
+
 # Tuning code
 units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
+frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
 numAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['n'])
 minAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['minValue'])
 maxAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['maxValue'])
@@ -45,17 +47,19 @@ numEle = np.int32(header['map0Settings']['data']['elevationDeg']['n'])
 minEle = np.int32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.int32(header['map0Settings']['data']['elevationDeg']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
-histPrePostMS = 50
+histPrePostMS = 100
 
-os.makedirs('RFLoc Tuning PNGs')
+if not os.path.exists('RFLoc Tuning PNGs'):
+    os.makedirs('RFLoc Tuning PNGs')
 os.chdir('RFLoc Tuning PNGs/')
 
 for unit in units:
     
     stimCount = np.zeros((numEle,numAzi))
-    spikeCountMat = np.zeros((50,numEle, numAzi))
+    spikeCountMat = np.zeros((25,numEle, numAzi))
     spikeCountMat[:,:,:] = np.nan
-    spikeHists = np.zeros((stimDurMS + 2*histPrePostMS, numEle, numAzi))
+    spikeHists = np.zeros((stimDurMS + 2*histPrePostMS+12, numEle, numAzi))
+
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
@@ -64,35 +68,31 @@ for unit in units:
         if 'numMap0Stim' in currTrial:
             map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
             map0Count = 0
-            trialStartMS = currTrial['trialStart']['timeMS']
-            trialStartSNEV = np.around(currTrial['taskEvents']['trialStart']['timeS'], 3)
-            stimDesc = currTrial['stimDesc']
+            stimDesc = currTrial['stimDesc']['data']
             spikeData = currTrial['spikeData']
-            for sCount, stim in enumerate(stimDesc['data']):
+            stim1TimeS = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+            for stim in stimDesc:
                 if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
                     aziIndex = int(stim['azimuthIndex'])
                     eleIndex = int(stim['elevationIndex'])
                     stCount = int(stimCount[eleIndex][aziIndex])
-                    stimOnTimeMS = stimDesc['timeMS'][sCount]
-                    stimDiffS = (stimOnTimeMS - trialStartMS)/1000
-                    stimOnSNEV = trialStartSNEV + stimDiffS
+                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
+                                   /1000) + stim1TimeS
+                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
+                                   /1000) + stim1TimeS
+                    stimCount[eleIndex][aziIndex] += 1
+                    map0Count += 1
                     '''
                     CHECK THIS
                     '''
-                    stimCount[eleIndex][aziIndex] += 1 #check this
-                    map0Count += 1
                     if unit in spikeData['unit']:
                         spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                        unitIndex = np.where(spikeData['unit'] == unit)
-                        if len(unitIndex) == 1:
-                            unitTimeStamps = spikeData['timeStamp']
-                        else:
-                            unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                        (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        unitIndex = np.where(spikeData['unit'] == unit)[0]
+                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                        stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
+                                        (unitTimeStamps <= stimOffTimeS))
                         spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
-                        
-                        
+
                         #histograms
                         # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
                         #                     (stimDurMS+49)/1000, 0.001)
@@ -100,26 +100,28 @@ for unit in units:
                         #     if np.around(histSpikes[i],3) in unitTimeStamps:
                         #         spikeHists[histCount][eleIndex][aziIndex] += 1
                         
-                        stimOnPreSNEV = stimOnSNEV - 0.050
-                        stimOnPostSNEV = stimOnSNEV + (stimDurMS+49)/1000
+                        stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
+                        stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
                         histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
-                                            & (unitTimeStamps <= stimOnPostSNEV))] - stimOnPreSNEV
+                                            & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
                         histStimSpikes = np.int32(histStimSpikes*1000)
                         spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
 
 
-
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+
 
     #plot figure
     fig = plt.figure()
     fig.set_size_inches(6,8)
-    aziLabel = np.linspace(minAzi,maxAzi, numAzi)
-    eleLabel = np.linspace(minEle,maxEle,numEle)
+    aziLabel = np.around(np.linspace(minAzi, maxAzi, numAzi),2)
+    eleLabel = np.around(np.linspace(minEle, maxEle, numEle),2)
 
     date = header['date']
-    text = fig.text(0.05, 0.9, f'RF tuning for unit {unit}\n{date}', size=13,\
-            fontweight='bold')
+
+    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n- - - - -\n \
+    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
+                    size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
     ax_row1 = []
@@ -146,12 +148,12 @@ for unit in units:
             histSmooth = smooth(spikeHist,20)
             ax_row2[i,j].plot(histSmooth)
             ax_row2[i,j].set_title(f"{eleLabel[i]},{aziLabel[j]}", fontsize=4)
-            ax_row2[i,j].set_ylim([0, 70])
-            ax_row2[i,j].set_yticks([0,35,70])
-            ax_row2[i,j].set_yticklabels([0,35,70], fontsize=5)
-            ax_row2[i,j].set_xticks([50,50+stimDurMS])
+            # ax_row2[i,j].set_ylim([0, 100])
+            ax_row2[i,j].set_yticks([0,50,100])
+            ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
+            ax_row2[i,j].set_xticks([histPrePostMS,histPrePostMS+stimDurMS])
             # ax_row2[i,j].set_xticklabels([])
-            ax_row2[i,j].set_xticklabels([50,50+stimDurMS], fontsize=5)
+            ax_row2[i,j].set_xticklabels([histPrePostMS,histPrePostMS+stimDurMS], fontsize=5)
             if i == 5 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
@@ -160,7 +162,8 @@ for unit in units:
 
     # saves plot as png
     plt.savefig(f'{unit}.pdf')
-    
+    continue
+plt.close('all')
 
 '''
 smoothHist = savgol_filter(spikeHist, 100,3)

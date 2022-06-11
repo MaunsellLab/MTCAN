@@ -124,7 +124,7 @@ def smooth(y, box_pts):
     moving point average
     '''
     box = np.ones(box_pts)/box_pts
-    y_smooth = np.convolve(y, box, mode='same')
+    y_smooth = np.convolve(y, box, mode='valid')
     return y_smooth
 
 

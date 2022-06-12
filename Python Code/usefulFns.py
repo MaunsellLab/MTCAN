@@ -1,5 +1,6 @@
 import scipy.io as sp
 from scipy.optimize import curve_fit
+from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from itertools import combinations
 import numpy as np

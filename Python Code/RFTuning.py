@@ -4,12 +4,14 @@ The script will save the plots for each unit as a PDF in a folder specific
 to the day's dataset. 
 
 to do:
-incorp frame render to align spikes
+flip heat map vertically, so that lower points on elevation are plotted lower
 
 Chery March 2022
 
 Modified to save plots as pngs and incorporated changes to track stimCounts
 on 04/26/22
+Modified to incorporate frame counter, fixed bugs relating to unit indexing
+within the stimDesc, added 1-d gaussian filter - 06/10/22
 '''
 
 from usefulFns import *
@@ -35,7 +37,12 @@ for currTrial in allTrials:
 # load data
 allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_GRF1_Spikes.mat')
 
-# Tuning code
+# create folder and change dir to save PDF's and np.array
+if not os.path.exists('RFLoc Tuning'):
+    os.makedirs('RFLoc Tuning')
+os.chdir('RFLoc Tuning/')
+
+## Tuning code ##
 units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
@@ -48,10 +55,6 @@ minEle = np.int32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.int32(header['map0Settings']['data']['elevationDeg']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 100
-
-if not os.path.exists('RFLoc Tuning PNGs'):
-    os.makedirs('RFLoc Tuning PNGs')
-os.chdir('RFLoc Tuning PNGs/')
 
 for unit in units:
     
@@ -119,7 +122,7 @@ for unit in units:
 
     date = header['date']
 
-    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n- - - - -\n \
+    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n- - - - -\n\
     Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
                     size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
@@ -145,15 +148,15 @@ for unit in units:
     for i in range(numEle):
         for j in range(numAzi):
             spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
-            histSmooth = smooth(spikeHist,20)
-            ax_row2[i,j].plot(histSmooth)
+            gaussSmooth = gaussian_filter1d(spikeHist, 15)
+            ax_row2[i,j].plot(gaussSmooth)
             ax_row2[i,j].set_title(f"{eleLabel[i]},{aziLabel[j]}", fontsize=4)
             # ax_row2[i,j].set_ylim([0, 100])
             ax_row2[i,j].set_yticks([0,50,100])
             ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
-            ax_row2[i,j].set_xticks([histPrePostMS,histPrePostMS+stimDurMS])
-            # ax_row2[i,j].set_xticklabels([])
-            ax_row2[i,j].set_xticklabels([histPrePostMS,histPrePostMS+stimDurMS], fontsize=5)
+            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
+            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=3)
+            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
             if i == 5 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)

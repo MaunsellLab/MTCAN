@@ -53,6 +53,23 @@ stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numDir))
 
+# assert frame consistency for frame duration
+stimDurFrame = []
+for corrTrial in correctTrials:
+    currTrial = allTrials[corrTrial]
+    stimDesc = currTrial['stimDesc']['data']
+    if 'numMap0Stim' in currTrial:
+        map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+        map0Count = 0
+        for stim in stimDesc:
+            if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+                frameDiff = stim['stimOffFrame'].tolist() - stim['stimOnFrame'].tolist()
+                stimDurFrame.append(frameDiff)
+if len(set(stimDurFrame)) != 1:
+    print('stimulus frame duration not consistent for mapping stimuli')
+else: 
+    trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
+
 
 for uCount, unit in enumerate(units):
 
@@ -126,7 +143,7 @@ for uCount, unit in enumerate(units):
     ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
     ax_row1.set_theta_zero_location("W")
     # ax_row1.set_rmax(120)
-    ax_row1.set_title('Direction Tuning Plot', fontsize=8)
+    ax_row1.set_title('Direction Tuning Polar Plot', fontsize=8)
 
     # hists
 
@@ -142,7 +159,7 @@ for uCount, unit in enumerate(units):
         ax_row2.append(np.array(ax))
     ax_row2 = np.array(ax_row2) # 2 x 3
 
-
+    yMax = 0
     plotCount = 0
     for i in range(2):
         for j in range(3):
@@ -150,10 +167,13 @@ for uCount, unit in enumerate(units):
             plotCount += 1
             # histSmooth = smooth(spikeHist,50)#*1000
             # ax_row2[i,j].plot(histSmooth)
-            gaussSmooth = gaussian_filter1d(spikeHist, 15)
+            gaussSmooth = gaussian_filter1d(spikeHist, 12)
+            if max(gaussSmooth) > yMax:
+                yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
             histTitle = titleArr[i][j]
             ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)
+            # ax_row2[i,j].set_ylim(bottom=0)
             # ax_row2[i,j].set_yticks([50,100])
             # ax_row2[i,j].set_yticklabels([50,100], fontsize=5)
             # ax_row2[i,j].set_xticks([histPrePostMS,histPrePostMS+stimDurMS])
@@ -166,6 +186,10 @@ for uCount, unit in enumerate(units):
                 ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
     
+    for i in range(2):
+        for j in range(3):
+            ax_row2[i,j].set_ylim([0, yMax*1.1])
+
     # saves plot as pdf 
     plt.savefig(f'{unit}.pdf')
     continue

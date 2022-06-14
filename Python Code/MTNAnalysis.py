@@ -78,22 +78,22 @@ stimIndexCount = {}
 for corrTrial in corrTrials:
     currTrial = allTrials[corrTrial]
     if 'spikeData' in currTrial:
-        trialStartMS = currTrial['trialStart']['timeMS']
-        trialStartSNEV = currTrial['taskEvents']['trialStart']['timeS']
         stimDesc = currTrial['stimDesc']['data']
-        for stimCount, stim in enumerate(stimDesc):
+        stim1TimeS = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+        for stim in stimDesc:
             if stim['stimLoc'] == 0 and stim['listType'] == 1:
-                stimOnTimeMS = currTrial['stimDesc']['timeMS'][stimCount]
-                stimDiffMS = stimOnTimeMS - trialStartMS
-                stimOnSNEV = trialStartSNEV + (stimDiffMS / 1000)
+                stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
+                              /1000) + stim1TimeS
+                stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
+                               /1000) + stim1TimeS
                 stimIndex = np.int32(stim['stimIndex'])
                 stimIndexCount[stimIndex] = stimIndexCount.get(stimIndex, 0) + 1
                 for unitCount, unit in enumerate(units):
                     if unit in currTrial['spikeData']['unit']:
-                        unitIndex = np.where(currTrial['spikeData']['unit'] == unit)
+                        unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
-                        stimSpikes = np.where((unitTimeStamps >= stimOnSNEV) & 
-                                    (unitTimeStamps <= stimOnSNEV + stimDurMS/1000))
+                        stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
+                                    (unitTimeStamps <= stimOffTimeS))
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
                         = len(stimSpikes[0])
 

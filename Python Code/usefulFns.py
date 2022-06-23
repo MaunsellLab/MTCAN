@@ -172,22 +172,22 @@ def eyePosDurTrial(currTrial):
     Outputs: defaultdict
     '''
     eyesXYDeg = defaultdict(list)
-    eyeLX = currTrial['eyeLXData'].item()['data'].item() 
-    eyeLY = currTrial['eyeLYData'].item()['data'].item()
-    eyeRX = currTrial['eyeRXData'].item()['data'].item()
-    eyeRY = currTrial['eyeRYData'].item()['data'].item()
-    eyeLeftCal = currTrial['eyeLeftCalibrationData'].item()['data'].item()['cal'].item()
-    eyeRightCal = currTrial['eyeRightCalibrationData'].item()['data'].item()['cal'].item()
+    eyeLX = currTrial['eyeLXData']['data']
+    eyeLY = currTrial['eyeLYData']['data']
+    eyeRX = currTrial['eyeRXData']['data']
+    eyeRY = currTrial['eyeRYData']['data']
+    eyeLeftCal = currTrial['eyeLeftCalibrationData']['data']['cal']
+    eyeRightCal = currTrial['eyeRightCalibrationData']['data']['cal']
     count = min([len(eyeLX), len(eyeLY), len(eyeRX), len(eyeRY)])
 
     for s in range(0, count):
-        xDegConvert = (eyeLX[s] * eyeLeftCal['m11'].item()) + (eyeLY[s] * eyeLeftCal['m21'].item()) + eyeLeftCal['tX'].item()
+        xDegConvert = (eyeLX[s] * eyeLeftCal['m11']) + (eyeLY[s] * eyeLeftCal['m21']) + eyeLeftCal['tX']
         eyesXYDeg['leftX'].append(xDegConvert)
-        yDegConvert = (eyeLX[s] * eyeLeftCal['m12'].item()) + (eyeLY[s] * eyeLeftCal['m22'].item()) + eyeLeftCal['tY'].item()
+        yDegConvert = (eyeLX[s] * eyeLeftCal['m12']) + (eyeLY[s] * eyeLeftCal['m22']) + eyeLeftCal['tY']
         eyesXYDeg['leftY'].append(yDegConvert)
-        xDegConvert = (eyeRX[s] * eyeRightCal['m11'].item()) + (eyeRY[s] * eyeRightCal['m21'].item()) + eyeRightCal['tX'].item()
+        xDegConvert = (eyeRX[s] * eyeRightCal['m11']) + (eyeRY[s] * eyeRightCal['m21']) + eyeRightCal['tX']
         eyesXYDeg['rightX'].append(xDegConvert)
-        yDegConvert = (eyeRX[s] * eyeRightCal['m12'].item()) + (eyeRY[s] * eyeRightCal['m22'].item()) + eyeRightCal['tY'].item()
+        yDegConvert = (eyeRX[s] * eyeRightCal['m12']) + (eyeRY[s] * eyeRightCal['m22']) + eyeRightCal['tY']
         eyesXYDeg['rightY'].append(yDegConvert)
 
     return eyesXYDeg

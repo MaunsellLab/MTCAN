@@ -17,9 +17,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import time
 
+# testing
+allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_MTN.mat')
 
 # load relevant file 
-allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220616', 'Meetz_220616_MTN_Spikes.mat')
 
 
 # generates a dictionary of stim Index and corresponding directions/contrasts

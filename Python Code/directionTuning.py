@@ -35,7 +35,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_GRF2_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_GRF2_Spikes.mat')
 
 # create folder and change directory to save PDFs and np.array
 if not os.path.exists('Direction Tuning'):
@@ -50,6 +50,7 @@ correctTrials = correctTrialsGRF(allTrials)
 frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
 numDir = np.int32(header['map0Settings']['data']['directionDeg']['n'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
+interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numDir))
 
@@ -68,7 +69,7 @@ for corrTrial in correctTrials:
 if len(set(stimDurFrame)) != 1:
     print('stimulus frame duration not consistent for mapping stimuli')
 else: 
-    trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
+    trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
 
 
 for uCount, unit in enumerate(units):
@@ -77,7 +78,7 @@ for uCount, unit in enumerate(units):
     spikeCountMat = np.zeros((50,1, numDir))
     spikeCountMat[:,:,:] = np.nan
     #made edit here
-    spikeHists = np.zeros((numDir, stimDurMS + 2*histPrePostMS+12))
+    spikeHists = np.zeros((numDir, trueStimDurMS + 2*histPrePostMS))
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
@@ -130,15 +131,15 @@ for uCount, unit in enumerate(units):
     fig.set_size_inches(6,8)
 
     text = fig.text(0.05, 0.85, f'Direction tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
-                    size=10, fontweight='bold')
+    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}\n\
+    Interstimulus Duration = {interstimDurMS} ms', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
 
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
     theta = np.radians(np.arange(0,420,360/numDir))
-    r = (np.append(spikeCountMean, spikeCountMean[0][0]))*1000/stimDurMS
-    err = (np.append(spikeCountSD, spikeCountSD[0][0]))*1000/stimDurMS
+    r = (np.append(spikeCountMean, spikeCountMean[0][0]))*1000/trueStimDurMS
+    err = (np.append(spikeCountSD, spikeCountSD[0][0]))*1000/trueStimDurMS
     ax_row1.plot(theta,r)
     ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
     ax_row1.set_theta_zero_location("W")
@@ -177,9 +178,9 @@ for uCount, unit in enumerate(units):
             # ax_row2[i,j].set_yticks([50,100])
             # ax_row2[i,j].set_yticklabels([50,100], fontsize=5)
             # ax_row2[i,j].set_xticks([histPrePostMS,histPrePostMS+stimDurMS])
-            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
-            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=5)
-            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
+            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
             if i == 1 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)

@@ -34,7 +34,7 @@ for currTrial in allTrials:
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -69,7 +69,7 @@ for corrTrial in correctTrials:
                 frameDiff = stim['stimOffFrame'].tolist() - stim['stimOnFrame'].tolist()
                 stimDurFrame.append(frameDiff)
 if len(set(stimDurFrame)) != 1:
-    print('stimulus frame duration not consistent for mapping stimuli')
+    print('stimulus frame duration not consistent across mapping stimuli')
 else: 
     trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
 
@@ -138,8 +138,8 @@ for unit in units:
     ax_row1 = []
     ax_row1.append(plt.subplot2grid((9,6), (0,3), colspan = 3, rowspan = 3)) # ax2
     ax_row1[0] = sns.heatmap(spikeCountMean)
-    ax_row1[0].set_xlabel('azimith (deg˚)', fontsize=8)
-    ax_row1[0].set_ylabel('elevation (deg˚)', fontsize = 8)
+    ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
+    ax_row1[0].set_ylabel('elevation (˚)', fontsize = 8)
     ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
     ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
     ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
@@ -175,14 +175,14 @@ for unit in units:
             if i == 0 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-                ax_row2[i,j].yaxis.set_label_coords(-0.5,1.70)
-    plt.tight_layout(pad=0.2, w_pad=0.2, h_pad=0.05)
+                ax_row2[i,j].yaxis.set_label_coords(-0.5,1.75)
+    plt.tight_layout(pad=0.1, w_pad=-0.25, h_pad=-1.45)
 
     for i in range(numEle):
         for j in range(numAzi):
             ax_row2[i,j].set_ylim([0, yMax*1.1])
 
-    # saves plot as png
+    # saves plot as pdf
     plt.savefig(f'{unit}.pdf')
     continue
 
@@ -190,6 +190,7 @@ plt.close('all')
 
 
 '''
+plt.tight_layout(pad=0.1, w_pad=0.1, h_pad=0.05)
 # histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
 #                     (stimDurMS+49)/1000, 0.001)
 # for histCount, i in enumerate(range(len(histSpikes))):

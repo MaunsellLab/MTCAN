@@ -24,7 +24,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220607', 'Meetz_220607_GRF3_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_GRF3_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('Speed Tuning'):
@@ -40,7 +40,9 @@ frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
 numSpeeds = np.int32(header['map0Settings']['data']['temporalFreqHz']['n'])
 minSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['minValue'])
 maxSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
+directionDeg = np.int32(header['map0Settings']['data']['directionDeg']['minValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
+interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numSpeeds))
 
@@ -114,17 +116,20 @@ for uCount, unit in enumerate(units):
     fig.set_size_inches(6,8)
 
     text = fig.text(0.05, 0.85, f'Speed tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
-                    size=10, fontweight='bold')
+    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}\n\
+    Interstimulus Duration = {interstimDurMS} ms\n Gabor Direction {directionDeg}˚',size=8, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
+    tempFreq = np.array([0.5,1,2,4,8,16])
+    speed = np.around(tempFreq/0.3,2)
+
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan=3, rowspan=4)
-    x = np.linspace(minSpeed,maxSpeed, numSpeeds)
+    # x = np.linspace(minSpeed,maxSpeed, numSpeeds)
     # x = np.logspace(1,5,num=6,base=2)
-    ax_row1.plot(x,spikeCountMean[0]*1000/stimDurMS)
-    ax_row1.errorbar(x, spikeCountMean[0]*1000/stimDurMS, yerr = spikeCountSD[0]*1000/stimDurMS,fmt='o', ecolor = 'black', color='black')
+    ax_row1.plot(speed,spikeCountMean[0]*1000/stimDurMS)
+    ax_row1.errorbar(speed, spikeCountMean[0]*1000/stimDurMS, yerr = spikeCountSD[0]*1000/stimDurMS,fmt='o', ecolor = 'black', color='black')
     ax_row1.set_title('Speed Tuning Plot', fontsize=8)
-    ax_row1.set_xlabel('Temporal Frequency (Hz)', fontsize = 8)
+    ax_row1.set_xlabel('Speed (˚/sec)', fontsize = 8)
     ax_row1.set_ylabel('Firing Rate (spikes/sec)', fontsize = 8)
 
     # hists
@@ -143,23 +148,23 @@ for uCount, unit in enumerate(units):
     for i in range(2):
         for j in range(3):
             spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount]
-            plotCount += 1
             gaussSmooth = gaussian_filter1d(spikeHist, 15)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
-            ax_row2[i,j].set_title(f"{i},{j}", fontsize=7)
-            ax_row2[i,j].set_ylim(bottom=0)
-            ax_row2[i,j].set_yticks([0,50,100])
-            ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
+            ax_row2[i,j].set_title(f"{speed[plotCount]}", fontsize=7)
+            plotCount += 1
+            # ax_row2[i,j].set_ylim(bottom=0)
+            # ax_row2[i,j].set_yticks([0,50,100])
+            # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
             ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
             ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=5)
             ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
             if i == 1 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-                ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
-    plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
+                ax_row2[i,j].yaxis.set_label_coords(-0.3,0.3)
+    plt.tight_layout(pad=0.5, w_pad=0.2, h_pad=0.2)
 
     for i in range(2):
         for j in range(3):

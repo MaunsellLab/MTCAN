@@ -1,6 +1,7 @@
 import scipy.io as sp
 from scipy.optimize import curve_fit
 from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage.filters import gaussian_filter
 from scipy import stats
 from itertools import combinations
 import numpy as np
@@ -302,6 +303,52 @@ def randTuningCurve(numNeurons):
 
     return tuningMat, tcDictionary
 
+
+''' function fitting working 
+
+def func(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300, L1_0, L1_60, L1_120,
+         L1_180, L1_240, L1_300, aL0, aL1, sig):
+    c0,c1,l0,l1 = fixed
+    L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
+    L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
+    return((c0*L0*l0).sum(-1) + (c1*L1*l1).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig)
+
+for unitCount, unit in enumerate(units):
+    resp = np.reshape(spikeCountMat[unitCount][1:blocksDone+1,:],(169*blocksDone))
+    fixParam = np.tile(np.arange(169), blocksDone)
+
+    c0s, c1s, l0s, l1s = [], [], [], []
+    direction_set = np.arange(0, 360, 60)
+    for i in fixParam:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+
+        # Make one-hot encoding of l0 and l1
+        l0_oh = np.zeros(6)
+        l1_oh = np.zeros(6)
+        l0_oh[np.argwhere(direction_set == l0).squeeze()] = 1
+        l1_oh[np.argwhere(direction_set == l1).squeeze()] = 1
+
+        c0s.append(np.repeat(c0,6))
+        c1s.append(np.repeat(c1,6))
+        l0s.append(l0_oh)
+        l1s.append(l1_oh)
+        #append([c0,l0_oh,c1,l1_oh])
+    c0s = np.array(c0s)
+    c1s = np.array(c1s)
+    l0s = np.array(l0s)
+    l1s = np.array(l1s)
+    #fix = np.array(fix)
+    #print(fix.shape)
+    pOpt, pCov = curve_fit(func, (c0s, c1s, l0s, l1s), resp, bounds=(
+        (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+        (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+        np.inf, np.inf, np.inf, 1,1,1)))
+    print(unit,pOpt)
+
+'''
 
 # stimCount test
 # correctTrials = correctTrialsGRF(allTrials)

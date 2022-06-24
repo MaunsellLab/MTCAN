@@ -210,7 +210,7 @@ def activeUnits(unitData, allTrials):
                 if unique not in units:
                     units.append(unique)
     
-    return units
+    return np.sort(units)
 
 
 def insertStimSpikeData(units, index, stimOnTimeSNEV):

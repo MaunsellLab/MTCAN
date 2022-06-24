@@ -148,11 +148,11 @@ for uCount, unit in enumerate(units):
     for i in range(2):
         for j in range(3):
             spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount]
-            gaussSmooth = gaussian_filter1d(spikeHist, 15)
+            gaussSmooth = gaussian_filter1d(spikeHist, 10)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
-            ax_row2[i,j].set_title(f"{speed[plotCount]}", fontsize=7)
+            ax_row2[i,j].set_title(f"{speed[plotCount]} ˚/sec", fontsize=7)
             plotCount += 1
             # ax_row2[i,j].set_ylim(bottom=0)
             # ax_row2[i,j].set_yticks([0,50,100])

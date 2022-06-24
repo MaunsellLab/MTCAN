@@ -4,6 +4,8 @@ The script will save the plots for each unit as a PDF in a folder specific
 to the day's dataset. 
 
 to do:
+2D gaussian fit to isolate RF size with graphic display, find the center of the rfeceptive fiel
+width, and center, elipsis on the heatmap
 
 Chery March 2022
 Modified to save plots as pngs and incorporated changes to track stimCounts
@@ -164,7 +166,7 @@ for unit in units:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
             # ax_row2[i,j].set_title(f"Ele:{eleLabel[i]},Azi:{aziLabel[j]}", fontsize=4)
-            ax_row2[i,j].set_ylim(bottom=0)
+            # ax_row2[i,j].set_ylim(bottom=0)
             # ax_row2[i,j].set_ylim([0, 100])
             # ax_row2[i,j].set_yticks([0,50,100])
             # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)

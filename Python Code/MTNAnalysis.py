@@ -5,7 +5,8 @@ MTN Analysis Script
 
 to do:
 trial certify
-incorp frame render to align spikes
+rotate norm plots to incorporate the preferrred direction in the middle
+
 '''
 import seaborn as sns
 import numpy as np
@@ -17,12 +18,15 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import time
 
-# testing
+### testing
 allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_MTN.mat')
 
 # load relevant file 
-allTrials, header = loadMatFile73('Meetz', '220616', 'Meetz_220616_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_MTN_Spikes.mat')
 
+if not os.path.exists('Normalization'):
+    os.makedirs('Normalization')
+os.chdir('Normalization/')
 
 # generates a dictionary of stim Index and corresponding directions/contrasts
 stimIndexDict = {}
@@ -39,12 +43,12 @@ for currTrial in allTrials:
                     if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
                         stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
                         {'direction': int(stim['directionDeg'].tolist()),
-                         'contrast': stim['contrast'].tolist()}
+                         'contrast': np.around(stim['contrast'],2).tolist()}
                 else:
                     if int(stim['stimLoc'].tolist()) not in stimIndexDict[index]:
                         stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
                         {'direction': int(stim['directionDeg'].tolist()),
-                         'contrast': stim['contrast'].tolist()}
+                         'contrast': np.around(stim['contrast'],2).tolist()}
 
 
 # numpy array of stimIndexDict
@@ -55,7 +59,7 @@ for i in range(len(stimIndexDict)):
     stimIndexArray[i][2] = stimIndexDict[i][1]['direction']
     stimIndexArray[i][3] = stimIndexDict[i][1]['contrast']
 
-# are there correct trials without spikeData
+## assert: are there correct trials without spikeData
 noSpikeData = []
 for trialCount, currTrial in enumerate(allTrials):
     trial = currTrial['trial']['data']
@@ -64,6 +68,7 @@ for trialCount, currTrial in enumerate(allTrials):
         if 'spikeData' not in currTrial:
             noSpikeData.append(trialCount)
 
+## assert: frame consistency during stimlus duration
 
 # generate list of unique active units
 units = activeUnits('spikeData', allTrials)
@@ -73,9 +78,12 @@ corrTrials = correctTrialsMTX(allTrials)
 
 # insert spike counts into matrix of unique stimulus sets
 stimDurMS = int(header['stimDurationMS']['data'].tolist())
+frameRateHz = header['frameRateHz']['data'].tolist()
 spikeCountMat = np.zeros((len(units),30,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
-spikeCountMat[:,1:,:] = np.nan
+histPrePostMS = 100
+spikeHists = np.zeros((len(units),169, stimDurMS+2*histPrePostMS+12))
+# spikeCountMat[:,1:,:] = np.nan
 stimIndexCount = {}
 for corrTrial in corrTrials:
     currTrial = allTrials[corrTrial]
@@ -95,11 +103,23 @@ for corrTrial in corrTrials:
                         unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
-                                    (unitTimeStamps <= stimOffTimeS))
+                                    (unitTimeStamps <= stimOffTimeS))[0]
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
-                        = len(stimSpikes[0])
+                        = len(stimSpikes)
 
-meanSpike = np.nanmean(spikeCountMat[:,1:,:], axis = 1)
+                        #PSTHs
+                        stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
+                        stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
+                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
+                                    & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
+                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        spikeHists[unitCount, stimIndex, histStimSpikes] += 1
+
+# blocks Done 
+blocksDone = int(allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone']
+                 .tolist()) 
+
+meanSpike = np.mean(spikeCountMat[:,1:blocksDone+1,:], axis = 1)
 
 meanSpikeReshaped = np.zeros((len(units),1,169))
 for count,i in enumerate(meanSpikeReshaped):
@@ -148,8 +168,9 @@ for unitCount in range(len(units)):
     b = a.reshape(13,13)
 
     #using seaborn
-    ax = sns.heatmap(b)
+    ax = sns.heatmap(b, square=True, linewidths=1)
     ax.set_xticks(np.arange(13)+0.5)
+    ax.set_title(f'heatmap of normalization for {units[unitCount]}')
     ax.set_xticklabels(['0','60','120','180','240','300','0','60','120',
                         '180','240','300','blank'], rotation = 45)
     ax.xaxis.set_ticks_position("top")
@@ -157,24 +178,100 @@ for unitCount in range(len(units)):
     ax.set_yticks(np.arange(13)+0.5)
     ax.set_yticklabels(['0','60','120','180','240','300','0','60','120',
                         '180','240','300','blank'], rotation = 0)
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f'{units[unitCount]}.pdf')
+    plt.close('all')
 
 
 ## correlations incomplete 
 combs = [i for i in combinations(units, 2)]
-corrMat = np.zeros((len(combs),1,169))
-blocks = int(header['blockStats']['data']['blocksDone'].tolist())  #john needs to fix
+corrMat = np.zeros((len(combs),169))
 
+#z-scored spikeCountMat
+zSpikeCountMat = stats.zscore(spikeCountMat[:,1:blocksDone+1,:], axis=2, nan_policy='omit')
+zSpikeCountMat = np.nan_to_num(zSpikeCountMat)
 for count, i in enumerate(combs):
-    n1 = units.index(i[0])
-    n2 = units.index(i[1])
+    print(count)
+    n1 = np.where(units == i[0])[0][0]
+    n2 = np.where(units == i[1])[0][0]
     for j in range(np.shape(spikeCountMat)[2]):
-        stimCorr = stats.pearonr(spikeCountMat[n1,1:blocks+1,j],
-                                 spikeCountMat[n2,1:blocks+1,j])
-        corrMat[count][0][j] = stimCorr[0][1]
+        stimCorr = stats.pearsonr(zSpikeCountMat[n1,1:blocksDone+1,j],
+                                 zSpikeCountMat[n2,1:blocksDone+1,j])
+        corrMat[count][j] = stimCorr[0]
 
-pairZScore = stats.zscore(corrMat, axis=2) # nan_policy='omit'
-popZMean = np.mean(axis=0)
+popCorr = np.mean(np.nanmean(corrMat,axis=1))
+
+
+#scipy curveFit Normalization parameters
+def func(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300, L1_0, L1_60, L1_120,
+         L1_180, L1_240, L1_300, aL0, aL1, sig):
+    c0,c1,l0,l1 = fixed
+    L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
+    L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
+    return((c0*L0*l0).sum(-1) + (c1*L1*l1).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig)
+
+resp = np.reshape(spikeCountMat[5][1:blocksDone+1,:],(169*blocksDone))
+fixParam = np.tile(np.arange(169), blocksDone)
+
+c0s, c1s, l0s, l1s = [], [], [], []
+direction_set = np.arange(0, 360, 60)
+for i in fixParam:
+    c0 = stimIndexDict[i][0]['contrast']
+    l0 = stimIndexDict[i][0]['direction']
+    c1 = stimIndexDict[i][1]['contrast']
+    l1 = stimIndexDict[i][1]['direction']
+
+    # Make one-hot encoding of l0 and l1
+    l0_oh = np.zeros(6)
+    l1_oh = np.zeros(6)
+    l0_oh[np.argwhere(direction_set == l0).squeeze()] = 1
+    l1_oh[np.argwhere(direction_set == l1).squeeze()] = 1
+
+    c0s.append(np.repeat(c0,6))
+    c1s.append(np.repeat(c1,6))
+    l0s.append(l0_oh)
+    l1s.append(l1_oh)
+    #append([c0,l0_oh,c1,l1_oh])
+c0s = np.array(c0s)
+c1s = np.array(c1s)
+l0s = np.array(l0s)
+l1s = np.array(l1s)
+#fix = np.array(fix)
+#print(fix.shape)
+print(curve_fit(func, (c0s, c1s, l0s, l1s), resp, bounds=((0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+      (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+       np.inf, np.inf, np.inf, 1,1,1))))
+
+
+
+#PSTHs
+yMax = 0
+unit2Pref = spikeHists[5,153,:] * 1000/stimIndexCount[153]
+unit2Null = spikeHists[5,162,:] * 1000/stimIndexCount[162]
+unit2PN = spikeHists[5,111,:] * 1000/stimIndexCount[111]
+gaussSmoothPref = gaussian_filter1d(unit2Pref, 10)
+gaussSmoothNull = gaussian_filter1d(unit2Null, 10)
+gaussSmoothPN = gaussian_filter1d(unit2PN, 10)
+if max(gaussSmoothPN) > yMax:
+    yMax = max(gaussSmoothPN)
+if max(gaussSmoothNull) > yMax:
+    yMax = max(gaussSmoothNull)
+if max(gaussSmoothPref) > yMax:
+    yMax = max(gaussSmoothPref)
+plt.plot(gaussSmoothPref, label='pref')   
+plt.plot(gaussSmoothNull, label='null') 
+plt.plot(gaussSmoothPN, label='p+n')
+plt.legend()
+
+plt.xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS],[-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS])
+plt.axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
+plt.ylim([0, yMax*1.1])
+plt.xlabel('time (ms)')
+plt.ylabel('Firing Rate spikes/sec')
+plt.show()
+
+'''
+'''
 
 ## selectivity for direction (similar to Bram)
 unitSelectivity = np.zeros((len(units),169)) 

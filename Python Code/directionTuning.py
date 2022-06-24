@@ -54,7 +54,7 @@ interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numDir))
 
-# assert frame consistency for frame duration
+# assert frame consistency during stimulus duration
 stimDurFrame = []
 for corrTrial in correctTrials:
     currTrial = allTrials[corrTrial]
@@ -168,7 +168,7 @@ for uCount, unit in enumerate(units):
             plotCount += 1
             # histSmooth = smooth(spikeHist,50)#*1000
             # ax_row2[i,j].plot(histSmooth)
-            gaussSmooth = gaussian_filter1d(spikeHist, 12)
+            gaussSmooth = gaussian_filter1d(spikeHist, 8)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)

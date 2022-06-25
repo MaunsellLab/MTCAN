@@ -1,13 +1,15 @@
 '''
 MTN Analysis Script
- - heatmap of Norm responses
+ - heatmap of normalized responses
  - potentially some correlations
+ - normalization equation, parameter fitting
+ - PSTHs of normalized responses
+
 
 to do:
-trial certify
-rotate norm plots to incorporate the preferrred direction in the middle
+reindex norm plots to incorporate the preferrred direction in the middle
 convert heatmap to spikes/sec, it's at spikes/stimDurMS
-heatmap range starts at 0
+WRITE code to find high/low contrasts used 
 
 '''
 import seaborn as sns
@@ -96,6 +98,9 @@ for i in range(len(stimIndexDict)):
     stimIndexArray[i][2] = stimIndexDict[i][1]['direction']
     stimIndexArray[i][3] = stimIndexDict[i][1]['contrast']
 
+# pandas dataframe
+stimIndexDF = pd.DataFrame(stimIndexArray, columns=['loc0 Direction', 'loc0 Contrast',
+                                            'loc1 Direction', 'loc1 Contrast'])
 
 # insert spike counts into matrix of unique stimulus sets
 stimDurMS = int(header['stimDurationMS']['data'].tolist())
@@ -233,7 +238,7 @@ for count, i in enumerate(combs):
 popCorr = np.mean(np.nanmean(corrMat,axis=1))
 
 
-# scipy curveFit Normalization parameters
+## scipy curveFit Normalization parameters
 def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, aL0, aL1, sig):
     c0,c1,l0,l1 = fixed
     L = np.array([L_0, L_60, L_120, L_180, L_240, L_300])
@@ -273,34 +278,45 @@ for unitCount, unit in enumerate(units):
     print(unit,pOpt)
 
 
-# PSTHs for P,N, P+N
-yMax = 0
-unit2Pref = spikeHists[5,129,:] * 1000/stimIndexCount[129]
-unit2Null = spikeHists[5,108,:] * 1000/stimIndexCount[108]
-unit2PN = spikeHists[5,111,:] * 1000/stimIndexCount[111]
-gaussSmoothPref = gaussian_filter1d(unit2Pref, 10)
-gaussSmoothNull = gaussian_filter1d(unit2Null, 10)
-gaussSmoothPN = gaussian_filter1d(unit2PN, 10)
-if max(gaussSmoothPN) > yMax:
-    yMax = max(gaussSmoothPN)
-if max(gaussSmoothNull) > yMax:
-    yMax = max(gaussSmoothNull)
-if max(gaussSmoothPref) > yMax:
-    yMax = max(gaussSmoothPref)
-plt.plot(gaussSmoothPref, label='pref')   
-plt.plot(gaussSmoothNull, label='null') 
-plt.plot(gaussSmoothPN, label='p+n')
-plt.title('loc0 Pref, loc1 Null: Pref+Pref, Pref+Null, Null+Null')
-plt.legend()
+## PSTHs for P+P, N+N, P+I, and converse for other location
 
-plt.xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS],[-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS])
-plt.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
-plt.ylim([0, yMax*1.1])
-plt.xlabel('time (ms)')
-plt.ylabel('Firing Rate spikes/sec')
-plt.show()
+dirArray = [0,60,120,180,240,300,0,60,120,180,240,300]
 
-#PSTHs for P, P+-60, P+-120, etc
+for unitCount, unit in enumerate(units):
+    b = meanSpikeReshaped[unitCount].reshape(13,13)
+    bSmooth = gaussian_filter(b, sigma=1)
+
+    maxLoc0 = max(bSmooth[12,:])
+    maxLoc1 = max(bSmooth[:,12])
+    if maxLoc0 > maxLoc1:
+        prefDir = dirArray[np.where(bSmooth[12,:]==maxLoc0)[0][0]]
+    else:
+        prefDir = dirArray[np.where(bSmooth[:,12]==maxLoc1)[0][0]]
+    nullDir = (prefDir + 180)%360
+
+    #low low contrast 
+    #### DEFINE LOW CONTRAST
+    # loc0 = Pref 
+    # loc1 = Null, Intermediate
+    a = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)]
+
+    # WRITE code to find high/low contrasts used 
+    #low low contrast
+    #low high contrast
+    #high low contrast
+    #high high contrast
+
+
+
+
+
+
+
+
+
+
 yMax = 0
 unitPref = spikeHists[2,115,:] * 1000/stimIndexCount[115]
 unitI1 = spikeHists[2,114,:] * 1000/stimIndexCount[114]
@@ -327,6 +343,34 @@ plt.plot(gaussSmoothI4, label='P, N')
 plt.plot(gaussSmoothI5, label='P, I5')
 plt.title('P+P, N+N, P+I')
 plt.legend()
+plt.xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS],[-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS])
+plt.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+plt.ylim([0, yMax*1.1])
+plt.xlabel('time (ms)')
+plt.ylabel('Firing Rate spikes/sec')
+plt.show()
+
+
+# PSTHs for P,N, P+N
+yMax = 0
+unit2Pref = spikeHists[5,129,:] * 1000/stimIndexCount[129]
+unit2Null = spikeHists[5,108,:] * 1000/stimIndexCount[108]
+unit2PN = spikeHists[5,111,:] * 1000/stimIndexCount[111]
+gaussSmoothPref = gaussian_filter1d(unit2Pref, 10)
+gaussSmoothNull = gaussian_filter1d(unit2Null, 10)
+gaussSmoothPN = gaussian_filter1d(unit2PN, 10)
+if max(gaussSmoothPN) > yMax:
+    yMax = max(gaussSmoothPN)
+if max(gaussSmoothNull) > yMax:
+    yMax = max(gaussSmoothNull)
+if max(gaussSmoothPref) > yMax:
+    yMax = max(gaussSmoothPref)
+plt.plot(gaussSmoothPref, label='pref')   
+plt.plot(gaussSmoothNull, label='null') 
+plt.plot(gaussSmoothPN, label='p+n')
+plt.title('loc0 Pref, loc1 Null: Pref+Pref, Pref+Null, Null+Null')
+plt.legend()
+
 plt.xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS],[-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS])
 plt.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
 plt.ylim([0, yMax*1.1])

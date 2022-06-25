@@ -279,7 +279,6 @@ for unitCount, unit in enumerate(units):
 
 
 ## PSTHs for P+P, N+N, P+I, and converse for other location
-
 dirArray = [0,60,120,180,240,300,0,60,120,180,240,300]
 
 for unitCount, unit in enumerate(units):
@@ -293,26 +292,72 @@ for unitCount, unit in enumerate(units):
     else:
         prefDir = dirArray[np.where(bSmooth[:,12]==maxLoc1)[0][0]]
     nullDir = (prefDir + 180)%360
+    otherDir = [i for i in dirArray[:6] if i != prefDir and i != nullDir]
 
     #low low contrast 
     #### DEFINE LOW CONTRAST
-    # loc0 = Pref 
-    # loc1 = Null, Intermediate
-    a = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+    # loc0 = Pref : loc1 = Null, Intermediate
+    #pref pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='pref')
+    # null null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
         (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
-        & (stimIndexDF['loc1 Contrast'] == lowC)]
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='null')
+    # pref null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='pref+null')
+    #intermediate Dir
+    for i in otherDir:
+        histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == i)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+        dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+        plt.plot(gaussian_filter1d(dirPlot,10), label=f'pref+I{prefDir,i}')
+
+    #loc0 = Null, Intermediate : loc1 = Pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='pref')
+    # null null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='null')
+    # null pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    plt.plot(gaussian_filter1d(dirPlot,10), label='null+pref')
+    #intermediate Dir
+    for i in otherDir:
+        histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == i) & 
+        (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+        dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+        plt.plot(gaussian_filter1d(dirPlot,10), label=f'I+prefDir{i, prefDir}')
+
+
+
+
 
     # WRITE code to find high/low contrasts used 
     #low low contrast
     #low high contrast
     #high low contrast
     #high high contrast
-
-
-
-
-
-
 
 
 

@@ -131,6 +131,16 @@ def smooth(y, box_pts):
     return y_smooth
 
 
+def spikeHistIndex(loc0Dir,loc0Con, loc1Dir, loc1Con):
+    '''
+    function will return the index for the each stimulus type PSTH
+    '''
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+    (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
+    & (stimIndexDF['loc1 Contrast'] == lowC)][0]
+    return histIndex
+
+
 def fieldInTrial(fieldList, trial = None):
     '''
     Function will check whether all fields in a list are in the trial

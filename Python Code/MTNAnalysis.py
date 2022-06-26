@@ -327,14 +327,14 @@ for unitCount, unit in enumerate(units):
             if max(smoothPlot) > yMax:
                 yMax = max(smoothPlot)
             ax2[plotCount].plot(smoothPlot, label=f'{loc0Dir}+{loc1Dir}')
+            ax2[plotCount].set_title(f'loc0 contrast {loc0Con} loc1 contrast {loc1Con}', fontsize= 5)
             ax2[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
             ax2[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
             ax2[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
             subCount += 1
-            if subCount == 7:
+            if subCount % 7 == 0:
                 plotCount += 1
-            if subCount == 14:
-                plotCount += 1
+
     plt.tight_layout(pad=0.5, w_pad=0.5, h_pad=0.5)
 
     for i in range(8):
@@ -342,13 +342,38 @@ for unitCount, unit in enumerate(units):
     plt.show()
 
 
-yMax = 0
-if max(gaussSmoothPref) > yMax:
-    yMax = max(gaussSmoothPref)
-plt.ylim([0, yMax*1.1])
-plt.title('P+P, N+N, P+I')
-plt.legend()
-plt.show()
+## mean response of PP, PN, NN to low and high contrast
+for unitCount, unit in enumerate(units):
+    b = meanSpikeReshaped[unitCount].reshape(13,13)
+    bSmooth = gaussian_filter(b, sigma=1)
+
+    maxLoc0 = max(bSmooth[12,:])
+    maxLoc1 = max(bSmooth[:,12])
+    if maxLoc0 > maxLoc1:
+        prefDir = dirArray[np.where(bSmooth[12,:]==maxLoc0)[0][0]]
+    else:
+        prefDir = dirArray[np.where(bSmooth[:,12]==maxLoc1)[0][0]]
+    nullDir = (prefDir + 180)%360
+    print(unit, prefDir, nullDir)
+    otherDir = [i for i in dirArray[:6] if i != prefDir and i != nullDir]
+
+    for i in [lowContrast, highContrast]:
+        colorCount = 0
+        for j in [(prefDir, prefDir),(prefDir,nullDir),(nullDir,prefDir),(nullDir,nullDir)]:
+            loc0Dir, loc1Dir = j
+            spikeIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
+            (stimIndexDF['loc0 Contrast'] == i) & (stimIndexDF['loc1 Direction'] == loc1Dir)
+            & (stimIndexDF['loc1 Contrast'] == i)][0]
+            avgSpike = meanSpike[unitCount][spikeIndex]
+            if colorCount == 0:
+                plt.scatter(i, avgSpike, c='blue')
+            if colorCount == 1 or colorCount == 2: 
+                plt.scatter(i,avgSpike, c='brown')
+            if colorCount == 3:
+                plt.scatter(i,avgSpike, c='red')
+            colorCount +=1 
+    plt.show()
+
 
 
 # PSTHs for P,N, P+N

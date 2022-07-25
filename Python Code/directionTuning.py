@@ -35,7 +35,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_GRF2_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622_7', 'Meetz_220622_GRF2_Spikes.mat')
 
 # create folder and change directory to save PDFs and np.array
 if not os.path.exists('Direction Tuning'):
@@ -53,6 +53,7 @@ stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numDir))
+allBaselineMat = np.zeros(len(units))
 
 # assert frame consistency during stimulus duration
 stimDurFrame = []
@@ -79,6 +80,7 @@ for uCount, unit in enumerate(units):
     spikeCountMat[:,:,:] = np.nan
     #made edit here
     spikeHists = np.zeros((numDir, trueStimDurMS + 2*histPrePostMS))
+    baselineSpikeCount = []
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
@@ -108,8 +110,10 @@ for uCount, unit in enumerate(units):
                         stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
                                         (unitTimeStamps <= stimOffTimeS))
                         spikeCountMat[stCount, 0, dirIndex] = len(stimSpikes[0])
+                        baselineSpikes = np.where((unitTimeStamps <= stimOnTimeS) &
+                                        (unitTimeStamps >= (stimOnTimeS-0.1)))[0]
+                        baselineSpikeCount.append(len(baselineSpikes))
                         
-                        #check my histograms
                         #histograms
                         stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
                         stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
@@ -118,10 +122,12 @@ for uCount, unit in enumerate(units):
                         histStimSpikes = np.int32(histStimSpikes*1000)
                         spikeHists[dirIndex, histStimSpikes] += 1
 
-
+    baselineSpikeCount = np.array(baselineSpikeCount)
+    baselineMeanSec = np.mean(baselineSpikeCount) * 1000/100
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
-    allTuningMat[uCount] = spikeCountMean
+    allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
+    allBaselineMat[uCount] = baselineMeanSec
 
     #plot figure
     #polar
@@ -195,7 +201,8 @@ for uCount, unit in enumerate(units):
     plt.savefig(f'{unit}.pdf')
     continue
 plt.close('all')
-# np.save('unitsDirTuningMat', allTuningMat)
+np.save('unitsDirTuningMat', allTuningMat)
+np.save('unitsBaselineMat', allBaselineMat)
 
 
 '''

@@ -24,7 +24,7 @@ import matplotlib.patheffects as path_effects
 import seaborn as sns
 
 
-# for testing purposes, to make unit field similar to real data
+### for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
         currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
@@ -34,9 +34,11 @@ for currTrial in allTrials:
             c = a + '_' + b
             currTrial['spikeData']['unit'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
+###
 
+## Start here
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622', 'Meetz_220622_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622_4', 'Meetz_220622_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -122,6 +124,7 @@ for unit in units:
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
 
+    bSmooth = gaussian_filter(spikeCountMean, sigma=1,truncate=1.5)
 
     ## Plot figure ##
     fig = plt.figure()
@@ -138,7 +141,7 @@ for unit in units:
 
     # heatmap
     ax_row1 = []
-    ax_row1.append(plt.subplot2grid((9,6), (0,3), colspan = 3, rowspan = 3)) # ax2
+    ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
     ax_row1[0] = sns.heatmap(spikeCountMean)
     ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
     ax_row1[0].set_ylabel('elevation (˚)', fontsize = 8)
@@ -148,10 +151,10 @@ for unit in units:
     ax_row1[0].invert_yaxis()
 
     ax_row2 = []
-    for i in range(8, 2, -1):
+    for i in np.arange(numEle+2, 2, -1):
         ax = []
-        for j in range(0, 6):
-            ax.append(plt.subplot2grid((9,6), (i,j)))
+        for j in np.arange(0, numAzi):
+            ax.append(plt.subplot2grid((numEle+3,6), (i,j)))
         ax_row2.append(np.array(ax))
 
     ax_row2 = np.array(ax_row2) # 6 x 6
@@ -161,7 +164,7 @@ for unit in units:
     for i in range(numEle):
         for j in range(numAzi):
             spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
-            gaussSmooth = gaussian_filter1d(spikeHist, 15)
+            gaussSmooth = gaussian_filter1d(spikeHist, 8)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
@@ -192,17 +195,6 @@ plt.close('all')
 
 
 '''
-plt.tight_layout(pad=0.1, w_pad=0.1, h_pad=0.05)
-# histSpikes = np.arange(stimOnSNEV - 0.050, stimOnSNEV + \
-#                     (stimDurMS+49)/1000, 0.001)
-# for histCount, i in enumerate(range(len(histSpikes))):
-#     if np.around(histSpikes[i],3) in unitTimeStamps:
-#         spikeHists[histCount][eleIndex][aziIndex] += 1
-
-smoothHist = savgol_filter(spikeHist, 100,3)
-plt.plot(smoothHist)
-plt.show()
-
 #moving point average
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
@@ -215,3 +207,54 @@ plt.plot(histSmooth)
 plt.show()
 '''
 
+def confidence_ellipse(x, y, ax, n_std=3.0, facecolor='none', **kwargs):
+    """
+    Create a plot of the covariance confidence ellipse of *x* and *y*.
+
+    Parameters
+    ----------
+    x, y : array-like, shape (n, )
+        Input data.
+
+    ax : matplotlib.axes.Axes
+        The axes object to draw the ellipse into.
+
+    n_std : float
+        The number of standard deviations to determine the ellipse's radiuses.
+
+    **kwargs
+        Forwarded to `~matplotlib.patches.Ellipse`
+
+    Returns
+    -------
+    matplotlib.patches.Ellipse
+    """
+    if x.size != y.size:
+        raise ValueError("x and y must be the same size")
+
+    cov = np.cov(x, y)
+    pearson = cov[0, 1]/np.sqrt(cov[0, 0] * cov[1, 1])
+    # Using a special case to obtain the eigenvalues of this
+    # two-dimensionl dataset.
+    ell_radius_x = np.sqrt(1 + pearson)
+    ell_radius_y = np.sqrt(1 - pearson)
+    ellipse = Ellipse((0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2,
+                      facecolor=facecolor, **kwargs)
+
+    # Calculating the stdandard deviation of x from
+    # the squareroot of the variance and multiplying
+    # with the given number of standard deviations.
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    mean_x = np.mean(x)
+
+    # calculating the stdandard deviation of y ...
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    mean_y = np.mean(y)
+
+    transf = transforms.Affine2D() \
+        .rotate_deg(45) \
+        .scale(scale_x, scale_y) \
+        .translate(mean_x, mean_y)
+
+    ellipse.set_transform(transf + ax.transData)
+    return ax.add_patch(ellipse)

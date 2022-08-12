@@ -491,14 +491,28 @@ for count, i in enumerate(combs):
     fixCorr = stats.pearsonr(zfixSpikeCount[n1].flatten(),zfixSpikeCount[n2].flatten())
     fixCorrMat[count] = fixCorr[0]
 
-## direction tuning similarity b/w neurons 
+## RF location tuning similarity b/w neurons Bhattacharyya Distance 2D
+RFLocMat = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
+combs = [i for i in combinations(units, 2)]
+pairLocSimScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+
+    m1, cov1, p = gauss2dParams(RFLocMat[n1])
+    m2, cov2, p2 = gauss2dParams(RFLocMat[n2])
+    BC = bhattCoef2D(m1,m2,cov1,cov2)
+    pairLocSimScore[pairCount] = BC
+
+
+## direction tuning similarity b/w neurons Bhattacharyya Distance
 dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
 unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
 extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
                             dirTuningMat[:,:3]), axis=1)
 angleMat = np.arange(180,900,60)
 
-combs = [i for i in combinations(filterUnits, 2)]
+combs = [i for i in combinations(units, 2)]
 pairSimPrefDir = np.zeros((len(combs),1))
 pairSimScore = np.zeros((len(combs),1))
 for pairCount, pair in enumerate(combs):
@@ -538,6 +552,14 @@ for pairCount, pair in enumerate(combs):
     BC = bhattCoef(m1, m2, v1, v2)
     pairSimScore[pairCount] = BC
 
+
+
+
+
+
+
+
+
 ## unit Direction Selectivity 
 unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
 unitSelectivity = np.zeros(len(units))
@@ -545,12 +567,13 @@ for unit in filterUnits:
     unitIndex = np.where(units == unit)[0][0]
     nMax = np.where(dirTuningMat[unitIndex] == np.max(dirTuningMat[unitIndex]))[0].squeeze() 
     prefDir = dirArray[nMax]
-    nullDir = (prefDir + 180)  %360
+    nullDir = (prefDir + 180) % 360
     nullResp = dirTuningMat[unitIndex][np.where(dirArray==nullDir)[0][0]]
     prefResp = dirTuningMat[unitIndex][nMax]
     baseResp = unitsBaselineMat[unitIndex]
     DS = 1 - ((nullResp-baseResp)/(prefResp-baseResp))
     unitSelectivity[unitIndex] = DS
+
 
 #pair Selectivity
 combs = [i for i in combinations(filterUnits, 2)]
@@ -560,14 +583,6 @@ for pairCount, pair in enumerate(combs):
     n2 = np.where(units == pair[1])[0][0]
     geoMean = np.sqrt((unitSelectivity[n1]*unitSelectivity[n2]))
     pairSelScore[pairCount] = geoMean
-
-
-
-
-
-
-
-
 
 
 ## selectivity for direction (similar to Bram)

@@ -38,7 +38,7 @@ for currTrial in allTrials:
 
 ## Start here
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622_4', 'Meetz_220622_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220622_3', 'Meetz_220622_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -58,6 +58,7 @@ numEle = np.int32(header['map0Settings']['data']['elevationDeg']['n'])
 minEle = np.float32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.float32(header['map0Settings']['data']['elevationDeg']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
+allTuningMat = np.zeros((len(units),numEle,numAzi))
 histPrePostMS = 100
 
 # assert frame consistency for frame duration
@@ -78,7 +79,7 @@ else:
     trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
 
 
-for unit in units:
+for uCount, unit in enumerate(units):
     stimCount = np.zeros((numEle,numAzi))
     spikeCountMat = np.zeros((25,numEle, numAzi))
     spikeCountMat[:,:,:] = np.nan
@@ -123,9 +124,11 @@ for unit in units:
 
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+    allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
 
-    bSmooth = gaussian_filter(spikeCountMean, sigma=1,truncate=1.5)
-
+    bSmooth = gaussian_filter1d(spikeCountMean, sigma=2)
+    sns.heatmap(bSmooth)
+    plt.show()
     ## Plot figure ##
     fig = plt.figure()
     fig.set_size_inches(6,8)
@@ -192,6 +195,66 @@ for unit in units:
     continue
 
 plt.close('all')
+np.save('unitsRFLocMat', allTuningMat)
+
+
+'''
+'''
+allTuningMat
+p_init = models.Gaussian2D(amplitude=1, x_mean=0, y_mean=0, x_stddev=None, 
+                           y_stddev=None, theta=None, cov_matrix=None)
+yi, xi = np.indices(spikeCountMean.shape)
+fit_p = fitting.LevMarLSQFitter()
+p = fit_p(p_init,xi,yi,spikeCountMean)
+plt.imshow(p(xi,yi))
+plt.show()
+
+
+#flips the spikeCountMean on its horizontal axis
+for i in range(len(RFLocMat)):
+    a = np.flip(RFLocMat[i], axis=0)
+    com = ndimage.center_of_mass(a)
+    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=None, 
+                                y_stddev=None, theta=None, cov_matrix=None)
+    yi, xi = np.indices(a.shape)
+    fit_p = fitting.LevMarLSQFitter()
+    p = fit_p(p_init,xi,yi,a)
+
+    theta = p.theta[0] * 180/np.pi
+    xStdDev = p.x_stddev[0]
+    yStdDev = p.y_stddev[0]
+    xMean = p.x_mean[0]
+    yMean = p.y_mean[0]
+    amp = p.amplitude[0]
+
+    rho = np.cos(theta)
+    covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
+                    [rho*xStdDev*yStdDev,yStdDev**2]])
+    meanVec = np.array([[xMean],[yMean]])
+
+    newMat = np.zeros((numEle*40,numAzi*40))
+    yi,xi = np.indices(newMat.shape)
+    p.x_mean = p.x_mean[0] * 40
+    p.y_mean = p.y_mean[0] * 40
+    p.x_stddev = p.x_stddev[0] * 40
+    p.y_stddev = p.y_stddev[0] * 40
+    modelData = p(xi,yi)
+    sns.heatmap(modelData)
+    plt.show()
+
+
+plt.imshow(p(xi,yi))
+plt.show() 
+
+
+cost2 = np.cos(theta) ** 2
+sint2 = np.sin(theta) ** 2
+sin2t = np.sin(2. * theta)
+xstd2 = xStdDev ** 2
+ystd2 = yStdDev ** 2
+a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
+b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
+c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
 
 
 '''

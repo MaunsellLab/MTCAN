@@ -7,6 +7,7 @@ from scipy import stats
 from itertools import combinations
 import numpy as np
 import numpy.ma as ma
+from numpy.linalg import inv
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import math
@@ -17,6 +18,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.ticker as ticker
 import time
+from astropy.modeling import models, fitting
 
 def loadMatFile73(NHP, date, fileName):
     '''
@@ -102,6 +104,36 @@ def gauss_fit(x, y):
     return popt
 
 
+def gauss2dParams(neuronTuningMat):
+    '''
+    function will return the parameters to fit a 2D gaussian
+    onto the neuron RF location heatmap
+    returns mean vector (meanVec) and covariance matrix (covMat)
+    '''
+
+    a = np.flip(neuronTuningMat, axis=0)
+    com = ndimage.center_of_mass(a)
+    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=None, 
+                            y_stddev=None, theta=None, cov_matrix=None)
+    yi, xi = np.indices(a.shape)
+    fit_p = fitting.LevMarLSQFitter()
+    p = fit_p(p_init,xi,yi,a)
+
+    theta = p.theta[0] * 180/np.pi
+    xStdDev = p.x_stddev[0]
+    yStdDev = p.y_stddev[0]
+    xMean = p.x_mean[0]
+    yMean = p.y_mean[0]
+    amp = p.amplitude[0]
+
+    rho = np.cos(theta)
+    covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
+                    [rho*xStdDev*yStdDev,yStdDev**2]])
+    meanVec = np.array([[xMean],[yMean]])
+
+    return meanVec, covMat, p
+
+
 def bhattCoef(m1, m2, v1, v2):
     '''
     This function will compute the Bhattacharyya Coefficient of two 
@@ -122,6 +154,35 @@ def bhattCoef(m1, m2, v1, v2):
 
     return BC
 
+
+def bhattCoef2D(m1,m2,cov1,cov2):
+    '''
+    This function will compute the Bhattacharyya Coefficient for two
+    2D-Gaussian distriutions. This is used to measure how much overlap there
+    is between two receptive fields.
+
+    Inputs:
+        m1 (np.array) - mean vector of the first 2D Gaussian
+        m2 (np.array) - mean vector of the second 2D Gaussian
+        cov1 (np.array) - covariance matrix of the first 2D Gaussian
+        cov2 (np.array) - covariance matrix of the second 2D Gaussian
+    Outputs:
+        BC (float) - a value b/w 0 and 1 that defines how similar the curves are
+    '''
+
+    meanDiff = m1 - m2
+    sigma = (cov1 + cov2)/2
+    detSigma = np.linalg.det(sigma)
+    detCov1 = np.linalg.det(cov1)
+    detCov2 = np.linalg.det(cov2)
+
+    X = 1/8 * np.dot(np.dot(np.transpose(meanDiff),inv(sigma)), meanDiff)
+    Y = 1/2 * np.log(detSigma/np.sqrt(detCov1 * detCov2))
+    BD = X + Y
+    BC = np.exp(-BD)
+
+    return BC
+    
 
 def smooth(y, box_pts):
     '''

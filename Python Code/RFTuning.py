@@ -38,7 +38,7 @@ for currTrial in allTrials:
 
 ## Start here
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622_3', 'Meetz_220622_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220912', 'Meetz_220912_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -126,9 +126,10 @@ for uCount, unit in enumerate(units):
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
 
-    bSmooth = gaussian_filter1d(spikeCountMean, sigma=2)
-    sns.heatmap(bSmooth)
-    plt.show()
+    # bSmooth = gaussian_filter1d(spikeCountMean, sigma=2)
+    # sns.heatmap(bSmooth)
+    # plt.show()
+
     ## Plot figure ##
     fig = plt.figure()
     fig.set_size_inches(6,8)
@@ -145,6 +146,7 @@ for uCount, unit in enumerate(units):
     # heatmap
     ax_row1 = []
     ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
+    bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
     ax_row1[0] = sns.heatmap(spikeCountMean)
     ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
     ax_row1[0].set_ylabel('elevation (˚)', fontsize = 8)
@@ -167,7 +169,7 @@ for uCount, unit in enumerate(units):
     for i in range(numEle):
         for j in range(numAzi):
             spikeHist = spikeHists[:,i,j] * 1000/stimCount[i,j]
-            gaussSmooth = gaussian_filter1d(spikeHist, 8)
+            gaussSmooth = gaussian_filter1d(spikeHist, 5)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
@@ -209,6 +211,7 @@ p = fit_p(p_init,xi,yi,spikeCountMean)
 plt.imshow(p(xi,yi))
 plt.show()
 
+RFLocMat = spikeCountMean
 
 #flips the spikeCountMean on its horizontal axis
 for i in range(len(RFLocMat)):
@@ -239,7 +242,7 @@ for i in range(len(RFLocMat)):
     p.x_stddev = p.x_stddev[0] * 40
     p.y_stddev = p.y_stddev[0] * 40
     modelData = p(xi,yi)
-    sns.heatmap(modelData)
+    sns.heatmap(modelData, cmap = sns.color_palette('mako', as_cmap=True),)
     plt.show()
 
 

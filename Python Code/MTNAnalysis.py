@@ -23,10 +23,12 @@ import time
 
 ### testing
 allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_MTN.mat')
+###
 
+####### START HERE ######
 
 # load relevant file 
-allTrials, header = loadMatFile73('Meetz', '220622_3', 'Meetz_220622_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220912', 'Meetz_220912_MTN_Spikes.mat')
 
 
 if not os.path.exists('Normalization'):
@@ -36,6 +38,7 @@ os.chdir('Normalization/')
 
 # list of indices of correctTrials (non-instruct, valid trialCertify)
 corrTrials = correctTrialsMTX(allTrials)
+
 
 # generate list of unique active units
 units = activeUnits('spikeData', allTrials)
@@ -103,7 +106,7 @@ stimIndexDF = pd.DataFrame(stimIndexArray, columns=['loc0 Direction', 'loc0 Cont
                                             'loc1 Direction', 'loc1 Contrast'])
 
 
-blocksDone = int(allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone']
+blocksDone = int(allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
                  .tolist()) 
 lowContrast,highContrast = stimIndexDF['loc0 Contrast'].unique()[0], \
                            stimIndexDF['loc0 Contrast'].unique()[1]
@@ -112,7 +115,7 @@ spikeCountMat = np.zeros((len(units),blocksDone+2,169))
 spikeCountMat[:,0,:] = np.arange(0,169)
 spikeCountDF = pd.DataFrame(columns = ['unit', 'stimIndex', 'stimCount', 'spikeCount'])
 fixSpikeCount = np.zeros((len(units),len(corrTrials),1))
-histPrePostMS = 100
+histPrePostMS = 200
 spikeHists = np.zeros((len(units),169, trueStimDurMS+2*histPrePostMS+12))
 # spikeCountMat[:,1:,:] = np.nan
 stimIndexCount = {}
@@ -135,9 +138,10 @@ for trialCount, corrTrial in enumerate(corrTrials):
                 for unitCount, unit in enumerate(units):
                     if unit in currTrial['spikeData']['unit']:
                         unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
+                        #added 50ms latency for spike counts
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
-                        stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
-                                    (unitTimeStamps <= stimOffTimeS))[0]
+                        stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS+0.05)) & 
+                                    (unitTimeStamps <= (stimOffTimeS+0.05)))[0]
                         spikeCountMat[unitCount][stimIndexCount[stimIndex]][stimIndex] \
                         = len(stimSpikes)
                         spikeCountDF = spikeCountDF.append({'unit':unit, 
@@ -145,12 +149,12 @@ for trialCount, corrTrial in enumerate(corrTrials):
                         'spikeCount' :len(stimSpikes)}, ignore_index = True)
 
                         # fixation spikeCount
-                        fixSpikes = np.where((unitTimeStamps >= fixateTimeS) & 
-                                             (unitTimeStamps <= stim1TimeS))[0]
-                        fixSpikeCount[unitCount][trialCount][0] = len(fixSpikes)
+                        # fixSpikes = np.where((unitTimeStamps >= fixateTimeS) & 
+                        #                      (unitTimeStamps <= stim1TimeS))[0]
+                        # fixSpikeCount[unitCount][trialCount][0] = len(fixSpikes)
 
                         #PSTHs
-                        stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
+                        stimOnPreSNEV = stimOnTimeS - (histPrePostMS/1000)
                         stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
                         histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
                                     & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
@@ -206,6 +210,7 @@ for unit in range(len(units)):
     a = meanSpikeReshaped[unit]
     b = a.reshape(13,13)
     bSmooth = gaussian_filter(b, sigma=1)
+
     maxLoc0 = max(bSmooth[12,:])
     maxLoc1 = max(bSmooth[:,12])
     if maxLoc0 > maxLoc1:
@@ -499,8 +504,10 @@ for pairCount, pair in enumerate(combs):
     n1 = np.where(units == pair[0])[0][0]
     n2 = np.where(units == pair[1])[0][0]
 
-    m1, cov1, p = gauss2dParams(RFLocMat[n1])
-    m2, cov2, p2 = gauss2dParams(RFLocMat[n2])
+    a = np.flip(RFLocMat[n1], axis=0)
+    b = np.flip(RFLocMat[n2], axis=0)
+    m1, cov1, p = gauss2dParams(a)
+    m2, cov2, p2 = gauss2dParams(b)
     BC = bhattCoef2D(m1,m2,cov1,cov2)
     pairLocSimScore[pairCount] = BC
 
@@ -523,7 +530,7 @@ for pairCount, pair in enumerate(combs):
     # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
     n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
     n1XFull = np.linspace(n1X[0],n1X[-1],1000)
-    params = gauss_fit(n1X, n1Y)
+    params = gaussFit(n1X, n1Y)
     # n1YFull = gauss(n1XFull, *params)
     m1 = params[2] # mean neuron 1
     v1 = params[3]**2 # var neuron 1
@@ -534,7 +541,7 @@ for pairCount, pair in enumerate(combs):
     # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
     n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
     n2XFull = np.linspace(n2X[0], n2X[-1],1000)
-    params = gauss_fit(n2X, n2Y)
+    params = gaussFit(n2X, n2Y)
     # n2YFull = gauss(n2XFull, *params)
     m2 = params[2]
     v2 = params[3]**2

@@ -24,7 +24,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622_4', 'Meetz_220622_GRF3_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220912', 'Meetz_220912_GRF3_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('Speed Tuning'):
@@ -37,14 +37,17 @@ units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
 frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
-numSpeeds = np.int32(header['map0Settings']['data']['temporalFreqHz']['n'])
-minSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['minValue'])
-maxSpeed = np.int32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
-directionDeg = np.int32(header['map0Settings']['data']['directionDeg']['minValue'])
-stimDurMS = np.int32(header['mapStimDurationMS']['data'])
+numTempFq = np.int32(header['map0Settings']['data']['temporalFreqHz']['n'])
+minTempFq = np.float32(header['map0Settings']['data']['temporalFreqHz']['minValue'])
+maxTempFq = np.float32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
+spatialFreq = np.float32(header['map0Settings']['data']['spatialFreqCPD']['minValue'])
+numDirs = np.int32(header['map0Settings']['data']['directionDeg']['n'])
+minDir = np.int32(header['map0Settings']['data']['directionDeg']['minValue'])
+maxDir = np.int32(header['map0Settings']['data']['directionDeg']['maxValue'])
 interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
-allTuningMat = np.zeros((len(units),numSpeeds))
+numBlocks = np.int32(header['mappingBlockStatus']['data']['blockLimit'])
+allTuningMat = np.zeros((len(units),numTempFq))
 
 # assert frame consistency for frame duration
 stimDurFrame = []
@@ -61,15 +64,14 @@ for corrTrial in correctTrials:
 if len(set(stimDurFrame)) != 1:
     print('stimulus frame duration not consistent for mapping stimuli')
 else: 
-    trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
+    trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
 
 
 for uCount, unit in enumerate(units):
 
-    stimCount = np.zeros((1,numSpeeds+1))
-    spikeCountMat = np.zeros((50,1, numSpeeds))
-    spikeCountMat[:,:,:] = np.nan
-    spikeHists = np.zeros((numSpeeds+1, stimDurMS + 2*histPrePostMS+12))
+    stimCount = np.zeros((numDirs,numTempFq))
+    spikeCountMat = np.zeros((numDirs,numBlocks+1, numTempFq))
+    spikeHists = np.zeros((numDirs, numTempFq, trueStimDurMS + 2*histPrePostMS))
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
@@ -82,12 +84,13 @@ for uCount, unit in enumerate(units):
             for stim in stimDesc:
                 if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
                     speedIndex = int(stim['temporalFreqIndex'])
-                    stCount = int(stimCount[0][speedIndex])
+                    dirIndex = int(stim['directionIndex'])
+                    stCount = int(stimCount[dirIndex][speedIndex])
                     stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
                                    /1000) + stim1TimeS
                     stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
                                    /1000) + stim1TimeS
-                    stimCount[0][speedIndex] += 1
+                    stimCount[dirIndex][speedIndex] += 1
                     map0Count += 1
                     if unit in spikeData['unit']:
                         spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
@@ -95,7 +98,7 @@ for uCount, unit in enumerate(units):
                         unitTimeStamps = spikeData['timeStamp'][unitIndex]
                         stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
                                         (unitTimeStamps <= stimOffTimeS))
-                        spikeCountMat[stCount][0][speedIndex] = len(stimSpikes[0])
+                        spikeCountMat[dirIndex][stCount][speedIndex] = len(stimSpikes[0])
                         
                         #histograms
                         stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
@@ -103,38 +106,50 @@ for uCount, unit in enumerate(units):
                         histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
                                         & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
                         histStimSpikes = np.int32(histStimSpikes*1000)
-                        spikeHists[speedIndex, histStimSpikes] += 1
+                        spikeHists[dirIndex, speedIndex, histStimSpikes] += 1
 
-    spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
-    spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
-    allTuningMat[uCount] = spikeCountMean
+    spikeCountMean = np.mean(spikeCountMat[:,:numBlocks+1,:], axis=1)
+    spikeCountSD = np.mean(spikeCountMat[:,:numBlocks+1,:], axis=1)
+    spikeCountSEM = spikeCountSD/np.sqrt(numBlocks)
+
+    print(spikeCountSEM)
+
+    # allTuningMat[uCount] = spikeCountMean
 
     #plot figure
     date = header['date']
+    tempFreqList = [minTempFq]
+    a = minTempFq
+    for i in range(numTempFq-1):
+        a = a * 2
+        tempFreqList.append(a)
+    tempFreq = np.array(tempFreqList)
+    speed = np.around(tempFreq/spatialFreq,2)
+    dirs = np.arange(0,360,120)
 
     fig = plt.figure()
     fig.set_size_inches(6,8)
-
     text = fig.text(0.05, 0.85, f'Speed tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}\n\
-    Interstimulus Duration = {interstimDurMS} ms\n Gabor Direction {directionDeg}˚',size=8, fontweight='bold')
+    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {numBlocks}\n\
+    Interstimulus Duration = {interstimDurMS}',size=8, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
-    tempFreq = np.array([0.5,1,2,4,8,16])
-    speed = np.around(tempFreq/0.3,2)
-
+    #### Line Graph
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan=3, rowspan=4)
-    # x = np.linspace(minSpeed,maxSpeed, numSpeeds)
-    # x = np.logspace(1,5,num=6,base=2)
-    ax_row1.plot(speed,spikeCountMean[0]*1000/stimDurMS)
-    ax_row1.errorbar(speed, spikeCountMean[0]*1000/stimDurMS, yerr = spikeCountSD[0]*1000/stimDurMS,fmt='o', ecolor = 'black', color='black')
+    for i,dir in enumerate(dirs):
+        ax_row1.plot(speed,spikeCountMean[i]*1000/trueStimDurMS, label=f'{dir}˚')
+        ax_row1.errorbar(speed,spikeCountMean[i]*1000/trueStimDurMS,
+        yerr = spikeCountSEM[i]*1000/trueStimDurMS, fmt='o',ecolor='black',color='black')
     ax_row1.set_title('Speed Tuning Plot', fontsize=8)
     ax_row1.set_xlabel('Speed (˚/sec)', fontsize = 8)
+    ax_row1.set_ylim(bottom=0)
+    ax_row1.set_xticks(speed)
+    ax_row1.set_xticklabels(np.around(speed), fontsize=3)
     ax_row1.set_ylabel('Firing Rate (spikes/sec)', fontsize = 8)
+    ax_row1.legend(prop={'size': 6})
 
-    # hists
 
-
+    #### Hists
     ax_row2 = []
     for countI, i in enumerate(range(4, 10, 3)):
         ax = []
@@ -147,19 +162,32 @@ for uCount, unit in enumerate(units):
     plotCount = 0
     for i in range(2):
         for j in range(3):
-            spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount]
-            gaussSmooth = gaussian_filter1d(spikeHist, 10)
+            spikeHist = spikeHists[0,plotCount,:] * 1000/stimCount[0][plotCount]
+            gaussSmooth = gaussian_filter1d(spikeHist, 5)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
+
+            spikeHist = spikeHists[1,plotCount,:] * 1000/stimCount[0][plotCount]
+            gaussSmooth = gaussian_filter1d(spikeHist, 5)
+            if max(gaussSmooth) > yMax:
+                yMax = max(gaussSmooth)
+            ax_row2[i,j].plot(gaussSmooth)
+
+            spikeHist = spikeHists[2,plotCount,:] * 1000/stimCount[0][plotCount]
+            gaussSmooth = gaussian_filter1d(spikeHist, 5)
+            if max(gaussSmooth) > yMax:
+                yMax = max(gaussSmooth)
+            ax_row2[i,j].plot(gaussSmooth)
+
             ax_row2[i,j].set_title(f"{speed[plotCount]} ˚/sec", fontsize=7)
             plotCount += 1
             # ax_row2[i,j].set_ylim(bottom=0)
             # ax_row2[i,j].set_yticks([0,50,100])
             # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
-            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
-            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=5)
-            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
+            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
             if i == 1 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
@@ -169,8 +197,13 @@ for uCount, unit in enumerate(units):
     for i in range(2):
         for j in range(3):
             ax_row2[i,j].set_ylim([0, yMax*1.1])
-    # saves plot as pdf 
+    
+    # saves plot as pdf
     plt.savefig(f'{unit}.pdf')
 
-np.save('unitsSpeedTuningMat', allTuningMat)
+# np.save('unitsSpeedTuningMat', allTuningMat)
 plt.close('all')
+
+'''
+log normal fit
+'''

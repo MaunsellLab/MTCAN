@@ -87,6 +87,25 @@ def correctTrialsMTX(allTrials):
     return correctTrials
 
 
+def logNormal(x,H,A,x0,sigma):
+    '''
+    equation for log-normal fot
+    '''
+    return H + A * np.exp(-(x-x0)**2 / (2*sigma**2))
+
+
+def logNormalFit(x,y):
+    '''
+    apply curve_fit from scipy.optimize to fit a lognormal
+    curve to speed tuning data
+    '''
+    x = np.log2(x)
+    mean = sum(x * y) / sum(y)
+    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
+    popt,pcov = curve_fit(gauss,x,y, p0=[min(y), max(y), mean, sigma])
+    return popt
+
+
 def gauss(x, H, A, x0, sigma):
     '''
     equation for gaussian fit
@@ -94,7 +113,7 @@ def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
-def gauss_fit(x, y):
+def gaussFit(x, y):
     '''
     apply curve_fit from scipy.optimize 
     '''
@@ -111,13 +130,12 @@ def gauss2dParams(neuronTuningMat):
     returns mean vector (meanVec) and covariance matrix (covMat)
     '''
 
-    a = np.flip(neuronTuningMat, axis=0)
-    com = ndimage.center_of_mass(a)
+    com = ndimage.center_of_mass(neuronTuningMat)
     p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=None, 
                             y_stddev=None, theta=None, cov_matrix=None)
-    yi, xi = np.indices(a.shape)
+    yi, xi = np.indices(neuronTuningMat.shape)
     fit_p = fitting.LevMarLSQFitter()
-    p = fit_p(p_init,xi,yi,a)
+    p = fit_p(p_init,xi,yi,neuronTuningMat)
 
     theta = p.theta[0] * 180/np.pi
     xStdDev = p.x_stddev[0]

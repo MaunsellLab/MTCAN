@@ -35,7 +35,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220622_7', 'Meetz_220622_GRF2_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '220912', 'Meetz_220912_GRF2_Spikes.mat')
 
 # create folder and change directory to save PDFs and np.array
 if not os.path.exists('Direction Tuning'):
@@ -54,6 +54,7 @@ interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
 histPrePostMS = 100
 allTuningMat = np.zeros((len(units),numDir))
 allBaselineMat = np.zeros(len(units))
+numBlocks = np.int32(header['mappingBlockStatus']['data']['blockLimit'])
 
 # assert frame consistency during stimulus duration
 stimDurFrame = []
@@ -76,8 +77,7 @@ else:
 for uCount, unit in enumerate(units):
 
     stimCount = np.zeros((1,numDir))
-    spikeCountMat = np.zeros((50,1, numDir))
-    spikeCountMat[:,:,:] = np.nan
+    spikeCountMat = np.zeros((numBlocks+1,numDir))
     #made edit here
     spikeHists = np.zeros((numDir, trueStimDurMS + 2*histPrePostMS))
     baselineSpikeCount = []
@@ -109,7 +109,7 @@ for uCount, unit in enumerate(units):
                         #made edit here
                         stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
                                         (unitTimeStamps <= stimOffTimeS))
-                        spikeCountMat[stCount, 0, dirIndex] = len(stimSpikes[0])
+                        spikeCountMat[stCount, dirIndex] = len(stimSpikes[0])
                         baselineSpikes = np.where((unitTimeStamps <= stimOnTimeS) &
                                         (unitTimeStamps >= (stimOnTimeS-0.1)))[0]
                         baselineSpikeCount.append(len(baselineSpikes))
@@ -124,8 +124,11 @@ for uCount, unit in enumerate(units):
 
     baselineSpikeCount = np.array(baselineSpikeCount)
     baselineMeanSec = np.mean(baselineSpikeCount) * 1000/100
-    spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
-    spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
+    spikeCountMean = np.mean(spikeCountMat[:numBlocks,:], axis = 0)
+    spikeCountSD = np.std(spikeCountMat[:numBlocks, :], axis = 0)
+    spikeCountSEM = spikeCountSD/np.sqrt(numBlocks)
+    # spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+    # spikeCountSD = ma.std(ma.masked_invalid(spikeCountMat), axis = 0)
     allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
     allBaselineMat[uCount] = baselineMeanSec
 
@@ -136,23 +139,29 @@ for uCount, unit in enumerate(units):
     fig = plt.figure()
     fig.set_size_inches(6,8)
 
+    totalSpikes = np.sum(spikeCountMat)
+    totalSpikesSec = int(totalSpikes * 1000/trueStimDurMS)
+
     text = fig.text(0.05, 0.85, f'Direction tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}\n\
-    Interstimulus Duration = {interstimDurMS} ms', size=10, fontweight='bold')
+    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {numBlocks}\n\
+    Interstimulus Duration = {interstimDurMS} ms\n\
+    Total Spikes, Total Spikes (sec) =\n\
+    {totalSpikes, totalSpikesSec}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
+
 
 
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
     theta = np.radians(np.arange(0,420,360/numDir))
-    r = (np.append(spikeCountMean, spikeCountMean[0][0]))*1000/trueStimDurMS
-    err = (np.append(spikeCountSD, spikeCountSD[0][0]))*1000/trueStimDurMS
+    r = (np.append(spikeCountMean, spikeCountMean[0]))*1000/trueStimDurMS
+    err = (np.append(spikeCountSEM, spikeCountSEM[0]))*1000/trueStimDurMS
     ax_row1.plot(theta,r)
     ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black')
     ax_row1.set_theta_zero_location("W")
     # ax_row1.set_rmax(120)
     ax_row1.set_title('Direction Tuning Polar Plot', fontsize=8)
 
-    # hists
+    ### Hists
 
     #made edit here
     # spikeHistsRS = np.reshape(spikeHists, (stimDurMS + 162,2,3))
@@ -170,11 +179,12 @@ for uCount, unit in enumerate(units):
     plotCount = 0
     for i in range(2):
         for j in range(3):
-            spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount] 
+            # spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount] 
+            spikeHist = spikeHists[plotCount,:] * 1000/numBlocks
             plotCount += 1
             # histSmooth = smooth(spikeHist,50)#*1000
             # ax_row2[i,j].plot(histSmooth)
-            gaussSmooth = gaussian_filter1d(spikeHist, 8)
+            gaussSmooth = gaussian_filter1d(spikeHist, 5)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
@@ -206,17 +216,6 @@ np.save('unitsBaselineMat', allBaselineMat)
 
 
 '''
-#gauss fit
-
-def gauss(x, H, A, x0, sigma):
-    return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
-
-def gauss_fit(x, y):
-    mean = sum(x * y) / sum(y)
-    sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
-    return popt
-
 %matplotlib notebook
 
 tc = np.array([10,23,45,80,37,16,12])

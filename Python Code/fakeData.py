@@ -325,6 +325,30 @@ for currTrial in allTrials:
 
 
 
+
+for trialCount, corrTrial in enumerate(corrTrials):
+    currTrial = allTrials[corrTrial]
+    if 'spikeData' in currTrial:
+        currTrial['spikeData']['unit'] = []
+        currTrial['spikeData']['timeStamp'] = []
+        stimDesc = currTrial['stimDesc']['data']
+        stim1TimeS = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+        for stim in stimDesc:
+            if stim['stimLoc'] == 0 and stim['listType'] == 1:
+                stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
+                              /1000) + stim1TimeS
+                stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
+                               /1000) + stim1TimeS
+                fakeSpikes = np.random.uniform(low=stimOnTimeS, high=stimOffTimeS, size=10).tolist()
+                currTrial['spikeData']['timeStamp'].extend(fakeSpikes)
+        currTrial['spikeData']['timeStamp'] = np.asarray(currTrial['spikeData']['timeStamp'])
+        currTrial['spikeData']['unit'] = np.ones(len(currTrial['spikeData']['timeStamp']))
+        currTrial['spikeData']['unit'] = np.asarray(currTrial['spikeData']['unit'])
+
+            
+
+
+
 '''
 old verison pre v7.3
 '''

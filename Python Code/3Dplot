@@ -1,0 +1,36 @@
+# recording session [6,10,11,12,13,14,15,16]
+x = [2,1,3,3,1,3,2,4] 
+y = [2,1,2,2,3,1,3,2]
+z = [23,22.4,23,21.5,20.5,22.5,21.3,23.5]
+ecc = ['25˚','13˚','14˚','25˚','26˚','8.6˚','20.6˚','18˚']
+z0 = np.zeros(len(x))
+
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+for i in range(len(ecc)):
+    ax.scatter(x[i],y[i],z[i])
+    ax.text(x[i],y[i],z[i], f'{ecc[i]}')
+ax.scatter(x,y,z0, color='red')
+
+ax.set_ylim3d(0,8)
+ax.set_xlim3d(0,8)
+ax.set_zlim3d(15,26)
+ax.set_xlabel('ML axis (mm)')
+ax.set_ylabel('AP axis (mm)')
+ax.set_zlabel('Depth (mm)')
+
+ax.invert_zaxis()
+plt.show()
+
+incorrectPostedTrials = []
+for corrTrial in corrTrials:
+    currTrial = allTrials[corrTrial]
+    if currTrial['taskEvents']['targetOn'] is not None:
+        taskEventStimOn = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+        taskEventTargetOn = currTrial['taskEvents']['targetOn']['time'].tolist()
+        taskDiffMS = (taskEventTargetOn - taskEventStimOn) * 1000
+        stimDescStimOn = currTrial['stimulusOn']['timeMS'][0].tolist()
+        stimDescTargOn = currTrial['targetOn']['timeMS'].tolist()
+        stimDescDiffMS = stimDescTargOn - stimDescStimOn
+        if abs(stimDescDiffMS-taskDiffMS) > 10:
+            incorrectPostedTrials.append(corrTrial)

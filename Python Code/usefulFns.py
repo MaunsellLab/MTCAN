@@ -87,6 +87,33 @@ def correctTrialsMTX(allTrials):
     return correctTrials
 
 
+def unitPrefNullDir(meanSpikeReshaped,unitCount):
+    '''
+    function will return the units preferred and null direction based
+    off of the maximum response at either location when there is only one 
+    stimulus.
+
+    Inputs: 
+        unitCount: unit's index in the units array
+        meanSpikeReshaped: array of meanSpike counts for each stimulusIndex
+    Outputs:
+        prefDirection, nullDirection: the preferred and null direction for the neuron
+    '''
+    dirArray = np.array([0,60,120,180,240,300,0,60,120,180,240,300])
+
+    b = meanSpikeReshaped[unitCount].reshape(13,13)
+    bSmooth = gaussian_filter(b, sigma=1)
+    maxLoc0 = max(bSmooth[12,:])
+    maxLoc1 = max(bSmooth[:,12])
+    if maxLoc0 > maxLoc1:
+        prefDirection = dirArray[np.where(bSmooth[12,:]==maxLoc0)[0][0]]
+    else:
+        prefDirection = dirArray[np.where(bSmooth[:,12]==maxLoc1)[0][0]]
+    nullDirection = (prefDirection + 180)%360
+
+    return prefDirection, nullDirection, bSmooth
+
+
 def logNormal(x,H,A,x0,sigma):
     '''
     equation for log-normal fot

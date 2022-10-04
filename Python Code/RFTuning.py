@@ -38,7 +38,7 @@ for currTrial in allTrials:
 
 ## Start here
 # load data
-allTrials, header = loadMatFile73('Meetz', '220912', 'Meetz_220912_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '221003', 'Meetz_221003_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -60,6 +60,7 @@ maxEle = np.float32(header['map0Settings']['data']['elevationDeg']['maxValue'])
 stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 allTuningMat = np.zeros((len(units),numEle,numAzi))
 histPrePostMS = 100
+sponWindowMS = 100
 
 # assert frame consistency for frame duration
 stimDurFrame = []
@@ -84,6 +85,7 @@ for uCount, unit in enumerate(units):
     spikeCountMat = np.zeros((25,numEle, numAzi))
     spikeCountMat[:,:,:] = np.nan
     spikeHists = np.zeros((stimDurMS + 2*histPrePostMS+12, numEle, numAzi))
+    sponSpikesArr = []
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
@@ -113,6 +115,10 @@ for uCount, unit in enumerate(units):
                         stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) & 
                                         (unitTimeStamps <= stimOffTimeS))
                         spikeCountMat[stCount][eleIndex][aziIndex] = len(stimSpikes[0])
+                        #spontaneous spike count (x ms before stim on)
+                        sponSpikes = np.where((unitTimeStamps>=(stimOnTimeS-(sponWindowMS/1000))) &
+                                     (unitTimeStamps <= stimOnTimeS))
+                        sponSpikesArr.extend([len(sponSpikes[0])])
 
                         #histograms
                         stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
@@ -124,11 +130,9 @@ for uCount, unit in enumerate(units):
 
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
+    sponSpikesArr = np.array(sponSpikesArr)
+    sponSpikesMean = np.mean(sponSpikesArr)
     allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
-
-    # bSmooth = gaussian_filter1d(spikeCountMean, sigma=2)
-    # sns.heatmap(bSmooth)
-    # plt.show()
 
     ## Plot figure ##
     fig = plt.figure()
@@ -146,14 +150,19 @@ for uCount, unit in enumerate(units):
     # heatmap
     ax_row1 = []
     ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
-    bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
-    ax_row1[0] = sns.heatmap(spikeCountMean)
+    # bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
+    bSmooth = gaussian_filter(spikeCountMean,sigma=1)
+    # ax_row1[0] = sns.heatmap(spikeCountMean)
+    ax_row1[0] = sns.heatmap(bSmooth)
+    ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5, 
+                       bSmooth.shape[0]), bSmooth, colors='yellow')
     ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
     ax_row1[0].set_ylabel('elevation (˚)', fontsize = 8)
     ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
     ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
     ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
     ax_row1[0].invert_yaxis()
+    # plt.show()
 
     ax_row2 = []
     for i in np.arange(numEle+2, 2, -1):
@@ -182,6 +191,7 @@ for uCount, unit in enumerate(units):
             ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
             ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=3)
             ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
+            ax_row2[i,j].axhline(y=sponSpikesMean*1000/sponWindowMS, linestyle='--', color='grey')
             if i == 0 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
@@ -191,7 +201,7 @@ for uCount, unit in enumerate(units):
     for i in range(numEle):
         for j in range(numAzi):
             ax_row2[i,j].set_ylim([0, yMax*1.1])
-
+    
     # saves plot as pdf
     plt.savefig(f'{unit}.pdf')
     continue
@@ -200,6 +210,8 @@ plt.close('all')
 np.save('unitsRFLocMat', allTuningMat)
 
 
+
+######## 2D gauss fit
 '''
 '''
 allTuningMat
@@ -217,8 +229,8 @@ RFLocMat = spikeCountMean
 for i in range(len(RFLocMat)):
     a = np.flip(RFLocMat[i], axis=0)
     com = ndimage.center_of_mass(a)
-    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=None, 
-                                y_stddev=None, theta=None, cov_matrix=None)
+    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
+                                y_stddev=1, theta=None, cov_matrix=None)
     yi, xi = np.indices(a.shape)
     fit_p = fitting.LevMarLSQFitter()
     p = fit_p(p_init,xi,yi,a)
@@ -246,18 +258,55 @@ for i in range(len(RFLocMat)):
     plt.show()
 
 
-plt.imshow(p(xi,yi))
-plt.show() 
 
 
-cost2 = np.cos(theta) ** 2
-sint2 = np.sin(theta) ** 2
-sin2t = np.sin(2. * theta)
-xstd2 = xStdDev ** 2
-ystd2 = yStdDev ** 2
-a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
-b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
-c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
+a = np.flip(spikeCountMean, axis=0)
+com = ndimage.center_of_mass(a)
+p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[1], x_stddev=1, 
+                            y_stddev=1, theta=None, cov_matrix=None)
+yi, xi = np.indices(a.shape)
+fit_p = fitting.LevMarLSQFitter()
+p = fit_p(p_init,xi,yi,a)
+
+theta = p.theta[0] * 180/np.pi
+xStdDev = p.x_stddev[0]
+yStdDev = p.y_stddev[0]
+xMean = p.x_mean[0]
+yMean = p.y_mean[0]
+amp = p.amplitude[0]
+
+rho = np.cos(theta)
+covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
+                [rho*xStdDev*yStdDev,yStdDev**2]])
+meanVec = np.array([[xMean],[yMean]])
+
+newMat = np.zeros((numEle*40,numAzi*40))
+yi,xi = np.indices(newMat.shape)
+p.x_mean = p.x_mean[0] * 40
+p.y_mean = p.y_mean[0] * 40
+p.x_stddev = p.x_stddev[0] * 40
+p.y_stddev = p.y_stddev[0] * 40
+modelData = p(xi,yi)
+
+
+fig, ax = plt.subplots(figsize=(6, 6))
+sns.heatmap(modelData, cmap = sns.color_palette('mako', as_cmap=True), ax=ax)
+ax.contour(np.arange(.5, modelData.shape[1]), np.arange(.5, 
+                       modelData.shape[0]), modelData, colors='yellow')
+
+plt.show()
+
+
+
+
+# cost2 = np.cos(theta) ** 2
+# sint2 = np.sin(theta) ** 2
+# sin2t = np.sin(2. * theta)
+# xstd2 = xStdDev ** 2
+# ystd2 = yStdDev ** 2
+# a = 0.5 * ((cost2 / xstd2) + (sint2 / ystd2))
+# b = 0.5 * ((sin2t / xstd2) - (sin2t / ystd2))
+# c = 0.5 * ((sint2 / xstd2) + (cost2 / ystd2))
 
 
 '''

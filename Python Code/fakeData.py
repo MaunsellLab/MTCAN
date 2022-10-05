@@ -496,3 +496,165 @@ for count, currTrial in enumerate(allTrialsData.item()[0]):
 
 
 '''
+
+'''
+MTN extra code 10/04/22
+'''
+'''
+Normalization across grid PSTHs plots - working
+    for x in contrastArray:
+    loc0Con, loc1Con = x
+    subPlot = plt.subplot2grid((2,4), subPlotList[subPlotCount])
+    # loc0 = Pref : loc1 = Null, Intermediate
+    # pref pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='pref')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    # null null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='null')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    # pref null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='pref+null')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    #intermediate Dir
+    for i in otherDir:
+        histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == i)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+        dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+        subPlot.plot(gaussian_filter1d(dirPlot,10), label=f'pref+I{prefDir,i}')
+        subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+        subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+        subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    subPlotCount += 1
+
+    subPlot = plt.subplot2grid((2,4), subPlotList[subPlotCount])
+    #loc0 = Null, Intermediate : loc1 = Pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='pref')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    # null null
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == nullDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='null')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    # null pref
+    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    subPlot.plot(gaussian_filter1d(dirPlot,10), label='null+pref')
+    subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+    subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    #intermediate Dirs
+    for i in otherDir:
+        histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == i) & 
+        (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == prefDir)
+        & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+        dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+        subPlot.plot(gaussian_filter1d(dirPlot,10), label=f'I+prefDir{i, prefDir}')
+        subPlot.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+        subPlot.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+        subPlot.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
+    subPlotCount += 1
+
+
+        ax2 = []
+    for row in range(2):
+        for col in range(4):
+            ax2.append(plt.subplot2grid((2,4), (row,col)))
+    ax2 = np.array(ax2)
+
+    fig = plt.figure()
+    fig.set_size_inches(8,4)
+    subPlotList = [(0,0),(0,1), (0,2), (0,3), (1,0), (1,1), (1,2), (1,3)]
+    plotCount = 0
+    for x in contrastList:
+        subCount = 0
+        loc0Con, loc1Con = x
+        ax2[plotCount] = plt.subplot2grid((2,4), subPlotList[plotCount])
+        for locDir in locDirList:
+            loc0Dir, loc1Dir = locDir
+            histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
+            (stimIndexDF['loc0 Contrast'] == loc0Con) & (stimIndexDF['loc1 Direction'] == loc1Dir)
+            & (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+            dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+            ax2[plotCount].plot(gaussian_filter1d(dirPlot,8), label=f'{loc0Dir}+{loc1Dir}')
+            ax2[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax2[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+            ax2[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+            subCount += 1
+            if subCount == 7:
+                plotCount += 1
+                ax2[plotCount] = plt.subplot2grid((2,4), subPlotList[plotCount])
+            if subCount == 14:
+                plotCount += 1
+    plt.tight_layout(pad=0.5, w_pad=0.5, h_pad=0.5)
+
+    for i in range(8):
+        ax2[i].set_ylim([0,300])
+    plt.show()
+
+
+# high high contrast curve_fit
+highCIndex = stimIndexDF.index[(stimIndexDF['loc0 Contrast'] == 1) 
+             & (stimIndexDF['loc1 Contrast'] == 1)]
+for unitCount, unit in enumerate(units):
+    respSubMat = spikeCountMat[unitCount,:blocksDone+1,108:144]
+    resp = np.reshape(respSubMat,(36*blocksDone))
+    fixParam = np.tile(np.arange(108,144), blocksDone)
+
+    c0s, c1s, l0s, l1s = [], [], [], []
+    direction_set = np.arange(0, 360, 60)
+    for i in fixParam:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+
+        # Make one-hot encoding of l0 and l1
+        l0_oh = np.zeros(6)
+        l1_oh = np.zeros(6)
+        l0_oh[np.argwhere(direction_set == l0).squeeze()] = 1
+        l1_oh[np.argwhere(direction_set == l1).squeeze()] = 1
+        c0s.append(np.repeat(c0,6))
+        c1s.append(np.repeat(c1,6))
+        l0s.append(l0_oh)
+        l1s.append(l1_oh)
+
+    c0s = np.array(c0s)
+    c1s = np.array(c1s)
+    l0s = np.array(l0s)
+    l1s = np.array(l1s)
+
+    pOpt, pCov = curve_fit(func, (c0s, c1s, l0s, l1s), resp, bounds=(
+        (0,0,0,0,0,0,0,0,0,0,0),(np.inf,np.inf,np.inf,np.inf,np.inf,np.inf,1,1,1,1,1)))
+    print(unit,pOpt)
+'''

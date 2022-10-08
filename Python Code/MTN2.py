@@ -1,10 +1,8 @@
 '''
-MTN Analysis Script
- - heatmap of normalized responses
- - potentially some correlations
- - normalization equation, parameter fitting
- - PSTHs of normalized responses
+MTN2 Analysis Script
 
+
+CHECK LOW/HIGH Contrast conditions 
 
 to do:
 convert heatmap to spikes/sec, it's at spikes/stimDurMS
@@ -22,14 +20,14 @@ import time
 
 '''
 ### testing
-allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_MTN.mat')
+allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_2_MTN.mat')
 ###
 '''
 
 ####### START HERE ######
 
 # load relevant file 
-allTrials, header = loadMatFile73('Meetz', '221005', 'Meetz_221005_MTN_Spikes.mat')
+allTrials, header = loadMatFile73('Testing', '221008', 'testing_221008_2_MTNC.mat')
 
 
 if not os.path.exists('Normalization'):
@@ -37,12 +35,36 @@ if not os.path.exists('Normalization'):
 os.chdir('Normalization/')
 
 
+## generate list of unique active units
+units = activeUnits('spikeData', allTrials)
+
+
 ## list of indices of correctTrials (non-instruct, valid trialCertify)
 corrTrials = correctTrialsMTX(allTrials)
 
-
-## generate list of unique active units
-units = activeUnits('spikeData', allTrials)
+## assert: stim sequence list is frozen
+seqList = []
+for corrTrial in corrTrials:
+    currTrial = allTrials[corrTrial]
+    stimDesc = currTrial['stimDesc']['data']
+    for stim in stimDesc:
+        if stim['stimLoc'] == 0 and stim['listType'] == 1:
+            if len(seqList) < 49:
+                seqList.append(int(stim['stimIndex'].tolist()))
+                seqArr = np.array(seqList)
+                lastIndex = int(stim['stimIndex'].tolist())
+            else:
+                posLastIndex = np.where(seqArr==lastIndex)[0][0]
+                if posLastIndex == len(seqArr)-1:
+                    if int(stim['stimIndex'].tolist()) != seqArr[0]:
+                        print('out of sequence')
+                    else:
+                        lastIndex = int(stim['stimIndex'].tolist())
+                else:
+                    if int(stim['stimIndex'].tolist()) != seqArr[posLastIndex+1]:
+                        print('out of sequence')
+                    else:
+                        lastIndex = int(stim['stimIndex'].tolist())
 
 
 ## assert: are there correct trials without spikeData
@@ -93,7 +115,7 @@ for currTrial in allTrials:
                         stimIndexDict[index][int(stim['stimLoc'].tolist())] = \
                         {'direction': int(stim['directionDeg'].tolist()),
                          'contrast': np.around(stim['contrast'],2).tolist()}
-stimIndexArray = np.zeros((169,4))
+stimIndexArray = np.zeros((49,4))
 for i in range(len(stimIndexDict)):
     stimIndexArray[i][0] = stimIndexDict[i][0]['direction']
     stimIndexArray[i][1] = stimIndexDict[i][0]['contrast']
@@ -106,20 +128,19 @@ stimIndexDF = pd.DataFrame(stimIndexArray, columns=['loc0 Direction', 'loc0 Cont
 #initialize lists/arrays/dataframes for counting spikeCounts and for analysis
 blocksDone = int(allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
                  .tolist()) 
-lowContrast,highContrast = stimIndexDF['loc0 Contrast'].unique()[0], \
-                           stimIndexDF['loc0 Contrast'].unique()[1]
-dirArray = np.array([0,60,120,180,240,300,0,60,120,180,240,300])
-spikeCountMat = np.zeros((len(units),blocksDone+1,169))
+highContrast = stimIndexDF['loc0 Contrast'].unique()[0]
+dirArray = np.array([0,60,120,180,240,300])
+spikeCountMat = np.zeros((len(units),blocksDone+1,49))
 spikeCountLong = []
 sponSpikeCountLong = []
 histPrePostMS = 100 #100ms window pre/post stimlus on/off
 sponWindowMS = 50 #50ms window before stimulus onset
-spikeHists = np.zeros((len(units),169, trueStimDurMS+(2*histPrePostMS+1)))
-stimIndexCount = np.zeros(169)
+spikeHists = np.zeros((len(units),49, trueStimDurMS+(2*histPrePostMS+1)))
+stimIndexCount = np.zeros(49) 
 
 
 # insert spike counts into matrix of unique stimulus sets
-for trialCount, corrTrial in enumerate(corrTrials):
+for corrTrial in corrTrials:
     currTrial = allTrials[corrTrial]
     if 'spikeData' in currTrial:
         stimDesc = currTrial['stimDesc']['data']
@@ -128,9 +149,9 @@ for trialCount, corrTrial in enumerate(corrTrials):
         for stim in stimDesc:
             if stim['stimLoc'] == 0 and stim['listType'] == 1:
                 stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
-                              /1000) + stim1TimeS
+                                /1000) + stim1TimeS
                 stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
-                               /1000) + stim1TimeS
+                                /1000) + stim1TimeS
                 stimIndex = np.int32(stim['stimIndex'])
                 stCount = int(stimIndexCount[stimIndex])
                 stimIndexCount[stimIndex] += 1
@@ -174,7 +195,7 @@ for unitCount, unit in enumerate(units):
 meanSpike = np.mean(spikeCountMat[:,:blocksDone,:], axis = 1)
 spikeCountSD = np.std(spikeCountMat[:,:blocksDone,:], axis = 1)
 spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
-meanSpikeReshaped = np.zeros((len(units),1,169))
+meanSpikeReshaped = np.zeros((len(units),1,49))
 for count,i in enumerate(meanSpikeReshaped):
     i[:,0:6] = meanSpike[count][0:6]
     i[:,6:12] = meanSpike[count][36:42]
@@ -220,10 +241,9 @@ for count,i in enumerate(meanSpikeReshaped):
 ## heatmap of normalization
 for unit in range(len(units)):
     prefDir, nullDir, bSmooth = unitPrefNullDir(meanSpikeReshaped, unit)
-    b = meanSpikeReshaped[unit].reshape(13,13)
 
     #using seaborn
-    ax = sns.heatmap(b, square=True, linewidths=0.2, vmin=0)
+    ax = sns.heatmap(bSmooth, square=True, linewidths=0.2, vmin=0)
     ax.set_xticks(np.arange(13)+0.5)
     ax.set_title(f'heatmap of normalization for {units[unit]}')
     ax.set_xticklabels(['0','60','120','180','240','300','0','60','120',
@@ -234,7 +254,7 @@ for unit in range(len(units)):
     ax.set_yticklabels(['0','60','120','180','240','300','0','60','120',
                         '180','240','300','blank'], rotation = 0)
     plt.tight_layout()
-    plt.savefig(f'{units[unit]}NormHeatmap.pdf')
+    plt.savefig(f'{units[unit]}NormHeatmapNonGaussianFilter.pdf')
     plt.close('all')
 
 for unit in range(len(units)):
@@ -311,8 +331,8 @@ def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, sL0, sL1, aL, sig):
     # return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig))
     return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL*c0[:,0])+(aL*c1[:,0])+sig))
 for unitCount, unit in enumerate(units):
-    resp = np.reshape(spikeCountMat[unitCount][:blocksDone+1,:],(169*blocksDone))
-    fixParam = np.tile(np.arange(169), blocksDone)
+    resp = np.reshape(spikeCountMat[unitCount][:blocksDone+1,:],(49*blocksDone))
+    fixParam = np.tile(np.arange(49), blocksDone)
 
     c0s, c1s, l0s, l1s = [], [], [], []
     direction_set = np.arange(0, 360, 60)
@@ -389,9 +409,6 @@ for unitCount, unit in enumerate(units):
     plt.tight_layout(pad=0.5, w_pad=0.5, h_pad=0.5)
     for i in range(8):
         ax[i].set_ylim([0,yMax*1.1])
-    
-    plt.show()
-
     plt.savefig(f'{unit}PrefNull.pdf')
     plt.close('all')
 
@@ -503,7 +520,7 @@ corrMat = np.zeros(len(combs))
 # z-scored spikeCountMat
 zSpikeCountMat = stats.zscore(spikeCountMat[:,:blocksDone,:], axis=1, nan_policy='omit') 
 zSpikeCountMat = np.nan_to_num(zSpikeCountMat)
-zSpikeCountMat = np.reshape(zSpikeCountMat,(len(units),blocksDone*169))
+zSpikeCountMat = np.reshape(zSpikeCountMat,(len(units),blocksDone*49))
 for count, i in enumerate(combs):
     print(i[0],i[1])
     n1 = np.where(units == i[0])[0][0]
@@ -609,10 +626,10 @@ for pairCount, pair in enumerate(combs):
 
 
 ## selectivity for direction (similar to Bram)
-unitSelectivity = np.zeros((len(units),169)) 
+unitSelectivity = np.zeros((len(units),49)) 
 unitSelectivity[:,:] = np.nan
 for uCount, unit in enumerate(units):
-    for stim in range(169):
+    for stim in range(49):
         loc0Contrast = stimIndexDict[stim][0]['contrast']
         loc1Contrast = stimIndexDict[stim][1]['contrast']
         if loc0Contrast != 0 and loc0Contrast != 0:

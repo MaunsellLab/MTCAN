@@ -38,7 +38,7 @@ for currTrial in allTrials:
 
 ## Start here
 # load data
-allTrials, header = loadMatFile73('Meetz', '221003', 'Meetz_221003_GRF1_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '221005', 'Meetz_221005_GRF1_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):

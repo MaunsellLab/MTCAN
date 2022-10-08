@@ -24,7 +24,7 @@ for currTrial in allTrials:
 
 
 # load data
-allTrials, header = loadMatFile73('Meetz', '220928', 'Meetz_220928_GRF3_Spikes.mat')
+allTrials, header = loadMatFile73('Meetz', '221005', 'Meetz_221005_GRF3_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('Speed Tuning'):

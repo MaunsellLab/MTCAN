@@ -245,3 +245,20 @@ for currTrial in allTrialsData.item()[0]:
 # targetOnFrame = stimDesc['stimOnFrame'][stimSeqLen]
 # targetOnTimeMs = targetOnFrame * (1000/75)
 # targetOnTimes.append(targetOnTimeMS)
+
+'''
+MTNC
+'''
+
+#testing
+stimIndexCount = np.zeros(49) 
+for trialCount, corrTrial in enumerate(corrTrials):
+    currTrial = allTrials[corrTrial]
+    stimDesc = currTrial['stimDesc']['data']
+    for stim in stimDesc:
+        if stim['stimLoc'] == 0 and stim['listType'] == 1:
+            stimIndex = np.int32(stim['stimIndex'])
+            stCount = int(stimIndexCount[stimIndex])
+            stimIndexCount[stimIndex] += 1
+
+

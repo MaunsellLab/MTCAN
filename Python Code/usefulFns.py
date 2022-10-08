@@ -114,6 +114,26 @@ def unitPrefNullDir(meanSpikeReshaped,unitCount):
     return prefDirection, nullDirection, bSmooth
 
 
+def vonMises(x,x0,conc,I0):
+    '''
+    equation for a Von Mises fit
+    '''
+    return (np.exp(conc * np.cos(x - x0))) / (2*np.pi*I0*conc)
+
+def vonMisesMatt(x,phase, kappa):
+    # Von mises distribution
+    z = np.exp(kappa * phase) / np.exp(kappa)
+    return z / np.mean(z)
+
+def vonMisesFit(x,y):
+    '''
+    apply curve_fit from scipy.optimize
+    '''
+
+    popt, pcov = curve_fit(vonMises, x,y)
+    return popt
+
+
 def logNormal(x,H,A,x0,sigma):
     '''
     equation for log-normal fot

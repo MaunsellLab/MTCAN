@@ -87,7 +87,7 @@ def correctTrialsMTX(allTrials):
     return correctTrials
 
 
-def unitPrefNullDir(meanSpikeReshaped,unitCount):
+def unitPrefNullDir(bSmooth):
     '''
     function will return the units preferred and null direction based
     off of the maximum response at either location when there is only one 
@@ -99,19 +99,17 @@ def unitPrefNullDir(meanSpikeReshaped,unitCount):
     Outputs:
         prefDirection, nullDirection: the preferred and null direction for the neuron
     '''
-    dirArray = np.array([0,60,120,180,240,300,0,60,120,180,240,300])
+    dirArray = np.array([0,60,120,180,240,300])
 
-    b = meanSpikeReshaped[unitCount].reshape(13,13)
-    bSmooth = gaussian_filter(b, sigma=1)
-    maxLoc0 = max(bSmooth[12,:])
-    maxLoc1 = max(bSmooth[:,12])
+    maxLoc0 = max(bSmooth[6,:])
+    maxLoc1 = max(bSmooth[:,6])
     if maxLoc0 > maxLoc1:
-        prefDirection = dirArray[np.where(bSmooth[12,:]==maxLoc0)[0][0]]
+        prefDirection = dirArray[np.where(bSmooth[6,:]==maxLoc0)[0][0]]
     else:
-        prefDirection = dirArray[np.where(bSmooth[:,12]==maxLoc1)[0][0]]
+        prefDirection = dirArray[np.where(bSmooth[:,6]==maxLoc1)[0][0]]
     nullDirection = (prefDirection + 180)%360
 
-    return prefDirection, nullDirection, bSmooth
+    return prefDirection, nullDirection 
 
 
 def vonMises(x,x0,conc,I0):

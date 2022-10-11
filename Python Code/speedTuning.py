@@ -22,9 +22,10 @@ for currTrial in allTrials:
             currTrial['spikeData']['unit'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
+## Start Here
+# Load relevant file here with pyMat reader 
+allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF3_Spikes.mat')
 
-# load data
-allTrials, header = loadMatFile73('Meetz', '221005', 'Meetz_221005_GRF3_Spikes.mat')
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('Speed Tuning'):
@@ -32,23 +33,32 @@ if not os.path.exists('Speed Tuning'):
 os.chdir('Speed Tuning/')
 
 
-# Tuning code
+## Tuning code
 units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
-frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
-numTempFq = np.int32(header['map0Settings']['data']['temporalFreqHz']['n'])
+
+## Assert: stimDesc field is in right format for easy access
+for corrTrial in correctTrials:
+    currTrial = allTrials[corrTrial]
+    nStim = len(currTrial['stimDesc']['data']['stimType'])
+    currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()} 
+                                    for i in range(nStim)]
+
+
+## Declare Variables 
+frameRateHz = header['displayCalibration']['data']['frameRateHz']
+numTempFq = header['map0Settings']['data']['temporalFreqHz']['n']
 minTempFq = np.float32(header['map0Settings']['data']['temporalFreqHz']['minValue'])
 maxTempFq = np.float32(header['map0Settings']['data']['temporalFreqHz']['maxValue'])
 spatialFreq = np.float32(header['map0Settings']['data']['spatialFreqCPD']['minValue'])
-numDirs = np.int32(header['map0Settings']['data']['directionDeg']['n'])
+numDirs = header['map0Settings']['data']['directionDeg']['n']
 minDir = np.int32(header['map0Settings']['data']['directionDeg']['minValue'])
 maxDir = np.int32(header['map0Settings']['data']['directionDeg']['maxValue'])
-interstimDurMS = np.int32(header['mapInterstimDurationMS']['data'])
+interstimDurMS = header['mapInterstimDurationMS']['data']
 histPrePostMS = 100
 sponWindowMS = 100
-numBlocks = int(allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
-                 .tolist()) 
+numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
 allTuningMat = np.zeros((len(units),numTempFq))
 
 # assert frame consistency for frame duration
@@ -57,11 +67,11 @@ for corrTrial in correctTrials:
     currTrial = allTrials[corrTrial]
     stimDesc = currTrial['stimDesc']['data']
     if 'numMap0Stim' in currTrial:
-        map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+        map0StimLim = currTrial['numMap0Stim']['data']
         map0Count = 0
         for stim in stimDesc:
             if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
-                frameDiff = stim['stimOffFrame'].tolist() - stim['stimOnFrame'].tolist()
+                frameDiff = stim['stimOffFrame'] - stim['stimOnFrame']
                 stimDurFrame.append(frameDiff)
 if len(set(stimDurFrame)) != 1:
     print('stimulus frame duration not consistent for mapping stimuli')
@@ -79,19 +89,19 @@ for uCount, unit in enumerate(units):
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
         if 'numMap0Stim' in currTrial:
-            map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+            map0StimLim = currTrial['numMap0Stim']['data']
             map0Count = 0
             stimDesc = currTrial['stimDesc']['data']
             spikeData = currTrial['spikeData']
-            stim1TimeS = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+            stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
             for stim in stimDesc:
                 if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
                     speedIndex = int(stim['temporalFreqIndex'])
                     dirIndex = int(stim['directionIndex'])
                     stCount = int(stimCount[dirIndex][speedIndex])
-                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
+                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
                                    /1000) + stim1TimeS
-                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
+                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
                                    /1000) + stim1TimeS
                     stimCount[dirIndex][speedIndex] += 1
                     map0Count += 1

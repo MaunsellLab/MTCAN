@@ -13,6 +13,7 @@ Modified to save plots as pngs and incorporated changes to track stimCounts
 Modified to incorporate frame counter, fixed bugs relating to unit indexing
 within the stimDesc, added 1-d gaussian filter - 06/10/22
 Flipped heatmap and corresponding PSTHs, - 06/12/22
+Import using pymat reader - 10/11/22
 '''
 
 from usefulFns import *
@@ -37,8 +38,9 @@ for currTrial in allTrials:
 ###
 
 ## Start here
-# load data
-allTrials, header = loadMatFile73('Meetz', '221010', 'Meetz_221010_GRF1_Spikes.mat')
+# Load relevant file here with pyMat reader 
+allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF1_Spikes.mat')
+
 
 # create folder and change dir to save PDF's and np.array
 if not os.path.exists('RFLoc Tuning'):
@@ -50,14 +52,21 @@ os.chdir('RFLoc Tuning/')
 units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
 
-frameRateHz = header['displayCalibration']['data']['frameRateHz'].tolist()
-numAzi = np.int32(header['map0Settings']['data']['azimuthDeg']['n'])
+## change stimDesc field to be a list of dictionaries
+for corrTrial in correctTrials:
+    currTrial = allTrials[corrTrial]
+    nStim = len(currTrial['stimDesc']['data']['stimType'])
+    currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()} 
+                                    for i in range(nStim)]
+
+
+frameRateHz = header['displayCalibration']['data']['frameRateHz']
+numAzi = header['map0Settings']['data']['azimuthDeg']['n']
 minAzi = np.float32(header['map0Settings']['data']['azimuthDeg']['minValue'])
 maxAzi = np.float32(header['map0Settings']['data']['azimuthDeg']['maxValue'])
-numEle = np.int32(header['map0Settings']['data']['elevationDeg']['n'])
+numEle = header['map0Settings']['data']['elevationDeg']['n']
 minEle = np.float32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.float32(header['map0Settings']['data']['elevationDeg']['maxValue'])
-stimDurMS = np.int32(header['mapStimDurationMS']['data'])
 allTuningMat = np.zeros((len(units),numEle,numAzi))
 histPrePostMS = 100
 sponWindowMS = 100
@@ -68,43 +77,42 @@ for corrTrial in correctTrials:
     currTrial = allTrials[corrTrial]
     stimDesc = currTrial['stimDesc']['data']
     if 'numMap0Stim' in currTrial:
-        map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+        map0StimLim = currTrial['numMap0Stim']['data']
         map0Count = 0
         for stim in stimDesc:
             if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
-                frameDiff = stim['stimOffFrame'].tolist() - stim['stimOnFrame'].tolist()
+                frameDiff = stim['stimOffFrame'] - stim['stimOnFrame']
                 stimDurFrame.append(frameDiff)
 if len(set(stimDurFrame)) != 1:
     print('stimulus frame duration not consistent across mapping stimuli')
 else: 
-    trueStimDurMS = np.around(1000/frameRateHz * stimDurFrame[0])
-
+    trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
 
 for uCount, unit in enumerate(units):
     stimCount = np.zeros((numEle,numAzi))
     spikeCountMat = np.zeros((25,numEle, numAzi))
     spikeCountMat[:,:,:] = np.nan
-    spikeHists = np.zeros((stimDurMS + 2*histPrePostMS+12, numEle, numAzi))
+    spikeHists = np.zeros((trueStimDurMS + 2*histPrePostMS+12, numEle, numAzi))
     sponSpikesArr = []
 
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
         # stimCount verify 
         if 'numMap0Stim' in currTrial:
-            map0StimLim = int(currTrial['numMap0Stim']['data'].tolist())
+            map0StimLim = currTrial['numMap0Stim']['data']
             map0Count = 0
             stimDesc = currTrial['stimDesc']['data']
             spikeData = currTrial['spikeData']
-            stim1TimeS = currTrial['taskEvents']['stimulusOn'][0]['time'].tolist()
+            stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
             for stim in stimDesc:
                 #extract spikes from each stimulus aligned to frame counter (on/off)
                 if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
                     aziIndex = int(stim['azimuthIndex'])
                     eleIndex = int(stim['elevationIndex'])
                     stCount = int(stimCount[eleIndex][aziIndex])
-                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'].tolist())
+                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
                                    /1000) + stim1TimeS
-                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'].tolist())
+                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
                                    /1000) + stim1TimeS
                     stimCount[eleIndex][aziIndex] += 1
                     map0Count += 1
@@ -143,7 +151,7 @@ for uCount, unit in enumerate(units):
     date = header['date']
 
     text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {stimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
+    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
                     size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
@@ -188,9 +196,9 @@ for uCount, unit in enumerate(units):
             # ax_row2[i,j].set_yticks([0,50,100])
             # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
             ax_row2[i,j].tick_params(axis='y', which='major', labelsize=4)
-            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+stimDurMS,2*histPrePostMS+stimDurMS])
-            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+stimDurMS, stimDurMS+histPrePostMS], fontsize=3)
-            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+stimDurMS, color='grey', alpha=0.2)
+            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=3)
+            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
             ax_row2[i,j].axhline(y=sponSpikesMean*1000/sponWindowMS, linestyle='--', color='grey')
             if i == 0 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)

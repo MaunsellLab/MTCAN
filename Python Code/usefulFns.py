@@ -19,6 +19,8 @@ import pandas as pd
 import matplotlib.ticker as ticker
 import time
 from astropy.modeling import models, fitting
+from pymatreader import read_mat
+
 
 def loadMatFile73(NHP, date, fileName):
     '''
@@ -31,6 +33,21 @@ def loadMatFile73(NHP, date, fileName):
     allTrials = mat73.loadmat(f'{fileName}', use_attrdict = True)
     allTrialsData = allTrials.trials
     header = allTrials.header
+
+    return allTrialsData, header
+
+
+def loadMatFilePyMat(NHP, date, fileName):
+    '''
+    Loads the given matfile and assigns variables to access trial data
+
+    Inputs: matfile name, (str)
+    Outputs: variables, (nd.array)
+    '''
+    os.chdir(f'../{NHP}/{date}/')
+    allTrials = read_mat(f'{fileName}')
+    allTrialsData = allTrials['trials']
+    header = allTrials['header']
 
     return allTrialsData, header
 
@@ -347,7 +364,7 @@ def activeUnits(unitData, allTrials):
                 if unique not in units:
                     units.append(unique)
     
-    return np.sort(units)
+    return np.sort(units).astype(np.uint16)
 
 
 def insertStimSpikeData(units, index, stimOnTimeSNEV):

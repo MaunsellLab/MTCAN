@@ -1,9 +1,6 @@
 '''
 MTN2 Analysis Script
 
-
-CHECK LOW/HIGH Contrast conditions 
-
 to do:
 convert heatmap to spikes/sec, it's at spikes/stimDurMS
 '''
@@ -29,10 +26,15 @@ allTrials, header = loadMatFile73('Testing', 'Meetz_220621', 'Meetz_220621_2_MTN
 # load relevant file 
 allTrials, header = loadMatFile73('Meetz', '221010', 'Meetz_221010_MTNC_Spikes.mat')
 
+# pyMat reader 
+allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_MTNC_Spikes.mat')
+
 
 if not os.path.exists('Normalization'):
     os.makedirs('Normalization')
 os.chdir('Normalization/')
+
+
 
 
 ## generate list of unique active units

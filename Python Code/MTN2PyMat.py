@@ -324,9 +324,9 @@ for unitCount, unit in enumerate(units):
     bSmooth = gaussian_filter(b, sigma=1)
     prefDir, nullDir = unitPrefNullDir(bSmooth)
 
-    # figure 
+    # Main Figure 
     fig = plt.figure()
-    fig.set_size_inches(12,5)
+    fig.set_size_inches(12,3)
     ax = []
     for row in range(3):
         for col in range(3):
@@ -334,177 +334,42 @@ for unitCount, unit in enumerate(units):
     ax = np.array(ax)
 
     #PSTH's plot 
+    locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
+                  (nullDir,prefDir),(prefDir,prefDir),('blank',prefDir),
+                  (nullDir,'blank'),(prefDir,'blank'),('blank','blank')]
     yMax = 0
     plotCount = 0
-
-    locDirList = []
-
-    # loc0 null loc1 null
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
-                                    (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                                    (stimIndexDF['loc1 Direction'] == nullDir) & 
-                                    (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: {nullDir}, loc1: {nullDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 pref loc1 null
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
-                                (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                                (stimIndexDF['loc1 Direction'] == nullDir) & 
-                                (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: {prefDir}, loc1: {nullDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 blank loc1 null
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
-                                    (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
-                                    (stimIndexDF['loc1 Direction'] == nullDir) & 
-                                    (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: blank, loc1: {nullDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 null loc1 pref
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
-                            (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                            (stimIndexDF['loc1 Direction'] == prefDir) & 
-                            (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: {nullDir}, loc1: {prefDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 pref loc1 pref
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
-                            (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                            (stimIndexDF['loc1 Direction'] == prefDir) & 
-                            (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: {prefDir} loc1: {prefDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 blank loc1 pref
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
-                                    (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
-                                    (stimIndexDF['loc1 Direction'] == prefDir) & 
-                                    (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: blank, loc1: {prefDir}', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
-    #loc0 null loc1 blank
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
-                                    (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                                    (stimIndexDF['loc1 Direction'] == zeroDir) & 
-                                    (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0:{nullDir}, loc1: blank', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    if plotCount == 6:
-        ax[plotCount].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-        ax[plotCount].set_xlabel('Stimulus Duration (ms)', fontsize=7)
-
-    plotCount +=1
-
-    # loc0 pref loc1 blank
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
-                                      (stimIndexDF['loc0 Contrast'] == highContrast) & 
-                                      (stimIndexDF['loc1 Direction'] == zeroDir) & 
-                                      (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: {prefDir}, loc1: blank', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1  
-
-    # loc0 blank loc1 blank
-    histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
-                                      (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
-                                      (stimIndexDF['loc1 Direction'] == zeroDir) & 
-                                      (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
-    dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    smoothPlot = gaussian_filter1d(dirPlot,5)
-    if max(smoothPlot) > yMax:
-        yMax = max(smoothPlot)
-    ax[plotCount].plot(smoothPlot)
-    ax[plotCount].set_title(f'loc0: blank, loc1: blank', fontsize= 5)
-    ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-    ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    plotCount +=1
-
+    for locDir in locDirList:
+        loc0Con = highContrast
+        loc1Con = highContrast
+        loc0Dir, loc1Dir = locDir
+        loc0Title = loc0Dir
+        loc1Title = loc1Dir
+        if loc0Dir == 'blank':
+            loc0Dir = zeroDir
+            loc0Con = zeroContrast
+        if loc1Dir == 'blank':
+            loc1Dir = zeroDir
+            loc1Con = zeroContrast
+        histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
+                                    (stimIndexDF['loc0 Contrast'] == loc0Con) & 
+                                    (stimIndexDF['loc1 Direction'] == loc1Dir) & 
+                                    (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+        dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+        smoothPlot = gaussian_filter1d(dirPlot,5)
+        if max(smoothPlot) > yMax:
+            yMax = max(smoothPlot)
+        ax[plotCount].plot(smoothPlot)
+        ax[plotCount].set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize= 5)
+        ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+        ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=7)
+        ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+        ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+        ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+        if plotCount == 6:
+            ax[plotCount].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+            ax[plotCount].set_xlabel('Stimulus Duration (ms)', fontsize=7)
+        plotCount +=1
     for i in range(9):
         ax[i].set_ylim([0,yMax*1.1])
 
@@ -525,13 +390,16 @@ for unitCount, unit in enumerate(units):
     tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
     tickLabels = np.append(tickLabels, ['blank'])
     ax2 = plt.subplot2grid((3,7), (0,3), colspan=2, rowspan=3)
-    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
-    ax2 = sns.heatmap(b, square=True, linewidths=0.2, vmin=0, annot=True)
+    ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
+    # ax2 = sns.heatmap(b, square=True, linewidths=0.2, vmin=0, annot=True)
     ax2.set_xticks(np.arange(7)+0.5)
     ax2.set_title(f'heatmap of normalization for {unit}')
     ax2.set_xticklabels(tickLabels, rotation = 45)
-    ax2.xaxis.set_ticks_position("top")
+    ax2.set_xlabel('Location 0 Stimulus Direction')
+    ax2.xaxis.set_label_position('top') 
+    ax2.set_ylabel('Location 1 Stimulus Direction')
 
+    ax2.xaxis.set_ticks_position("top")
     ax2.set_yticks(np.arange(7)+0.5)
     ax2.set_yticklabels(tickLabels, rotation = 0)
     plt.tight_layout(pad=0.5, w_pad=0.5, h_pad=0.5)
@@ -988,3 +856,172 @@ for unit in range(len(units)):
     plt.tight_layout()
     plt.show()
 
+
+# loc0 null loc1 null
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+                                (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                                (stimIndexDF['loc1 Direction'] == nullDir) & 
+                                (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: {nullDir}, loc1: {nullDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 pref loc1 null
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+                            (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                            (stimIndexDF['loc1 Direction'] == nullDir) & 
+                            (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: {prefDir}, loc1: {nullDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 blank loc1 null
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
+                                (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
+                                (stimIndexDF['loc1 Direction'] == nullDir) & 
+                                (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: blank, loc1: {nullDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 null loc1 pref
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+                        (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                        (stimIndexDF['loc1 Direction'] == prefDir) & 
+                        (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: {nullDir}, loc1: {prefDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 pref loc1 pref
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+                        (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                        (stimIndexDF['loc1 Direction'] == prefDir) & 
+                        (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: {prefDir} loc1: {prefDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 blank loc1 pref
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
+                                (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
+                                (stimIndexDF['loc1 Direction'] == prefDir) & 
+                                (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: blank, loc1: {prefDir}', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+#loc0 null loc1 blank
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
+                                (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                                (stimIndexDF['loc1 Direction'] == zeroDir) & 
+                                (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0:{nullDir}, loc1: blank', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+if plotCount == 6:
+    ax[plotCount].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+    ax[plotCount].set_xlabel('Stimulus Duration (ms)', fontsize=7)
+plotCount +=1
+
+# loc0 pref loc1 blank
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == prefDir) & 
+                                    (stimIndexDF['loc0 Contrast'] == highContrast) & 
+                                    (stimIndexDF['loc1 Direction'] == zeroDir) & 
+                                    (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: {prefDir}, loc1: blank', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1  
+
+# loc0 blank loc1 blank
+histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == zeroDir) & 
+                                    (stimIndexDF['loc0 Contrast'] == zeroContrast) & 
+                                    (stimIndexDF['loc1 Direction'] == zeroDir) & 
+                                    (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+smoothPlot = gaussian_filter1d(dirPlot,5)
+if max(smoothPlot) > yMax:
+    yMax = max(smoothPlot)
+ax[plotCount].plot(smoothPlot)
+ax[plotCount].set_title(f'loc0: blank, loc1: blank', fontsize= 5)
+ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
+ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+plotCount +=1
+
+
+for i in range(9):
+    ax[i].set_ylim([0,yMax*1.1])

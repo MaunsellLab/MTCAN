@@ -39,7 +39,7 @@ for currTrial in allTrials:
 
 ## Start here
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF1_Spikes.mat')
+allTrials, header = loadMatFilePyMat('Meetz', '221013', 'Meetz_221013_GRF1_Spikes.mat')
 
 
 # create folder and change dir to save PDF's and np.array
@@ -49,8 +49,9 @@ os.chdir('RFLoc Tuning/')
 
 
 ## Tuning code ##
-units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
+units = activeUnits('spikeData', allTrials)
+unitChannels = unitsInfo(units, correctTrials, allTrials)
 
 ## change stimDesc field to be a list of dictionaries
 for corrTrial in correctTrials:
@@ -67,6 +68,7 @@ maxAzi = np.float32(header['map0Settings']['data']['azimuthDeg']['maxValue'])
 numEle = header['map0Settings']['data']['elevationDeg']['n']
 minEle = np.float32(header['map0Settings']['data']['elevationDeg']['minValue'])
 maxEle = np.float32(header['map0Settings']['data']['elevationDeg']['maxValue'])
+interstimDurMS = header['mapInterstimDurationMS']['data']
 allTuningMat = np.zeros((len(units),numEle,numAzi))
 histPrePostMS = 100
 sponWindowMS = 100
@@ -136,7 +138,6 @@ for uCount, unit in enumerate(units):
                         histStimSpikes = np.int32(histStimSpikes*1000)
                         spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
 
-
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     sponSpikesArr = np.array(sponSpikesArr)
     sponSpikesMean = np.mean(sponSpikesArr)
@@ -150,9 +151,12 @@ for uCount, unit in enumerate(units):
 
     date = header['date']
 
-    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {int(stimCount[0][0])}',\
-                    size=10, fontweight='bold')
+    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n\
+    - - - - -\n\
+    Stimulus Duration: {trueStimDurMS} ms\n\
+    Number of Blocks: {int(stimCount[0][0])}\n\
+    Interstimulus Duration: {interstimDurMS}\n\
+    Channel: {unitsChannel[uCount]}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
     # heatmap

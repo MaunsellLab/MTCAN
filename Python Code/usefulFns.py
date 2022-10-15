@@ -118,8 +118,8 @@ def unitPrefNullDir(bSmooth):
     '''
     dirArray = np.array([0,60,120,180,240,300])
 
-    maxLoc0 = max(bSmooth[6,:])
-    maxLoc1 = max(bSmooth[:,6])
+    maxLoc0 = max(bSmooth[6,:6])
+    maxLoc1 = max(bSmooth[:6,6])
     if maxLoc0 > maxLoc1:
         prefDirection = dirArray[np.where(bSmooth[6,:]==maxLoc0)[0][0]]
     else:
@@ -135,10 +135,12 @@ def vonMises(x,x0,conc,I0):
     '''
     return (np.exp(conc * np.cos(x - x0))) / (2*np.pi*I0*conc)
 
+
 def vonMisesMatt(x,phase, kappa):
     # Von mises distribution
     z = np.exp(kappa * phase) / np.exp(kappa)
     return z / np.mean(z)
+
 
 def vonMisesFit(x,y):
     '''
@@ -348,13 +350,11 @@ def eyePosDurTrial(currTrial):
 
 
 def activeUnits(unitData, allTrials):
-
     '''
     function returns the active units across trials for a session as a list
 
     Inputs: unitData (str): Are we using fakeData or spikeData
     Outputs: units (list): active units for a sessioon
-
     '''
     units = []
     for currTrial in allTrials:
@@ -365,6 +365,33 @@ def activeUnits(unitData, allTrials):
                     units.append(unique)
     
     return np.sort(units).astype(np.uint16)
+
+
+def unitsInfo(units, corrTrials, allTrials):
+    '''
+    function will return the channel the unit was found and whether
+    the unit is a multi-unit or single unit.
+
+    Input: 
+        units (list): list of active units
+        corrTrials (list): list of correc trials
+        allTrials (dict): all trials in the dataset
+    Outputs: 
+        unitChannel (list):  list of which channel the unit was found
+    '''
+
+    unitChannels = []
+    for unit in units:
+        for corrTrial in corrTrials:
+            currTrial = allTrials[corrTrial]
+            spikeData = currTrial['spikeData']
+            for count, sd in enumerate(spikeData['unit']):
+                if sd == unit:
+                    unitChannels.append(spikeData['channel'][count])
+                    break
+            break
+
+    return (np.array(unitChannels) + 1)                
 
 
 def insertStimSpikeData(units, index, stimOnTimeSNEV):

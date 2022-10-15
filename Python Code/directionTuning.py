@@ -36,7 +36,7 @@ for currTrial in allTrials:
 
 #### Start Here:
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF2_Spikes.mat')
+allTrials, header = loadMatFilePyMat('Meetz', '221013', 'Meetz_221013_GRF2_Spikes.mat')
 
 # create folder and change directory to save PDFs and np.array
 if not os.path.exists('Direction Tuning'):
@@ -44,9 +44,9 @@ if not os.path.exists('Direction Tuning'):
 os.chdir('Direction Tuning/')
 
 # Tuning code
-units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
-
+units = activeUnits('spikeData', allTrials)
+unitsChannel = unitsInfo(units, correctTrials, allTrials)
 
 ## change stimDesc field to be a list of dictionaries
 for corrTrial in correctTrials:
@@ -159,15 +159,18 @@ for uCount, unit in enumerate(units):
 
     fig = plt.figure()
     fig.set_size_inches(6,8)
-    text = fig.text(0.05, 0.85, f'Direction tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {numBlocks}\n\
-    Interstimulus Duration = {interstimDurMS} ms\n\
-    Total Spikes, Total Spikes (sec) =\n\
-    {totalSpikes, totalSpikesSec}', size=10, fontweight='bold')
+    text = fig.text(0.05, 0.80, f'Direction tuning for unit {unit}\n\
+    {date}\n\
+    - - - - - - - - - - - - - -\n\
+    Stimulus Duration: {trueStimDurMS} ms\n\
+    Number of Blocks: {numBlocks}\n\
+    Interstimulus Duration: {interstimDurMS} ms\n\
+    Total Spikes: {totalSpikes}\n\
+    Channel: {unitsChannel[uCount]}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
 
-    ### Polar 
+    ## Polar 
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)
     theta = np.radians(np.arange(0,420,360/numDir))
     sponTheta = np.radians(np.arange(0,360,360/100))
@@ -184,7 +187,7 @@ for uCount, unit in enumerate(units):
     ax_row1.set_title('Direction Tuning Polar Plot', fontsize=8)
 
 
-    ### Hists
+    ## Hists
     titleArr = np.reshape(np.arange(0,360,60),(2,3))
     ax_row2 = []
     for countI, i in enumerate(range(4, 10, 3)):
@@ -226,7 +229,7 @@ for uCount, unit in enumerate(units):
     for i in range(2):
         for j in range(3):
             ax_row2[i,j].set_ylim([0, yMax*1.1])
-
+    
     # saves plot as pdf 
     plt.savefig(f'{unit}.pdf')
     continue

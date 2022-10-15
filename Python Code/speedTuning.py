@@ -14,12 +14,12 @@ import matplotlib.patheffects as path_effects
 # for testing purposes, to make unit field similar to real data
 for currTrial in allTrials:
     if 'spikeData' in currTrial:
-        currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
+        # currTrial['spikeData']['unit'] = currTrial['spikeData']['unit'].tolist()
         for i in range(0,len(currTrial['spikeData']['channel'])):
             a = str(int(currTrial['spikeData']['channel'][i]))
             b = str(int(currTrial['spikeData']['unit'][i]))
             c = a + '_' + b
-            currTrial['spikeData']['unit'][i] = c
+            currTrial['spikeData']['unitChannel'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
 ## Start Here
@@ -34,8 +34,9 @@ os.chdir('Speed Tuning/')
 
 
 ## Tuning code
-units = activeUnits('spikeData', allTrials)
 correctTrials = correctTrialsGRF(allTrials)
+units = activeUnits('spikeData', allTrials)
+unitChannel = unitsInfo(units, correctTrials, allTrials)
 
 
 ## Assert: stimDesc field is in right format for easy access
@@ -153,9 +154,13 @@ for uCount, unit in enumerate(units):
 
     fig = plt.figure()
     fig.set_size_inches(6,8)
-    text = fig.text(0.05, 0.85, f'Speed tuning for unit {unit}\n{date}\n- - - - -\n\
-    Stimulus Duration = {trueStimDurMS} ms\nNumber of Blocks = {numBlocks}\n\
-    Interstimulus Duration = {interstimDurMS}',size=8, fontweight='bold')
+    text = fig.text(0.05, 0.85, f'Speed tuning for unit {unit}\n\
+    {date}\n\
+    - - - - - - - - - -\n\
+    Stimulus Duration: {trueStimDurMS} ms\n\
+    Number of Blocks: {numBlocks}\n\
+    Interstimulus Duration: {interstimDurMS}\n\
+    Channel: {unitChannel[uCount]}',size=8, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
     #### Line Graph

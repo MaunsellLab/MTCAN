@@ -111,7 +111,7 @@ for i in correctShortRT:
     saccadeTime = currTrial['saccade'].item()['timeMS'].item()
     diff = (saccadeTime - trialStart) - eyePosSacTimeMS
     
-    targetOn = currTrial['targetOn'].item()['timeMS'].item()
+    targetOn = currTrial['targetOn']['timeMS']
     eyePosReactTime = eyePosSacTimeMS - (targetOn - trialStart)
     eyePosDurTarget.append((trialNumber, eyePosReactTime))
     knotRTSaccTarget = saccadeTime - targetOn
@@ -262,3 +262,24 @@ for trialCount, corrTrial in enumerate(corrTrials):
             stimIndexCount[stimIndex] += 1
 
 
+'''
+MTNC
+'''
+
+for shortTrial in shortRT:
+    currTrial = allTrials[shortTrial]
+    eyeXYPos = eyePosDurTrial(currTrial)
+    eyeXYPos = eyePosDurTrial(currTrial)
+    fixate = currTrial['fixate']['timeMS']
+    trialStart = currTrial['trialStart']['timeMS']
+    fixateTimeWRTEyePos = math.floor((fixate - trialStart)/2)
+    windowWidth = currTrial['fixWindowData']['data']['windowDeg']['size']['width']
+    windowHeight = currTrial['fixWindowData']['data']['windowDeg']['size']['height']
+
+    for index, xDeg in enumerate(eyeXYPos['leftX'][fixateTimeWRTEyePos:]):
+        if -(windowWidth/2) > xDeg or xDeg > (windowWidth/2):
+            eyePosSac = index + fixateTimeWRTEyePos
+            break
+    eyePosSacTimeMS = eyePosSac * 2
+    saccadeTime = currTrial['saccade']['timeMS']
+    diff = (saccadeTime - trialStart) - eyePosSacTimeMS

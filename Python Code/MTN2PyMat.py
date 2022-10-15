@@ -433,138 +433,34 @@ for unitCount, unit in enumerate(units):
     #spikeCounts in spikes/sec
     unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS 
 
-    for pos in ['alone', 'both']:
-        if pos == 'alone':
+    offset = lambda p: transforms.ScaledTranslation(p/72.,0, plt.gcf().dpi_scale_trans)
+    trans = plt.gca().transData
+    offsetCount = 0
+
+    # plot category by category 
+    for pos in [0.35, 0.65]:
+        if pos == 0.35:
             for indx in ['pref+blank','null+blank','blank+pref','blank+null']:
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
-                ax4 = plt.scatter(pos,mean)
-                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o")
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount))
+                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt='o', transform=trans+offset(offsetCount))
+                offsetCount += 5
         else:
+            offsetCount = 0
             for indx in ['pref+pref','pref+null','null+pref','null+null']:
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
-                ax4 = plt.scatter(pos,mean)
-                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o")
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount))
+                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o", transform=trans+offset(offsetCount))
+                offsetCount -= 5
+    ax4 = plt.axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+    ax4 = plt.ylim(bottom=0)
+    ax4 = plt.xticks([0.35,0.65], ['Singular Stimulus', 'Dual Stimulus'])
+    ax4 = plt.xlim(left=0.2,right=0.8)
+    ax4 = plt.ylabel('Firing Rate spikes/sec')
 
     plt.show()
-
-    # Main Figure 
-    # fig = plt.figure()
-    # fig.set_size_inches(12,6)
-    # ax = []
-    # for row in range(3):
-    #     for col in range(3):
-    #         ax.append(plt.subplot2grid((3,7), (row,col)))
-    # ax = np.array(ax)
-
-    # #PSTH's plot 
-    # locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
-    #               (nullDir,prefDir),(prefDir,prefDir),('blank',prefDir),
-    #               (nullDir,'blank'),(prefDir,'blank'),('blank','blank')]
-    # yMax = 0
-    # plotCount = 0
-    # for locDir in locDirList:
-    #     loc0Con = highContrast
-    #     loc1Con = highContrast
-    #     loc0Dir, loc1Dir = locDir
-    #     loc0Title = loc0Dir
-    #     loc1Title = loc1Dir
-    #     if loc0Dir == 'blank':
-    #         loc0Dir = zeroDir
-    #         loc0Con = zeroContrast
-    #     if loc1Dir == 'blank':
-    #         loc1Dir = zeroDir
-    #         loc1Con = zeroContrast
-    #     histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
-    #                                 (stimIndexDF['loc0 Contrast'] == loc0Con) & 
-    #                                 (stimIndexDF['loc1 Direction'] == loc1Dir) & 
-    #                                 (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
-    #     dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-    #     smoothPlot = gaussian_filter1d(dirPlot,5)
-    #     if max(smoothPlot) > yMax:
-    #         yMax = max(smoothPlot)
-    #     ax[plotCount].plot(smoothPlot)
-    #     ax[plotCount].set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize= 5)
-    #     ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-    #     ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=7)
-    #     ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-    #     ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-    #     ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    #     if plotCount == 6:
-    #         ax[plotCount].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-    #         ax[plotCount].set_xlabel('Stimulus Duration (ms)', fontsize=7)
-    #     plotCount +=1
-    # for i in range(9):
-    #     ax[i].set_ylim([0,yMax*1.1])
-
-
-    # # Normalization Plot
-    # #ReIndexing to have pref direction in the middle Gauss Smooth
-    # nullIndex = np.where(dirArray==nullDir)[0][0]
-    # reIndex = (np.array([0,1,2,3,4,5])+nullIndex) % 6
-    # bSmoothReIndex = np.zeros((7,7))
-    # tempMain = bSmooth[:6,:6][:,reIndex]
-    # tempMain = tempMain[:6,:6][reIndex,:]
-    # temp0Blank = bSmooth[:6,6][reIndex]
-    # temp1Blank = bSmooth[6,:6][reIndex]
-    # bSmoothReIndex[:6,:6] = tempMain
-    # bSmoothReIndex[:6,6] = temp0Blank
-    # bSmoothReIndex[6,:6] = temp1Blank
-    # bSmoothReIndex[6,6] = bSmooth[6,6]
-
-    # tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
-    # tickLabels = np.append(tickLabels, ['blank'])
-
-    # ax2 = plt.subplot2grid((3,7), (0,3), colspan=2, rowspan=2)
-    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
-    # ax2.set_xticks(np.arange(7)+0.5)
-    # ax2.set_title(f'heatmap of normalization for {unit}')
-    # ax2.set_xticklabels(tickLabels, rotation = 45)
-    # ax2.set_xlabel('Location 0 Stimulus Direction')
-    # ax2.xaxis.set_label_position('top') 
-    # ax2.set_ylabel('Location 1 Stimulus Direction')
-
-    # ax2.xaxis.set_ticks_position("top")
-    # ax2.set_yticks(np.arange(7)+0.5)
-    # ax2.set_yticklabels(tickLabels, rotation = 0)
-    
-    # #Raw not smoothed
-    # #reIndexing to have pref direction in the middle
-    # bReIndex = np.zeros((7,7))
-    # tempMain = b[:6,:6][:,reIndex]
-    # tempMain = tempMain[:6,:6][reIndex,:]
-    # temp0Blank = b[:6,6][reIndex]
-    # temp1Blank = b[6,:6][reIndex]
-    # bReIndex[:6,:6] = tempMain
-    # bReIndex[:6,6] = temp0Blank
-    # bReIndex[6,:6] = temp1Blank
-    # bReIndex[6,6] = b[6,6]
-
-    # ax3 = plt.subplot2grid((3,7), (2,3),colspan=2, rowspan=1)
-    # ax3 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
-    # ax3.set_xticks(np.arange(7)+0.5)
-    # ax3.set_title(f'heatmap of normalization for {unit} not smoothed')
-    # ax3.set_xticklabels(tickLabels, rotation = 45)
-    # ax3.set_xlabel('Location 0 Stimulus Direction')
-    # ax3.xaxis.set_label_position('top') 
-    # ax3.set_ylabel('Location 1 Stimulus Direction')
-
-    # ax3.xaxis.set_ticks_position("top")
-    # ax3.set_yticks(np.arange(7)+0.5)
-    # ax3.set_yticklabels(tickLabels, rotation = 0)
-
-    ## barplot of contrast response
-    # unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
-    # unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS #spikeCounts in spikes/sec
-    # ax4 = sns.catplot(data=unitDF, x='contrast', y='stimSpikes', hue='prefNullStr',
-    #                   kind='point', errorbar="se", ax=ax3)
-    # ax4.set(ylim=(0, None))
-    # # ax3.axhline(y=ponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
-    # ax4.refline(y=(sponSpikesMean[unitCount]*1000/sponWindowMS), color='grey')
-    # ax4.set(xlabel='Contrast', ylabel='Firing Rate (spikes/sec)')
-    # plt.tight_layout()
-    # plt.show()
 
 
 ## Z-scored Correlations 
@@ -760,7 +656,14 @@ for uCount, unit in enumerate(units):
             unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
 
 
+###################################### STOP ########################################
+###################################### HERE ########################################
 '''
+
+
+EXTRA CODE 
+
+
 '''
 ###### mean response of PP, PN, NN to low and high contrast
 for unitCount, unit in enumerate(units):
@@ -946,3 +849,122 @@ for unit in units:
     plt.savefig(f'{unit}BarPlot.pdf')
     plt.close('all')
 
+
+## SUPER PLOT
+
+# Main Figure 
+    # fig = plt.figure()
+    # fig.set_size_inches(12,6)
+    # ax = []
+    # for row in range(3):
+    #     for col in range(3):
+    #         ax.append(plt.subplot2grid((3,7), (row,col)))
+    # ax = np.array(ax)
+
+    # #PSTH's plot 
+    # locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
+    #               (nullDir,prefDir),(prefDir,prefDir),('blank',prefDir),
+    #               (nullDir,'blank'),(prefDir,'blank'),('blank','blank')]
+    # yMax = 0
+    # plotCount = 0
+    # for locDir in locDirList:
+    #     loc0Con = highContrast
+    #     loc1Con = highContrast
+    #     loc0Dir, loc1Dir = locDir
+    #     loc0Title = loc0Dir
+    #     loc1Title = loc1Dir
+    #     if loc0Dir == 'blank':
+    #         loc0Dir = zeroDir
+    #         loc0Con = zeroContrast
+    #     if loc1Dir == 'blank':
+    #         loc1Dir = zeroDir
+    #         loc1Con = zeroContrast
+    #     histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
+    #                                 (stimIndexDF['loc0 Contrast'] == loc0Con) & 
+    #                                 (stimIndexDF['loc1 Direction'] == loc1Dir) & 
+    #                                 (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+    #     dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+    #     smoothPlot = gaussian_filter1d(dirPlot,5)
+    #     if max(smoothPlot) > yMax:
+    #         yMax = max(smoothPlot)
+    #     ax[plotCount].plot(smoothPlot)
+    #     ax[plotCount].set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize= 5)
+    #     ax[plotCount].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+    #     ax[plotCount].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=7)
+    #     ax[plotCount].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+    #     ax[plotCount].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+    #     ax[plotCount].axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+    #     if plotCount == 6:
+    #         ax[plotCount].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+    #         ax[plotCount].set_xlabel('Stimulus Duration (ms)', fontsize=7)
+    #     plotCount +=1
+    # for i in range(9):
+    #     ax[i].set_ylim([0,yMax*1.1])
+
+
+    # # Normalization Plot
+    # #ReIndexing to have pref direction in the middle Gauss Smooth
+    # nullIndex = np.where(dirArray==nullDir)[0][0]
+    # reIndex = (np.array([0,1,2,3,4,5])+nullIndex) % 6
+    # bSmoothReIndex = np.zeros((7,7))
+    # tempMain = bSmooth[:6,:6][:,reIndex]
+    # tempMain = tempMain[:6,:6][reIndex,:]
+    # temp0Blank = bSmooth[:6,6][reIndex]
+    # temp1Blank = bSmooth[6,:6][reIndex]
+    # bSmoothReIndex[:6,:6] = tempMain
+    # bSmoothReIndex[:6,6] = temp0Blank
+    # bSmoothReIndex[6,:6] = temp1Blank
+    # bSmoothReIndex[6,6] = bSmooth[6,6]
+
+    # tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
+    # tickLabels = np.append(tickLabels, ['blank'])
+
+    # ax2 = plt.subplot2grid((3,7), (0,3), colspan=2, rowspan=2)
+    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
+    # ax2.set_xticks(np.arange(7)+0.5)
+    # ax2.set_title(f'heatmap of normalization for {unit}')
+    # ax2.set_xticklabels(tickLabels, rotation = 45)
+    # ax2.set_xlabel('Location 0 Stimulus Direction')
+    # ax2.xaxis.set_label_position('top') 
+    # ax2.set_ylabel('Location 1 Stimulus Direction')
+
+    # ax2.xaxis.set_ticks_position("top")
+    # ax2.set_yticks(np.arange(7)+0.5)
+    # ax2.set_yticklabels(tickLabels, rotation = 0)
+    
+    # #Raw not smoothed
+    # #reIndexing to have pref direction in the middle
+    # bReIndex = np.zeros((7,7))
+    # tempMain = b[:6,:6][:,reIndex]
+    # tempMain = tempMain[:6,:6][reIndex,:]
+    # temp0Blank = b[:6,6][reIndex]
+    # temp1Blank = b[6,:6][reIndex]
+    # bReIndex[:6,:6] = tempMain
+    # bReIndex[:6,6] = temp0Blank
+    # bReIndex[6,:6] = temp1Blank
+    # bReIndex[6,6] = b[6,6]
+
+    # ax3 = plt.subplot2grid((3,7), (2,3),colspan=2, rowspan=1)
+    # ax3 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
+    # ax3.set_xticks(np.arange(7)+0.5)
+    # ax3.set_title(f'heatmap of normalization for {unit} not smoothed')
+    # ax3.set_xticklabels(tickLabels, rotation = 45)
+    # ax3.set_xlabel('Location 0 Stimulus Direction')
+    # ax3.xaxis.set_label_position('top') 
+    # ax3.set_ylabel('Location 1 Stimulus Direction')
+
+    # ax3.xaxis.set_ticks_position("top")
+    # ax3.set_yticks(np.arange(7)+0.5)
+    # ax3.set_yticklabels(tickLabels, rotation = 0)
+
+    ## barplot of contrast response
+    # unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
+    # unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS #spikeCounts in spikes/sec
+    # ax4 = sns.catplot(data=unitDF, x='contrast', y='stimSpikes', hue='prefNullStr',
+    #                   kind='point', errorbar="se", ax=ax3)
+    # ax4.set(ylim=(0, None))
+    # # ax3.axhline(y=ponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+    # ax4.refline(y=(sponSpikesMean[unitCount]*1000/sponWindowMS), color='grey')
+    # ax4.set(xlabel='Contrast', ylabel='Firing Rate (spikes/sec)')
+    # plt.tight_layout()
+    # plt.show()

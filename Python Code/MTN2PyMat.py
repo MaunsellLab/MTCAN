@@ -188,7 +188,7 @@ sponSpikesMean = np.zeros(len(units)) # spikes in 50ms window
 sponSpikesSEM = np.zeros(len(units)) 
 for unitCount, unit in enumerate(units):
     sponSpikesMean[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit']==unit].mean()[1]
-    sponSpikesSEM[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit']==unit].mean()[1]
+    sponSpikesSEM[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit']==unit].sem()[1]
 meanSpike = np.mean(spikeCountMat[:,:blocksDone,:], axis = 1)
 spikeCountSD = np.std(spikeCountMat[:,:blocksDone,:], axis = 1)
 spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
@@ -217,15 +217,52 @@ for count,i in enumerate(meanSpikeReshaped):
     i[:,48] = meanSpike[count][48]
 
 
+## Filter Units
+# inclusion criteria:
+# 1. pref response > 2x null response
+# 2. pref response > baseline (need to incorporate this)
+filterUnits = []
+for unitCount, unit in enumerate(units):
+    b = meanSpikeReshaped[unitCount].reshape(7,7)
+    bSmooth = gaussian_filter(b, sigma=1)
+    prefDir, nullDir = unitPrefNullDir(bSmooth)
+
+    orientList = [(prefDir,'blank'),(nullDir,'blank'),
+                  ('blank',prefDir),('blank',nullDir)] 
+    respList = []
+    for i in orientList:
+        loc0Dir, loc1Dir = i
+        loc0Con = highContrast
+        loc1Con = highContrast
+        if loc0Dir == 'blank':
+            loc0Dir = 0
+            loc0Con = 0
+        if loc1Dir == 'blank':
+            loc1Dir = 0
+            loc1Con = 0
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == loc0Con) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
+                    & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone].mean()
+        meanResp = unitDF[3] * 1000/trueStimDurMS
+        respList.append(meanResp)
+    
+    if respList[0] > 2*respList[1] or respList[2] > 2*respList[3]:
+        filterUnits.append(unit)
+
+
 ## scipy curveFit Normalization parameters
-def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, sL0, sL1, aL, sig):
+def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, sL0, sL1, aL0, aL1, sig):
     c0,c1,l0,l1 = fixed
     L = np.array([L_0, L_60, L_120, L_180, L_240, L_300])
     # return((c0*sL0*L*l0).sum(-1) + (c1*sL1*L*l1).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig)
-    # return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig))
-    return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL*c0[:,0])+(aL*c1[:,0])+sig))
+    return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig))
+    # return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL*c0[:,0])+(aL*c1[:,0])+sig))
 for unitCount, unit in enumerate(units):
-    resp = np.reshape(spikeCountMat[unitCount][:blocksDone+1,:],(49*blocksDone))
+    resp = np.reshape(spikeCountMat[unitCount][:blocksDone,:],(49*blocksDone))
     fixParam = np.tile(np.arange(49), blocksDone)
 
     c0s, c1s, l0s, l1s = [], [], [], []
@@ -252,7 +289,7 @@ for unitCount, unit in enumerate(units):
     l1s = np.array(l1s)
 
     pOpt, pCov = curve_fit(func, (c0s, c1s, l0s, l1s), resp, bounds=(
-        (0,0,0,0,0,0,0,0,0,0),(np.inf,np.inf,np.inf,np.inf,np.inf,np.inf,1,1,1,1)))
+        (0,0,0,0,0,0,0,0,0,0,0),(np.inf,np.inf,np.inf,np.inf,np.inf,np.inf,1,1,1,1,1)))
     print(unit,pOpt)
 
 
@@ -460,7 +497,8 @@ for unitCount, unit in enumerate(units):
     ax4 = plt.xlim(left=0.2,right=0.8)
     ax4 = plt.ylabel('Firing Rate spikes/sec')
 
-    plt.show()
+    plt.savefig(f'{unit}superPlot.pdf')
+    plt.close('all')
 
 
 ## Z-scored Correlations 

@@ -17,7 +17,7 @@ import time
 
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221013', 'Meetz_221013_MTNC_Spikes.mat')
+allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_MTNC_Spikes.mat')
 
 if not os.path.exists('Normalization'):
     os.makedirs('Normalization')
@@ -354,10 +354,9 @@ for unitCount, unit in enumerate(units):
     bSmooth = gaussian_filter(b, sigma=1)
     prefDir, nullDir = unitPrefNullDir(bSmooth)
 
-
     ## figure 
     fig = plt.figure(constrained_layout=True)
-    fig.set_size_inches(14,7)
+    fig.set_size_inches(16,7)
 
     gs0 = gridspec.GridSpec(1,3)
 
@@ -412,6 +411,7 @@ for unitCount, unit in enumerate(units):
         axes = fig.get_axes()
         for ax in axes:
             ax.set_ylim([0,yMax*1.1])
+
 
     # Normalization Plot
     #ReIndexing to have pref direction in the middle Gauss Smooth
@@ -480,7 +480,7 @@ for unitCount, unit in enumerate(units):
             for indx in ['pref+blank','null+blank','blank+pref','blank+null']:
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
-                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount))
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount), label=indx)
                 ax4 = plt.errorbar(pos,mean, yerr=sem, fmt='o', transform=trans+offset(offsetCount))
                 offsetCount += 5
         else:
@@ -488,7 +488,7 @@ for unitCount, unit in enumerate(units):
             for indx in ['pref+pref','pref+null','null+pref','null+null']:
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
-                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount))
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount), label=indx)
                 ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o", transform=trans+offset(offsetCount))
                 offsetCount -= 5
     ax4 = plt.axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
@@ -496,6 +496,7 @@ for unitCount, unit in enumerate(units):
     ax4 = plt.xticks([0.35,0.65], ['Singular Stimulus', 'Dual Stimulus'])
     ax4 = plt.xlim(left=0.2,right=0.8)
     ax4 = plt.ylabel('Firing Rate spikes/sec')
+    ax4 = plt.legend(loc='upper right', prop={'size': 6})
 
     plt.savefig(f'{unit}superPlot.pdf')
     plt.close('all')

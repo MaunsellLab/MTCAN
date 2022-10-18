@@ -4,8 +4,7 @@ The script will save the plots for each unit as a PDF in a folder specific
 to the day's dataset. 
 
 to do:
-2D gaussian fit to isolate RF size with graphic display, find the center of the rfeceptive fiel
-width, and center, elipsis on the heatmap
+
 
 Chery March 2022
 Modified to save plots as pngs and incorporated changes to track stimCounts
@@ -14,6 +13,7 @@ Modified to incorporate frame counter, fixed bugs relating to unit indexing
 within the stimDesc, added 1-d gaussian filter - 06/10/22
 Flipped heatmap and corresponding PSTHs, - 06/12/22
 Import using pymat reader - 10/11/22
+2D Gauss fit overlay on heatmap (1 sd, 2sd) - 10/18/22
 '''
 
 from usefulFns import *
@@ -51,7 +51,7 @@ os.chdir('RFLoc Tuning/')
 ## Tuning code ##
 correctTrials = correctTrialsGRF(allTrials)
 units = activeUnits('spikeData', allTrials)
-unitChannels = unitsInfo(units, correctTrials, allTrials)
+unitsChannel = unitsInfo(units, correctTrials, allTrials)
 
 ## change stimDesc field to be a list of dictionaries
 for corrTrial in correctTrials:
@@ -143,6 +143,26 @@ for uCount, unit in enumerate(units):
     sponSpikesMean = np.mean(sponSpikesArr)
     allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
 
+    #2D Gauss Fit 
+    com = ndimage.center_of_mass(spikeCountMean)
+    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
+                                y_stddev=1, theta=None, cov_matrix=None)
+    yi, xi = np.indices(spikeCountMean.shape)
+    fit_p = fitting.LevMarLSQFitter()
+    p = fit_p(p_init,xi,yi,spikeCountMean)
+
+    theta = p.theta[0] * 180/np.pi
+    xStdDev = p.x_stddev[0]
+    yStdDev = p.y_stddev[0]
+    xMean = p.x_mean[0] + 0.5
+    yMean = p.y_mean[0] + 0.5
+    amp = p.amplitude[0]
+
+    rho = np.cos(theta)
+    covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
+                    [rho*xStdDev*yStdDev,yStdDev**2]])
+    meanVec = np.array([[xMean],[yMean]])
+
     ## Plot figure ##
     fig = plt.figure()
     fig.set_size_inches(6,8)
@@ -164,18 +184,25 @@ for uCount, unit in enumerate(units):
     ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
     # bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
     bSmooth = gaussian_filter(spikeCountMean,sigma=1)
-    # ax_row1[0] = sns.heatmap(spikeCountMean)
-    ax_row1[0] = sns.heatmap(bSmooth)
-    ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5, 
-                       bSmooth.shape[0]), bSmooth, colors='yellow')
+    ax_row1[0] = sns.heatmap(bSmooth * 1000/trueStimDurMS)
+    # ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5, 
+    #                    bSmooth.shape[0]), bSmooth, colors='yellow')
     ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
     ax_row1[0].set_ylabel('elevation (˚)', fontsize = 8)
     ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
     ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
     ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
     ax_row1[0].invert_yaxis()
-    # plt.show()
 
+    #overlay 1SD, 2SD ellipse
+    el1SD = Ellipse((xMean,yMean),xStdDev,yStdDev,theta,fill=None,edgecolor='blue')
+    ax_row1[0].add_artist(el1SD)
+    el1SD.set(linestyle=':')
+    el2SD = Ellipse((xMean,yMean),2*xStdDev,2*yStdDev,theta,fill=None,edgecolor='black')
+    el2SD.set(linestyle='--')
+    ax_row1[0].add_artist(el2SD)
+    plt.show()
+    
     ax_row2 = []
     for i in np.arange(numEle+2, 2, -1):
         ax = []
@@ -220,7 +247,6 @@ for uCount, unit in enumerate(units):
 
 plt.close('all')
 np.save('unitsRFLocMat', allTuningMat)
-
 
 
 ######## 2D gauss fit
@@ -269,12 +295,16 @@ for i in range(len(RFLocMat)):
     sns.heatmap(modelData, cmap = sns.color_palette('mako', as_cmap=True),)
     plt.show()
 
+from matplotlib.patches import Ellipse
+ells =  Ellipse((xMean,yMean),xStdDev, yStdDev, rho)
+ax.add_artist(ells)
+
 
 
 
 a = np.flip(spikeCountMean, axis=0)
 com = ndimage.center_of_mass(a)
-p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[1], x_stddev=1, 
+p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
                             y_stddev=1, theta=None, cov_matrix=None)
 yi, xi = np.indices(a.shape)
 fit_p = fitting.LevMarLSQFitter()

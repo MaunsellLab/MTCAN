@@ -39,7 +39,7 @@ for currTrial in allTrials:
 
 ## Start here
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221013', 'Meetz_221013_GRF1_Spikes.mat')
+allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_GRF1_Spikes.mat')
 
 
 # create folder and change dir to save PDF's and np.array
@@ -130,12 +130,8 @@ for uCount, unit in enumerate(units):
                                      (unitTimeStamps <= stimOnTimeS))
                         sponSpikesArr.extend([len(sponSpikes[0])])
 
-                        #histograms
-                        stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
-                        stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
-                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
-                                            & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
-                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        histStimSpikes = histSpikes(stimOnTimeS,stimOffTimeS,
+                                                histPrePostMS,unitTimeStamps)
                         spikeHists[histStimSpikes, eleIndex, aziIndex] += 1
 
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
@@ -144,12 +140,13 @@ for uCount, unit in enumerate(units):
     allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
 
     #2D Gauss Fit 
-    com = ndimage.center_of_mass(spikeCountMean)
+    spikeCountFitArray = spikeCountMean - sponSpikesMean
+    com = ndimage.center_of_mass(spikeCountFitArray)
     p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
                                 y_stddev=1, theta=None, cov_matrix=None)
-    yi, xi = np.indices(spikeCountMean.shape)
+    yi, xi = np.indices(spikeCountFitArray.shape)
     fit_p = fitting.LevMarLSQFitter()
-    p = fit_p(p_init,xi,yi,spikeCountMean)
+    p = fit_p(p_init,xi,yi,spikeCountFitArray)
 
     theta = p.theta[0] * 180/np.pi
     xStdDev = p.x_stddev[0]
@@ -184,7 +181,7 @@ for uCount, unit in enumerate(units):
     ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
     # bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
     bSmooth = gaussian_filter(spikeCountMean,sigma=1)
-    ax_row1[0] = sns.heatmap(bSmooth * 1000/trueStimDurMS)
+    ax_row1[0] = sns.heatmap(spikeCountMean * 1000/trueStimDurMS, vmin=0)
     # ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5, 
     #                    bSmooth.shape[0]), bSmooth, colors='yellow')
     ax_row1[0].set_xlabel('azimith (˚)', fontsize=8)
@@ -196,20 +193,19 @@ for uCount, unit in enumerate(units):
 
     #overlay 1SD, 2SD ellipse
     el1SD = Ellipse((xMean,yMean),xStdDev,yStdDev,theta,fill=None,edgecolor='blue')
-    ax_row1[0].add_artist(el1SD)
     el1SD.set(linestyle=':')
+    ax_row1[0].add_artist(el1SD)
     el2SD = Ellipse((xMean,yMean),2*xStdDev,2*yStdDev,theta,fill=None,edgecolor='black')
     el2SD.set(linestyle='--')
     ax_row1[0].add_artist(el2SD)
-    plt.show()
-    
+
+
     ax_row2 = []
     for i in np.arange(numEle+2, 2, -1):
         ax = []
         for j in np.arange(0, numAzi):
             ax.append(plt.subplot2grid((numEle+3,6), (i,j)))
         ax_row2.append(np.array(ax))
-
     ax_row2 = np.array(ax_row2) # 6 x 6
 
     # PSTHs

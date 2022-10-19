@@ -121,13 +121,11 @@ for uCount, unit in enumerate(units):
                         sponSpikesArr.extend([len(sponSpikes[0])])
 
                         #histograms
-                        stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
-                        stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
-                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
-                                            & (unitTimeStamps < stimOffPostSNEV))] - stimOnPreSNEV
-                        histStimSpikes = np.int32(histStimSpikes*1000)
+                        histStimSpikes = histSpikes(stimOnTimeS,stimOffTimeS,
+                                                 histPrePostMS,unitTimeStamps)
                         spikeHists[dirIndex, histStimSpikes] += 1
 
+    # summary stats 
     spikeCountMean = np.mean(spikeCountMat[:numBlocks,:], axis = 0)
     spikeCountSD = np.std(spikeCountMat[:numBlocks, :], axis = 0)
     spikeCountSEM = spikeCountSD/np.sqrt(numBlocks)
@@ -179,7 +177,8 @@ for uCount, unit in enumerate(units):
     err = (np.append(spikeCountSEM, spikeCountSEM[0]))*1000/trueStimDurMS
     spon = np.array([sponSpikesMean] * len(sponTheta))
     ax_row1.plot(theta,r, markersize=2)
-    ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black', color='black',markersize=2)
+    ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black',
+                     color='black', markersize=2)
     ax_row1.plot(sponTheta,spon*1000/sponWindowMS, linestyle='--')
     ax_row1.plot(np.radians(nXFull%360), nYFull*1000/trueStimDurMS)
     ax_row1.set_theta_zero_location("W")
@@ -201,25 +200,22 @@ for uCount, unit in enumerate(units):
     plotCount = 0
     for i in range(2):
         for j in range(3):
-            # spikeHist = spikeHists[plotCount,:] * 1000/stimCount[0][plotCount] 
             spikeHist = spikeHists[plotCount,:] * 1000/numBlocks
             plotCount += 1
-            # histSmooth = smooth(spikeHist,50)#*1000
-            # ax_row2[i,j].plot(histSmooth)
             gaussSmooth = gaussian_filter1d(spikeHist, 5)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
             ax_row2[i,j].plot(gaussSmooth)
             histTitle = titleArr[i][j]
             ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)
-            # ax_row2[i,j].set_ylim(bottom=0)
-            # ax_row2[i,j].set_yticks([50,100])
-            # ax_row2[i,j].set_yticklabels([50,100], fontsize=5)
-            # ax_row2[i,j].set_xticks([histPrePostMS,histPrePostMS+stimDurMS])
-            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
-            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=5)
-            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.2)
-            ax_row2[i,j].axhline(y=sponSpikesMean*1000/sponWindowMS, linestyle='--', color='grey')
+            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,
+                                     2*histPrePostMS+trueStimDurMS])
+            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, 
+                                     trueStimDurMS+histPrePostMS], fontsize=5)
+            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, 
+                                 color='grey', alpha=0.2)
+            ax_row2[i,j].axhline(y=sponSpikesMean*1000/sponWindowMS, 
+                                 linestyle='--', color='grey')
             if i == 1 and j == 0:
                 ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
                 ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)

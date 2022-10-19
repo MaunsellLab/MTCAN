@@ -132,6 +132,30 @@ def unitPrefNullDir(bSmooth):
     return prefDirection, nullDirection 
 
 
+def histSpikes(stimOnTimeS,stimOffTimeS,histPrePostMS,unitTimeStamps):
+    '''
+    Function will extract the time a unit spikes within the histogram window
+    during a stimulus presentation. 
+
+    Inputs:
+        stimOnTimeS: when does the stimulus turn on (float)
+        stimOffTimeS: when does the stimulus turn off (float)
+        histPrePostMS: histogram pre and post window (int)
+        unitTimeStamps: all the times the unit fired during that trial (array)
+    
+    Outputs:
+        histStimSpikes: index values for when the unit fired within the hist window 
+    '''
+
+    stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
+    stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
+    histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV) &
+                     (unitTimeStamps < stimOffPostSNEV))] - stimOnPreSNEV
+    histStimSpikes = np.int32(histStimSpikes*1000)
+
+    return histStimSpikes
+
+
 def vonMises(x,x0,conc,I0):
     '''
     equation for a Von Mises fit
@@ -186,7 +210,8 @@ def gaussFit(x, y):
     '''
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
+    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
+                   bounds=((0,0,0,0),(np.inf,1.25*np.max(y),np.inf,np.inf)))
     return popt
 
 

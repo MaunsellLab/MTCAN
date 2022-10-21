@@ -254,6 +254,11 @@ for unitCount, unit in enumerate(units):
         filterUnits.append(unit)
 
 
+## scipy curvefit Normalization parameters
+##new eqn with L0-L6 being a gaussian fit 
+
+
+
 ## scipy curveFit Normalization parameters
 def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, sL0, sL1, aL0, aL1, sig):
     c0,c1,l0,l1 = fixed

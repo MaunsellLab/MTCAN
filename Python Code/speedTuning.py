@@ -22,9 +22,15 @@ for currTrial in allTrials:
             currTrial['spikeData']['unitChannel'][i] = c
         currTrial['spikeData']['unit'] = np.array(currTrial['spikeData']['unit'])
 
-## Start Here
+##### Start Here
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF3_Spikes.mat')
+
+monkeyName = 'Meetz'
+seshDate = '221017'
+fileName = f'{monkeyName}_{seshDate}_GRF3_Spikes.mat'
+
+allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
+# allTrials, header = loadMatFilePyMat('Meetz', '221010', 'Meetz_221010_GRF3_Spikes.mat')
 
 
 # create folder and change dir to save PDF's and np.array

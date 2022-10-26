@@ -1,22 +1,16 @@
 # recording session 
-sesh = [6,10,11,12,14,15,16,17,18,19,20]
+sesh = [6,10,11,12,14,15,16,17,18,19,20,22]
 
 #grid coordinates (mm)
-x = [2,1,3,3,3,2,4,2,4,3,1] 
-y = [2,1,2,2,1,3,2,1,1,3,2]
-z = [23,22.4,23,21.5,22.3,21.3,23.5,20.07,23.8,22.6,23]
+x = np.array([2,1,3,3,3,2,4,2,4,3,1,2])
+y = np.array([2,1,2,2,1,3,2,1,1,3,2,0])
+z = np.array([23,22.4,23,21.5,22.3,21.3,23.5,20.07,23.8,22.6,23,24.6])
 z0 = np.zeros(len(x))
 
-x_all = np.repeat(x, 2)
-y_all = np.repeat(y, 2)
-z_all = np.repeat(z, 2)
-z_all[1:-1:2] = 0
-z_all[-1] = 0
-
 # visual hemifield attributes
-ecc = ['25˚','13˚','14˚','25˚','8.6˚','20.6˚','18˚', '7˚','12˚','21˚','11˚']
-azi = [20,5,12,20,5,20,15,5,7,15,0]
-ele = [-15,-12,-7.5,-15,-7,-5,-10,-5, -10,-15,-11]
+ecc = ['25˚','13˚','14˚','25˚','8.6˚','20.6˚','18˚', '7˚','12˚','21˚','11˚','8˚']
+azi = [20,5,12,20,5,20,15,5,7,15,0,0]
+ele = [-15,-12,-7.5,-15,-7,-5,-10,-5, -10,-15,-11,-9]
 
 # figure
 fig = plt.figure()
@@ -24,17 +18,17 @@ ax = fig.add_subplot(111,projection='3d')
 for i in range(len(ecc)):
     ax.scatter(x[i],y[i],z[i])
     ax.text(x[i],y[i],z[i], f'{sesh[i]}')
-ax.plot(x_all, y_all, z_all)
+    ax.plot([x[i],x[i]],[y[i],y[i]], [z0[i], z[i]], color='blue', alpha=0.5)
 ax.scatter(x,y,z0, color='red')
 
-ax.set_ylim3d(-8,8)
-ax.set_xlim3d(-8,8)
-ax.set_zlim3d(0,26)
+ax.set_ylim3d(0,8)
+ax.set_xlim3d(0,8)
+ax.set_zlim3d(18,26)
 ax.set_xlabel('M axis (mm)')
 ax.set_ylabel('A axis (mm)')
 ax.set_zlabel('Depth (mm)')
-
 ax.invert_zaxis()
+
 
 fig2, ax2 = plt.subplots()
 for i in range(len(sesh)):
@@ -42,7 +36,7 @@ for i in range(len(sesh)):
     ax2.annotate(sesh[i],(azi[i],ele[i]))
 
 ax2.set_xlim(-23,23)
-ax2.set_ylim(-18,18)
+ax2.set_ylim(-23,23)
 ax2.axhline(y=0)
 ax2.axvline(x=0)
 plt.show()
@@ -50,10 +44,23 @@ plt.show()
 
 
 
+'''
+'''
 
+max_range = np.array([x.max()-x.min(), y.max()-y.min(), z.max()-z.min()]).max()
+Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(x.max()+x.min())
+Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(y.max()+y.min())
+Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(z.max()+z.min())
+# Comment or uncomment following both lines to test the fake bounding box:
+for xb, yb, zb in zip(Xb, Yb, Zb):
+   ax.plot([xb], [yb], [zb], 'w')
+plt.grid()
 
-
-
+x_all = np.repeat(x, 2)
+y_all = np.repeat(y, 2)
+z_all = np.repeat(z, 2)
+z_all[1:-1:2] = 0
+z_all[-1] = 0
 
 incorrectPostedTrials = []
 for corrTrial in corrTrials:

@@ -17,7 +17,11 @@ import time
 
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_MTNC_Spikes.mat')
+monkeyName = 'Meetz'
+seshDate = '221013'
+fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
+
+allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
 if not os.path.exists('Normalization'):
     os.makedirs('Normalization')
@@ -127,6 +131,7 @@ highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
                              min(stimIndexDF['loc0 Contrast'].unique())
 zeroDir = 0
 dirArray = np.array([0,60,120,180,240,300])
+angleMat = np.arange(180,900,60)
 spikeCountMat = np.zeros((len(units),blocksDone+1,49))
 spikeCountLong = []
 sponSpikeCountLong = []
@@ -256,6 +261,190 @@ for unitCount, unit in enumerate(units):
 
 ## scipy curvefit Normalization parameters
 ##new eqn with L0-L6 being a gaussian fit 
+def gaussFunc(fixed,gBO,A,MU,SIG,S,b):
+    '''
+    curve fit caraibles for my direction tuning gauss func and a scalar
+    at the other location
+    gBO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: gaussian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    b: baseline
+    '''
+
+    c0,l0,c1,l1 = fixed.T
+
+    return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) + 
+            (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
+
+
+def normFunc0(fixed, BO, A, MU, SIG, S, al, c50, M):
+    '''
+    curve fit variables for my norm function, when loc0 has stronger response
+
+    BO: gaussian tuning curve baseline offset 
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0,l0,c1,l1 = fixed.T
+    num = (c0 * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
+    denom = (al * c0) + c1 + c50
+
+    return  ((num/denom) + M).squeeze()
+
+
+def normFunc1(fixed, BO, A, MU, SIG, S, al, c50, M):
+    '''
+    curve fit variables for my norm function, when loc1 has stronger response
+
+    BO: gaussian tuning curve baseline offset 
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0,l0,c1,l1 = fixed.T
+    num = (c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
+    denom = c0 + (al* c1) + c50
+
+    return  ((num/denom) + M).squeeze()
+
+b = meanSpikeReshaped[unitCount].reshape(7,7)
+
+l0Ind = [36,37,38,39,40,41]
+l1Ind = [42,43,44,45,46,47]
+
+maxLoc0 = max(b[6,:6])
+loc0Mat = b[6,:6]
+loc1Mat = b[:6,6]
+
+
+extTunMat0 = np.concatenate((loc0Mat[3:],loc0Mat[:],loc0Mat[:3]),axis=0)
+extTunMat1 = np.concatenate((loc1Mat[3:],loc1Mat[:],loc1Mat[:3]),axis=0)
+extL0Ind = np.concatenate((l0Ind[3:],l0Ind[:],l0Ind[:3]),axis=0)
+extL1Ind = np.concatenate((l1Ind[3:],l1Ind[:],l1Ind[:3]),axis=0)
+loc0Max = int(np.where(b[6,:6] == maxLoc0)[0] + 3)
+
+# dependent variables extended array
+resp0 = extTunMat0[loc0Max-3:loc0Max+4]
+resp1 = extTunMat1[loc0Max-3:loc0Max+4]
+resp = np.concatenate((resp0,resp1,np.array([b[6,6]])), axis=0)
+
+#fixed variables extended array
+loc0X = extL0Ind[loc0Max-3:loc0Max+4]
+loc1X = extL1Ind[loc0Max-3:loc0Max+4]
+indList = np.concatenate((loc0X,loc1X,np.array([48])),axis=0)
+
+dirArr = angleMat[loc0Max-3:loc0Max+4]
+dirArr = np.concatenate((dirArr, dirArr), axis=0)
+dirArr = np.concatenate((dirArr,np.array([0])))
+
+fixedVals = []
+for count, i in enumerate(indList):
+    if count <=6:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = dirArr[count]
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = 0
+    elif count > 6 and count < 14:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = 0
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = dirArr[count]
+    else:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction'] 
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction'] 
+    fixedVals.append((c0,l0,c1,l1))
+fixedVals = np.array(fixedVals)
+
+pOpt, pCov = curve_fit(gaussFunc, fixedVals, resp.squeeze(), bounds=(
+(0,0,180,0,0,0), 
+(np.inf,np.inf,840,360,np.inf,np.inf)))
+print(unit,pOpt)
+
+
+'''
+132 [1.80994228e-01 2.43075528e+01 3.95501472e+02 4.18684643e+01
+ 5.94190815e-01 1.72546764e+00]
+'''
+
+b = meanSpikeReshaped[unitCount].reshape(7,7)
+
+maxLoc0 = max(b[6,:6])
+maxLoc1 = max(b[:6,6])
+loc0Mat = b[6,:6]
+loc1Mat = b[:6,6]
+base = b[6,6]
+
+resp = b[:6,:6].reshape(1,36)
+fixedVals = []
+
+if maxLoc0 > maxLoc1:
+    extTunMat = np.concatenate((loc0Mat[3:],loc0Mat[:],loc0Mat[:3]),axis=0)
+    loc0Max = int(np.where(b[6,:6] == maxLoc0)[0] + 3)
+    n1X = angleMat[loc0Max-3:loc0Max+4]
+    n1Y = extTunMat[loc0Max-3:loc0Max+4]
+    params = gaussFit(n1X, n1Y)
+    mu = params[2] - 360 
+    sig = params[3]
+    amplitude = params[1]
+    baseOffset = params[0]
+
+    for i in range(36):
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+        fixedVals.append((c0,l0,c1,l1))
+    fixedVals = np.array(fixedVals)
+
+    pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(), bounds=(
+        (baseOffset,amplitude,mu,sig,0,0,0,base),
+        (baseOffset+1,amplitude+1,mu+1,sig+1,1,np.inf,1,base+1)))
+    print(unit,pOpt)
+
+
+else:
+    extTunMat = np.concatenate((loc1Mat[3:],loc1Mat[:],loc1Mat[:3]),axis=0)
+    loc1Max = int(np.where(b[:6,6] == maxLoc1)[0] + 3)
+    n1X = angleMat[loc1Max-3:loc1Max+4]
+    # n1Y = extTunMat[loc1Max-3:loc1Max+4]/max(extTunMat[loc1Max-3:loc1Max+4])
+    n1Y = extTunMat[loc1Max-3:loc1Max+4]
+    params = gaussFit(n1X, n1Y)
+    mu = params[2] - 360 
+    sig = params[3] 
+    amplitude = params[1]
+    baseOffset = params[0]
+
+    for i in range(36):
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+        fixedVals.append((c0,l0,c1,l1))
+    fixedVals = np.array(fixedVals)
+
+    pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(), bounds=(
+        (baseOffset,amplitude,mu,sig,0,0,0,base),
+        (baseOffset+1,amplitude+1,mu+1,sig+1,1,np.inf,1,base+1)))
+    print(unit,'normFunc1',pOpt)
+
+
+
+
 
 
 

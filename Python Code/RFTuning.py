@@ -39,7 +39,12 @@ for currTrial in allTrials:
 
 ## Start here
 # Load relevant file here with pyMat reader 
-allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_GRF1_Spikes.mat')
+monkeyName = 'Meetz'
+seshDate = '221017'
+fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
+
+allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
+# allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_GRF1_Spikes.mat')
 
 
 # create folder and change dir to save PDF's and np.array

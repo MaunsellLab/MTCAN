@@ -44,8 +44,8 @@ def loadMatFilePyMat(NHP, date, fileName):
     '''
     Loads the given matfile and assigns variables to access trial data
 
-    Inputs: matfile name, (str)
-    Outputs: variables, (nd.array)
+    Inputs: NHP (monkey Name), date of data collection (str), fileName (str)
+    Outputs: variables, (dict)
     '''
     os.chdir(f'../{NHP}/{date}/')
     allTrials = read_mat(f'{fileName}')

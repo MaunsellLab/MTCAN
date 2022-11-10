@@ -5,6 +5,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage.filters import gaussian_filter
 from scipy import stats
 from itertools import combinations
+import itertools
 import numpy as np
 import numpy.ma as ma
 from numpy.linalg import inv
@@ -211,7 +212,7 @@ def gaussFit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
-                   bounds=((0,0,0,0),(np.inf,1.25*np.max(y),np.inf,np.inf)))
+                   bounds=((0,0,0,0),(np.inf,2.00*np.max(y),np.inf,np.inf)))
     return popt
 
 
@@ -410,16 +411,19 @@ def unitsInfo(units, corrTrials, allTrials):
 
     unitChannels = []
     for unit in units:
+        breakNum = 0
         for corrTrial in corrTrials:
             currTrial = allTrials[corrTrial]
             spikeData = currTrial['spikeData']
             for count, sd in enumerate(spikeData['unit']):
                 if sd == unit:
                     unitChannels.append(spikeData['channel'][count])
+                    breakNum = 10
                     break
-            break
+            if breakNum == 10:
+                break
 
-    return (np.array(unitChannels) + 1)                
+    return np.array(unitChannels)   
 
 
 def insertStimSpikeData(units, index, stimOnTimeSNEV):

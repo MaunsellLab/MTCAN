@@ -37,7 +37,7 @@ for currTrial in allTrials:
 #### Start Here:
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221017'
+seshDate = '220914'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -169,7 +169,7 @@ for uCount, unit in enumerate(units):
     Total Spikes: {totalSpikes}\n\
     Channel: {unitsChannel[uCount]}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
-
+    #Channel: {unitsChannel[uCount]}
 
     ## Polar 
     ax_row1 = plt.subplot2grid((10,6), (0,3), colspan = 3, rowspan = 4, polar=True)

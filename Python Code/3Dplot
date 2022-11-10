@@ -1,3 +1,5 @@
+## 3D PLOT 
+
 # recording session 
 sesh = [6,10,11,12,14,15,16,17,18,19,20,22]
 
@@ -40,6 +42,290 @@ ax2.set_ylim(-23,23)
 ax2.axhline(y=0)
 ax2.axvline(x=0)
 plt.show()
+
+'''
+'''
+## Individual Penetrations along AP plane
+
+### A = 0
+sesh = [8,23,22,25]
+guideLen = [12,17,17,17]
+azi = [7,15,0,10] # azi of RF 
+ele =[-2,-5,-7.5,0] # ele of RF
+x = [0,1,2,3] # M coordinate
+y = [0,0,0,0] # A coordinate 
+z0 = np.zeros(len(sesh)) # z0
+z = [20.9,21.7,25,24.1] # final z depth
+zGrey = [15.5,19.1,19.6,18.6] # grey matter start
+zMT = [20.9,21.2,24.4,24.1] # MT start 
+
+# figure 1
+fig, ax = plt.subplots()
+fig.set_size_inches(8,8)
+
+ax.plot((x,x),(z0,z),color='green', linewidth=3)
+# white matter in grey
+ax.plot((x,x),(z0,zGrey), color='grey', linewidth=3, label='white matter')
+# grey matter in black
+ax.plot((x,x),(zGrey,zMT), color='black', linewidth=3, label='grey matter')
+# guide tube 
+ax.plot((x,x),(z0,guideLen),color='blue', linewidth=7, label='guide tube')
+# stretch of MT in red
+ax.plot((x,x), (zMT,z), color='red', linewidth = 3, label=' MT')
+
+for count,i in enumerate(sesh):
+    ax.annotate(i,(x[count]-0.25,z0[count]-0.25))
+
+# figure 1 formating 
+ax.set_xlim([min(x)-1,max(x)+1])
+ax.invert_yaxis()
+ax.set_facecolor('#eafff5')
+ax.set_xlabel('M axis (mm)')
+ax.set_ylabel('Depth (mm)')
+ax.axis('equal')
+ax.set_title(f'Penetrations for Anterior Slice = {y[0]}')
+
+# remove duplicate labels
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
+# figure 2
+fig2, ax2 = plt.subplots() 
+for i in range(len(sesh)):
+    ax2.scatter(azi[i],ele[i],)
+    ax2.annotate(sesh[i],(azi[i],ele[i]))
+
+# figure 2 formatting
+ax2.set_xlim(-23,23)
+ax2.set_ylim(-23,23)
+ax2.axhline(y=0)
+ax2.axvline(x=0)
+plt.show()
+
+
+### A = 1
+sesh = [10,17,14,18]
+guideLen = [13,17,17,17]
+azi = [5,5,5,7] # azi of RF 
+ele =[-15,-5,-7,-10] # ele of RF
+x = [1,2,3,4] # M coordinate
+y = [1,1,1,1] # A coordinate 
+z0 = np.zeros(len(sesh)) # z0
+z = [22.4,23.8,23.4,23.8] # final z depth
+zGrey = [17.3,19.7,18.5,19.3] # grey matter start
+zMT = [21.4,20.07,21.4,23.8] # MT start 
+
+# figure 1
+fig, ax = plt.subplots()
+fig.set_size_inches(8,8)
+
+ax.plot((x,x),(z0,z),color='green', linewidth=3)
+# white matter in grey
+ax.plot((x,x),(z0,zGrey), color='grey', linewidth=3, label='white matter')
+# grey matter in black
+ax.plot((x,x),(zGrey,zMT), color='black', linewidth=3, label='grey matter')
+# guide tube 
+ax.plot((x,x),(z0,guideLen),color='blue', linewidth=7, label='guide tube')
+# stretch of MT in red
+ax.plot((x,x), (zMT,z), color='red', linewidth = 3, label='MT')
+
+for count,i in enumerate(sesh):
+    ax.annotate(i,(x[count]-0.25,z0[count]-0.25))
+
+# figure 1 formating 
+ax.set_xlim([min(x)-1,max(x)+1])
+ax.invert_yaxis()
+ax.set_facecolor('#eafff5')
+ax.set_xlabel('M axis (mm)')
+ax.set_ylabel('Depth (mm)')
+ax.axis('equal')
+ax.set_title(f'Penetrations for Anterior Slice = {y[0]}')
+
+# remove duplicate labels
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
+
+# figure 2
+fig2, ax2 = plt.subplots()
+for i in range(len(sesh)):
+    ax2.scatter(azi[i],ele[i],)
+    ax2.annotate(sesh[i],(azi[i],ele[i]))
+
+# figure 2 formatting
+ax2.set_xlim(-23,23)
+ax2.set_ylim(-23,23)
+ax2.axhline(y=0)
+ax2.axvline(x=0)
+plt.show()
+
+
+## A = 2
+sesh = [6,11,16,20,9]
+guideLen = [13,15,17,17,15]
+azi = [20,12,15,0,200] # azi of RF 
+ele =[-15,-7,-10,-11,200] # ele of RF
+ecc = ['25˚','14˚','18˚','11˚','no MT']
+x = [2,3,4,1,0] # M coordinate
+y = [2,2,2,2,2] # A coordinate 
+z0 = np.zeros(len(sesh)) # z0
+z = [23.9,24,23.8,22.9,27.75] # final z depth
+zGrey = [15.3,15.8,19,19.6,24.1] # grey matter start
+zMT = [23.1,23.2,23,22.4,27.75] # MT start 
+
+# figure 1
+fig, ax = plt.subplots()
+fig.set_size_inches(8,8)
+
+ax.plot((x,x),(z0,z),color='green', linewidth=3)
+# white matter in grey
+ax.plot((x,x),(z0,zGrey), color='grey', linewidth=3, label='white matter')
+# grey matter in black
+ax.plot((x,x),(zGrey,zMT), color='black', linewidth=3, label='grey matter')
+# guide tube 
+ax.plot((x,x),(z0,guideLen),color='blue', linewidth=7, label='guide tube')
+# stretch of MT in red
+ax.plot((x,x), (zMT,z), color='red', linewidth = 3, label='MT')
+
+for count,i in enumerate(sesh):
+    ax.annotate(i,(x[count]-0.25,z0[count]-0.25))
+
+# figure 1 formating 
+ax.set_xlim([min(x)-1,max(x)+1])
+ax.invert_yaxis()
+ax.set_facecolor('#eafff5')
+ax.set_xlabel('M axis (mm)')
+ax.set_ylabel('Depth (mm)')
+ax.axis('equal')
+ax.set_title(f'Penetrations for Anterior Slice = {y[0]}')
+
+# remove duplicate labels
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
+
+# figure 2
+fig2, ax2 = plt.subplots()
+for i in range(len(sesh)):
+    ax2.scatter(azi[i],ele[i],)
+    ax2.annotate(sesh[i],(azi[i],ele[i]))
+
+# figure 2 formatting
+ax2.set_xlim(-23,23)
+ax2.set_ylim(-23,23)
+ax2.axhline(y=0)
+ax2.axvline(x=0)
+plt.show()
+
+############# A = 3
+sesh = [15,19]
+guideLen = [17,17]
+azi = [18,15] # azi of RF 
+ele =[-7.5,-10] # ele of RF
+x = [2,3] # M coordinate
+y = [3,3] # A coordinate 
+z0 = np.zeros(len(sesh)) # z0
+z = [21.3,22.6] # final z depth
+zGrey = [19.5,19.7] # grey matter start
+zMT = [20.9,21.5] # MT start 
+
+# figure 1
+fig, ax = plt.subplots()
+fig.set_size_inches(8,8)
+
+ax.plot((x,x),(z0,z),color='green', linewidth=3)
+# white matter in grey
+ax.plot((x,x),(z0,zGrey), color='grey', linewidth=3, label='white matter')
+# grey matter in black
+ax.plot((x,x),(zGrey,zMT), color='black', linewidth=3, label='grey matter')
+# guide tube 
+ax.plot((x,x),(z0,guideLen),color='blue', linewidth=7, label='guide tube')
+# stretch of MT in red
+ax.plot((x,x), (zMT,z), color='red', linewidth = 3, label='MT')
+
+for count,i in enumerate(sesh):
+    ax.annotate(i,(x[count]-0.25,z0[count]-0.25))
+
+# figure 1 formating 
+ax.set_xlim([min(x)-1,max(x)+1])
+ax.invert_yaxis()
+ax.set_facecolor('#eafff5')
+ax.set_xlabel('M axis (mm)')
+ax.set_ylabel('Depth (mm)')
+ax.axis('equal')
+ax.set_title(f'Penetrations for Anterior Slice = {y[0]}')
+
+# remove duplicate labels
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+
+
+# figure 2
+fig2, ax2 = plt.subplots()
+for i in range(len(sesh)):
+    ax2.scatter(azi[i],ele[i],)
+    ax2.annotate(sesh[i],(azi[i],ele[i]))
+
+# figure 2 formatting
+ax2.set_xlim(-23,23)
+ax2.set_ylim(-23,23)
+ax2.axhline(y=0)
+ax2.axvline(x=0)
+plt.show()
+
+
+'''
+''' 
+
+# multiple penetrations in the same grid hole (3M,2A)
+sesh = [11,12,27]
+guideLen = [15,17,17]
+azi = [] # azi of RF 
+ele =[] # ele of RF
+ecc = [] #e ccentricity of RF 
+x = [3,4,5] # M coordinate
+y = [2,2,2] # A coordinate 
+z0 = np.zeros(len(sesh)) # z0
+z = [24,22.15,22.21] # final z depth
+zGrey = [15.83,18.2,18.25] # grey matter start
+zMT = [23.2,21.27,21.5] # MT start 
+
+# figure 1
+fig, ax = plt.subplots()
+fig.set_size_inches(8,8)
+
+ax.plot((x,x),(z0,z),color='green', linewidth=3)
+# white matter in grey
+ax.plot((x,x),(z0,zGrey), color='grey', linewidth=3, label='white matter')
+# grey matter in black
+ax.plot((x,x),(zGrey,zMT), color='black', linewidth=3, label='grey matter')
+# guide tube 
+ax.plot((x,x),(z0,guideLen),color='blue', linewidth=7, label='guide tube')
+# stretch of MT in red
+ax.plot((x,x), (zMT,z), color='red', linewidth = 3, label='MT')
+
+for count,i in enumerate(sesh):
+    ax.annotate(i,(x[count]-0.25,z0[count]-0.25))
+
+# figure 1 formating 
+ax.set_xlim([min(x)-1,max(x)+1])
+ax.invert_yaxis()
+ax.set_facecolor('#eafff5')
+ax.set_xlabel('M axis (mm)')
+ax.set_ylabel('Depth (mm)')
+ax.axis('equal')
+ax.set_title(f'Penetrations for Anterior Slice = {y[0]}')
+
+# remove duplicate labels
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())
+plt.show()
+
 
 
 

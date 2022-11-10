@@ -40,7 +40,7 @@ for currTrial in allTrials:
 ## Start here
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221017'
+seshDate = '220914'
 fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -181,6 +181,7 @@ for uCount, unit in enumerate(units):
     Channel: {unitsChannel[uCount]}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
 
+
     # heatmap
     ax_row1 = []
     ax_row1.append(plt.subplot2grid((numEle+3,6), (0,3), colspan = 3, rowspan = 3)) # ax2
@@ -194,6 +195,9 @@ for uCount, unit in enumerate(units):
     ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
     ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
     ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
+    # marker lines
+    ax_row1[0].scatter(3.29-0.5,5-4.6, s=130, marker='o', color='red')
+    ax_row1[0].scatter(2.90-0.5,5-5.15, s=130, marker='o', color='blue')
     ax_row1[0].invert_yaxis()
 
     #overlay 1SD, 2SD ellipse

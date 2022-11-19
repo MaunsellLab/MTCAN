@@ -397,6 +397,48 @@ def activeUnits(unitData, allTrials):
     return np.sort(units).astype(np.uint16)
 
 
+def normFunc0(fixed, BO,A,MU,SIG,S,al,c50,M):
+    '''
+    curve fit variables for my norm function, when loc0 has a stronger response
+    
+    BO: gaussian tuning curve baseline offset 
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0,l0,c1,l1 = fixed.T
+    num = (c0 * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
+    denom = c0 + (al * c1) + c50
+
+    return  ((num/denom) + M).squeeze()
+
+
+def normFunc1(fixed, BO, A, MU, SIG, S, al, c50, M):
+    '''
+    curve fit variables for my norm function, when loc1 has stronger response
+
+    BO: gaussian tuning curve baseline offset 
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0,l0,c1,l1 = fixed.T
+    num = (c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
+    denom = (al * c0) + c1 + c50
+
+    return  ((num/denom) + M).squeeze()
+
+
 def unitsInfo(units, corrTrials, allTrials):
     '''
     function will return the channel the unit was found and whether

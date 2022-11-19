@@ -40,11 +40,26 @@ for currTrial in allTrials:
 ## Start here
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '220914'
+seshDate = '221117'
 fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
+# ascertain the position of the gabor stimuli for MTNC
+fileNameMTNC = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
+allTrials, header = loadMatFilePyMat(monkeyName, seshDate,fileNameMTNC)
+corrTrials = correctTrialsMTX(allTrials)
+currTrial = allTrials[corrTrials[0]]
+stimDesc = currTrial['stimDesc']['data']
+for count, i in enumerate(stimDesc['stimLoc']):
+    if i == 0:
+        stim0Azi = stimDesc['azimuthDeg'][count]
+        stim0Ele = stimDesc['elevationDeg'][count]
+    if i == 1:
+        stim1Azi = stimDesc['azimuthDeg'][count]
+        stim1Ele = stimDesc['elevationDeg'][count] 
+os.chdir('../../Python Code')
+
+## Load the RF location file now 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
-# allTrials, header = loadMatFilePyMat('Meetz', '221017', 'Meetz_221017_GRF1_Spikes.mat')
 
 
 # create folder and change dir to save PDF's and np.array
@@ -173,14 +188,16 @@ for uCount, unit in enumerate(units):
 
     date = header['date']
 
-    text = fig.text(0.05, 0.85, f'RF tuning for unit {unit}\n{date}\n\
-    - - - - -\n\
+    text = fig.text(0.05, 0.75, f'RF tuning for unit {unit}\n\
+    {date}\n\
+    - - - - - - - - - - - - - - - \n\
     Stimulus Duration: {trueStimDurMS} ms\n\
     Number of Blocks: {int(stimCount[0][0])}\n\
     Interstimulus Duration: {interstimDurMS}\n\
-    Channel: {unitsChannel[uCount]}', size=10, fontweight='bold')
+    Channel: {unitsChannel[uCount]}\n\
+    Stim0 Azi: {stim0Azi:.1f}, Ele: {stim0Ele:.1f}\n\
+    Stim1 Azi: {stim1Azi:.1f}, Ele: {stim1Ele:.1f}', size=10, fontweight='bold')
     text.set_path_effects([path_effects.Normal()])
-
 
     # heatmap
     ax_row1 = []
@@ -196,8 +213,13 @@ for uCount, unit in enumerate(units):
     ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
     ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
     # marker lines
-    ax_row1[0].scatter(3.29-0.5,5-4.6, s=130, marker='o', color='red')
-    ax_row1[0].scatter(2.90-0.5,5-5.15, s=130, marker='o', color='blue')
+    ax_row1[0].scatter(((stim0Azi+abs(minAzi))/(maxAzi+abs(minAzi))*numAzi),
+                       (stim0Ele+abs(minEle))/(abs(minEle)+maxEle)*numEle, 
+                       s=100, marker='o', color='red')
+    ax_row1[0].scatter(((stim1Azi+abs(minAzi))/(maxAzi+abs(minAzi))*numAzi),
+                       (stim1Ele+abs(minEle))/(abs(minEle)+maxEle)*numEle, 
+                       s=100, marker='o', color='green')
+
     ax_row1[0].invert_yaxis()
 
     #overlay 1SD, 2SD ellipse
@@ -248,6 +270,7 @@ for uCount, unit in enumerate(units):
     
     # saves plot as pdf
     plt.savefig(f'{unit}.pdf')
+    plt.close('all')
     continue
 
 plt.close('all')

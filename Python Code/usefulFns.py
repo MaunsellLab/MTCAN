@@ -24,6 +24,7 @@ import matplotlib.ticker as ticker
 import time
 from astropy.modeling import models, fitting
 from pymatreader import read_mat
+import glob
 
 
 def loadMatFile73(NHP, date, fileName):
@@ -212,7 +213,7 @@ def gaussFit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
-                   bounds=((0,0,0,0),(np.inf,2.00*np.max(y),np.inf,np.inf)))
+                   bounds=((0,0,0,0),(np.inf,1.50*np.max(y),np.inf,np.inf)))
     return popt
 
 

@@ -37,7 +37,7 @@ for currTrial in allTrials:
 #### Start Here:
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '220914'
+seshDate = '221117'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -65,7 +65,8 @@ interstimDurMS = header['mapInterstimDurationMS']['data']
 histPrePostMS = 100
 sponWindowMS = 100
 allTuningMat = np.zeros((len(units),numDir))
-numBlocks = header['mappingBlockStatus']['data']['blockLimit']
+# numBlocks = header['mappingBlockStatus']['data']['blockLimit']
+numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
 
 # assert frame consistency during stimulus duration
 stimDurFrame = []
@@ -231,6 +232,7 @@ for uCount, unit in enumerate(units):
     
     # saves plot as pdf 
     plt.savefig(f'{unit}.pdf')
+    plt.close('all')
     continue
 plt.close('all')
 np.save('unitsDirTuningMat', allTuningMat)

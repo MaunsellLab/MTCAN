@@ -33,6 +33,7 @@ corrTrials = correctTrialsMTX(allTrials)
 
 ## generate list of unique active units, and their channel
 units = activeUnits('spikeData', allTrials)
+unitCluster = allTrials[corrTrials[0]]['spikeTempInfo']['cgs']
 unitsChannel = unitsInfo(units, corrTrials, allTrials)
 
 
@@ -305,13 +306,6 @@ for unitCount, unit in enumerate(units):
 #     return  ((num/denom) + M).squeeze()
 
 
-def exNormFit(filler):
-    '''
-    wrapping into function to clean things up for visualization
-    '''
-
-    return 
-
 def gaussFunc(fixed,BO,A,MU,SIG,S,b):
     '''
     curve fit caraibles for my direction tuning gauss func and a scalar
@@ -416,6 +410,8 @@ pOpt, pCov = curve_fit(gaussFunc, fixedVals, resp.squeeze(), bounds=(
 (0,0,180,0,0,b[6,6]), 
 (np.inf,2*max(resp),840,360,np.inf,b[6,6]+1)))
 print(unit,pOpt)
+
+
 
 # gBO,A,MU,SIG,S,b
 
@@ -647,7 +643,7 @@ for unitCount, unit in enumerate(units):
             ax.set_xticklabels([])
             ax.set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
             ax.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-            ax.axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+            ax.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
             if plotCount == 6:
                 ax.set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax.set_xlabel('Stimulus Duration (ms)', fontsize=7)
@@ -737,7 +733,7 @@ for unitCount, unit in enumerate(units):
                 ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount), label=indx)
                 ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o", transform=trans+offset(offsetCount))
                 offsetCount -= 5
-    ax4 = plt.axhline(y=sponSpikesMean[unitCount]*1000/sponWindowMS, linestyle='--', color='grey')
+    ax4 = plt.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
     ax4 = plt.ylim(bottom=0)
     ax4 = plt.xticks([0.35,0.65], ['Singular Stimulus', 'Dual Stimulus'])
     ax4 = plt.xlim(left=0.2,right=0.8)
@@ -750,7 +746,7 @@ for unitCount, unit in enumerate(units):
 
 ## Z-scored Correlations 
 # filtered units test
-combs = [i for i in combinations(filterUnits, 2)]
+# combs = [i for i in combinations(filterUnits, 2)]
 
 # unfiltered units 
 combs = [i for i in combinations(units, 2)]
@@ -769,6 +765,175 @@ for count, i in enumerate(combs):
 popCorr = np.mean(corrMat)
 
 
+# distance of neuron pair (based on channel number)
+pairChannelDistance = []
+for count, i in enumerate(combs):
+    n1Chan = int(unitsChannel[np.where(units == i[0])[0][0]])
+    n2Chan = int(unitsChannel[np.where(units == i[1])[0][0]])
+    channelDiff = abs(n1Chan-n2Chan)
+    pairChannelDistance.append(channelDiff)
+
+pairChannelDistance = np.array(pairChannelDistance)
+
+
+## RF location tuning similarity b/w neurons Bhattacharyya Distance 2D
+RFLocMat = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
+combs = [i for i in combinations(units, 2)]
+pairLocSimScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+
+    a = np.flip(RFLocMat[n1], axis=0)
+    b = np.flip(RFLocMat[n2], axis=0)
+    m1, cov1, p = gauss2dParams(a)
+    m2, cov2, p2 = gauss2dParams(b)
+    BC = bhattCoef2D(m1,m2,cov1,cov2)
+    pairLocSimScore[pairCount] = BC
+
+
+## direction tuning similarity b/w neurons Bhattacharyya Distance
+dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
+# unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
+extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
+                            dirTuningMat[:,:3]), axis=1)
+angleMat = np.arange(180,900,60)
+
+combs = [i for i in combinations(units, 2)]
+pairSimPrefDir = np.zeros((len(combs),1))
+pairSimScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+    n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0][0] + 3)
+    n1X = angleMat[n1Max-3:n1Max+4]
+    # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
+    n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
+    n1XFull = np.linspace(n1X[0],n1X[-1],1000)
+    params = gaussFit(n1X, n1Y)
+    # n1YFull = gauss(n1XFull, *params)
+    m1 = params[2] # mean neuron 1
+    v1 = params[3]**2 # var neuron 1
+    n1TrueMean = m1 - 360
+    
+    n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0][0] + 3)
+    n2X = angleMat[n2Max-3:n2Max+4]
+    # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+    n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
+    n2XFull = np.linspace(n2X[0], n2X[-1],1000)
+    params = gaussFit(n2X, n2Y)
+    # n2YFull = gauss(n2XFull, *params)
+    m2 = params[2]
+    v2 = params[3]**2
+    n2TrueMean = m2 - 360
+
+    m1 = m1%360
+    m2 = m2%360
+    if abs(m1-m2) > 180:
+        if m1 > m2:
+            m1 = m2-(360-(m1-m2))
+        else:
+            m2 = m1-(360-(m2-m1))
+
+    # similarity of pref dirs only
+    pairSimPrefDir[pairCount] = 1 - (abs(m1-m2)/180)
+    # bhattacharyya similarity score 
+    BC = bhattCoef(m1, m2, v1, v2)
+    pairSimScore[pairCount] = BC
+
+
+pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
+pairCombinedSimScoreMulti = np.squeeze((pairLocSimScore * pairSimScore))
+pairCombinedSimScorePrefDir = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2)
+
+# compile similarity scores and correlation matrix into one matrix
+compiledArr = np.array([corrMat, np.squeeze(pairSimScore), 
+              np.squeeze(pairSimPrefDir), np.squeeze(pairLocSimScore),
+              pairCombinedSimScore, pairCombinedSimScoreMulti, 
+              pairCombinedSimScorePrefDir])
+np.save(f'../../corrMaster/pairCorrelationsAndSimScores{seshDate}', compiledArr)
+# compiledPD = pd.DataFrame(compiledArr, columns=['correlations','pairSimScore',
+#                           'pairSimPrefDir','pairLocSimScore','pairCombinedSimScore',
+#                           'pairCombinedSimScoreMulti','pairCombinedSimScorePrefDir',])
+
+
+## Plot Noise Correlations as a function of combined location similarity 
+pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
+plt.scatter(pairCombinedSimScore, corrMat)
+
+pairCombinedSimScoreMulti = np.squeeze((pairLocSimScore * pairSimScore))
+plt.scatter(pairCombinedSimScoreMulti, corrMat)
+
+pairCombinedSimScorePrefDir = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2)
+plt.scatter(pairCombinedSimScorePrefDir, corrMat)
+
+m, b = np.polyfit(pairCombinedSimScore, corrMat, 1)
+plt.plot(pairCombinedSimScore, m*pairCombinedSimScore+b)
+pearsonR, pValue = stats.pearsonr(pairCombinedSimScore,corrMat)
+
+plt.axis('equal')
+plt.xlabel('Averaged Sim Score (dir tuning and RF location')
+plt.ylabel("Pearson's Correlation")
+plt.show()
+
+## unit Direction Selectivity 
+unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
+unitSelectivity = np.zeros(len(units))
+for unit in filterUnits:
+    unitIndex = np.where(units == unit)[0][0]
+    nMax = np.where(dirTuningMat[unitIndex] == np.max(dirTuningMat[unitIndex]))[0].squeeze() 
+    prefDir = dirArray[nMax]
+    nullDir = (prefDir + 180) % 360
+    nullResp = dirTuningMat[unitIndex][np.where(dirArray==nullDir)[0][0]]
+    prefResp = dirTuningMat[unitIndex][nMax]
+    baseResp = unitsBaselineMat[unitIndex]
+    DS = 1 - ((nullResp-baseResp)/(prefResp-baseResp))
+    unitSelectivity[unitIndex] = DS
+
+
+#pair Selectivity
+combs = [i for i in combinations(filterUnits, 2)]
+pairSelScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+    geoMean = np.sqrt((unitSelectivity[n1]*unitSelectivity[n2]))
+    pairSelScore[pairCount] = geoMean
+
+
+## selectivity for direction (similar to Bram)
+unitSelectivity = np.zeros((len(units),49)) 
+unitSelectivity[:,:] = np.nan
+for uCount, unit in enumerate(units):
+    for stim in range(49):
+        loc0Contrast = stimIndexDict[stim][0]['contrast']
+        loc1Contrast = stimIndexDict[stim][1]['contrast']
+        if loc0Contrast != 0 and loc0Contrast != 0:
+            dir1 = stimIndexDict[stim][0]['direction']
+            con1 = stimIndexDict[stim][0]['contrast']
+            l1Index = np.where((stimIndexArray[:,0]== dir1) & (stimIndexArray[:,1] == con1)
+                              & (stimIndexArray[:,3]==0))
+            l1 = meanSpike[uCount][l1Index[0]]
+            dir2 = stimIndexDict[stim][1]['direction']
+            con2 = stimIndexDict[stim][1]['contrast']
+            l2Index = np.where((stimIndexArray[:,2]== dir2) & (stimIndexArray[:,3] == con2)
+                              & (stimIndexArray[:,1]==0))
+            l2 = meanSpike[uCount][l2Index[0]]
+            unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
+
+
+
+
+
+###################################### STOP ########################################
+###################################### HERE ########################################
+'''
+
+
+EXTRA CODE 
+
+
+'''
 ## PSTHs for P+P, N+N, P+I, and converse for other location
 for unitCount, unit in enumerate(units):
     if unit != 61: ####### REMOVE THIS
@@ -831,125 +996,7 @@ for unitCount, unit in enumerate(units):
         plt.close('all')
 
 
-## RF location tuning similarity b/w neurons Bhattacharyya Distance 2D
-RFLocMat = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
-combs = [i for i in combinations(units, 2)]
-pairLocSimScore = np.zeros((len(combs),1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
 
-    a = np.flip(RFLocMat[n1], axis=0)
-    b = np.flip(RFLocMat[n2], axis=0)
-    m1, cov1, p = gauss2dParams(a)
-    m2, cov2, p2 = gauss2dParams(b)
-    BC = bhattCoef2D(m1,m2,cov1,cov2)
-    pairLocSimScore[pairCount] = BC
-
-
-## direction tuning similarity b/w neurons Bhattacharyya Distance
-dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
-# unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
-extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
-                            dirTuningMat[:,:3]), axis=1)
-angleMat = np.arange(180,900,60)
-
-combs = [i for i in combinations(units, 2)]
-pairSimPrefDir = np.zeros((len(combs),1))
-pairSimScore = np.zeros((len(combs),1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-    n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0] + 3)
-    n1X = angleMat[n1Max-3:n1Max+4]
-    # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
-    n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
-    n1XFull = np.linspace(n1X[0],n1X[-1],1000)
-    params = gaussFit(n1X, n1Y)
-    # n1YFull = gauss(n1XFull, *params)
-    m1 = params[2] # mean neuron 1
-    v1 = params[3]**2 # var neuron 1
-    n1TrueMean = m1 - 360
-    
-    n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0] + 3)
-    n2X = angleMat[n2Max-3:n2Max+4]
-    # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
-    n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
-    n2XFull = np.linspace(n2X[0], n2X[-1],1000)
-    params = gaussFit(n2X, n2Y)
-    # n2YFull = gauss(n2XFull, *params)
-    m2 = params[2]
-    v2 = params[3]**2
-    n2TrueMean = m2 - 360
-
-    if abs(m1-m2) > 180:
-        if m1 > m2:
-            m1 = m2-(360-(m1-m2))
-        else:
-            m2 = m1-(360-(m2-m1))
-
-    # similarity of pref dirs only
-    pairSimPrefDir[pairCount] = 1 - (abs(m1-m2)/180)
-    # bhattacharyya similarity score 
-    BC = bhattCoef(m1, m2, v1, v2)
-    pairSimScore[pairCount] = BC
-
-
-## unit Direction Selectivity 
-unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
-unitSelectivity = np.zeros(len(units))
-for unit in filterUnits:
-    unitIndex = np.where(units == unit)[0][0]
-    nMax = np.where(dirTuningMat[unitIndex] == np.max(dirTuningMat[unitIndex]))[0].squeeze() 
-    prefDir = dirArray[nMax]
-    nullDir = (prefDir + 180) % 360
-    nullResp = dirTuningMat[unitIndex][np.where(dirArray==nullDir)[0][0]]
-    prefResp = dirTuningMat[unitIndex][nMax]
-    baseResp = unitsBaselineMat[unitIndex]
-    DS = 1 - ((nullResp-baseResp)/(prefResp-baseResp))
-    unitSelectivity[unitIndex] = DS
-
-
-#pair Selectivity
-combs = [i for i in combinations(filterUnits, 2)]
-pairSelScore = np.zeros((len(combs),1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-    geoMean = np.sqrt((unitSelectivity[n1]*unitSelectivity[n2]))
-    pairSelScore[pairCount] = geoMean
-
-
-## selectivity for direction (similar to Bram)
-unitSelectivity = np.zeros((len(units),49)) 
-unitSelectivity[:,:] = np.nan
-for uCount, unit in enumerate(units):
-    for stim in range(49):
-        loc0Contrast = stimIndexDict[stim][0]['contrast']
-        loc1Contrast = stimIndexDict[stim][1]['contrast']
-        if loc0Contrast != 0 and loc0Contrast != 0:
-            dir1 = stimIndexDict[stim][0]['direction']
-            con1 = stimIndexDict[stim][0]['contrast']
-            l1Index = np.where((stimIndexArray[:,0]== dir1) & (stimIndexArray[:,1] == con1)
-                              & (stimIndexArray[:,3]==0))
-            l1 = meanSpike[uCount][l1Index[0]]
-            dir2 = stimIndexDict[stim][1]['direction']
-            con2 = stimIndexDict[stim][1]['contrast']
-            l2Index = np.where((stimIndexArray[:,2]== dir2) & (stimIndexArray[:,3] == con2)
-                              & (stimIndexArray[:,1]==0))
-            l2 = meanSpike[uCount][l2Index[0]]
-            unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
-
-
-###################################### STOP ########################################
-###################################### HERE ########################################
-'''
-
-
-EXTRA CODE 
-
-
-'''
 ###### mean response of PP, PN, NN to low and high contrast
 for unitCount, unit in enumerate(units):
     if unit != 61: ########## REMOVE THIS 

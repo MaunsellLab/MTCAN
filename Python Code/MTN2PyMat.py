@@ -227,9 +227,6 @@ for count,i in enumerate(meanSpikeReshaped):
 # inclusion criteria:
 # 1. pref response > 2x null response
 # 2. pref response > baseline (need to incorporate this)
-
-
-
 filterUnits = []
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7)
@@ -263,53 +260,15 @@ for unitCount, unit in enumerate(units):
         filterUnits.append(unit)
 
 
-## scipy curveFit Normalization parameters
-def func(fixed, L_0, L_60, L_120, L_180, L_240, L_300, sL0, sL1, aL0, aL1, sig):
-    c0,c1,l0,l1 = fixed
-    L = np.array([L_0, L_60, L_120, L_180, L_240, L_300])
-    # return((c0*sL0*L*l0).sum(-1) + (c1*sL1*L*l1).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig)
-    return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL0*c0[:,0])+(aL1*c1[:,0])+sig))
-    # return (((c0*sL0*(l0*L)).sum(-1) + (c1*sL1*(l1*L)).sum(-1))/((aL*c0[:,0])+(aL*c1[:,0])+sig))
-for unitCount, unit in enumerate(units):
-    resp = np.reshape(spikeCountMat[unitCount][:blocksDone,:],(49*blocksDone))
-    fixParam = np.tile(np.arange(49), blocksDone)
-
-    c0s, c1s, l0s, l1s = [], [], [], []
-    direction_set = np.arange(0, 360, 60)
-    for i in fixParam:
-        c0 = stimIndexDict[i][0]['contrast']
-        l0 = stimIndexDict[i][0]['direction']
-        c1 = stimIndexDict[i][1]['contrast']
-        l1 = stimIndexDict[i][1]['direction']
-
-        # Make one-hot encoding of l0 and l1
-        l0_oh = np.zeros(6)
-        l1_oh = np.zeros(6)
-        l0_oh[np.argwhere(direction_set == l0).squeeze()] = 1
-        l1_oh[np.argwhere(direction_set == l1).squeeze()] = 1
-        c0s.append(np.repeat(c0,6))
-        c1s.append(np.repeat(c1,6))
-        l0s.append(l0_oh)
-        l1s.append(l1_oh)
-
-    c0s = np.array(c0s)
-    c1s = np.array(c1s)
-    l0s = np.array(l0s)
-    l1s = np.array(l1s)
-
-    pOpt, pCov = curve_fit(func, (c0s, c1s, l0s, l1s), resp, bounds=(
-        (0,0,0,0,0,0,0,0,0,0,0),(np.inf,np.inf,np.inf,np.inf,np.inf,np.inf,1,1,1,1,1)))
-    print(unit,pOpt)
-
-
 ## PSTH, Normalization (pref+null+blank) heatmap, and bar plot 
 pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount', 
                                 'stimSpikes', 'contrast', 'prefNullStr'])
 for unitCount, unit in enumerate(units):
-    b = meanSpikeReshaped[unitCount].reshape(7,7)
-    bSmooth = gaussian_filter(b, sigma=1) * 1000/trueStimDurMS
-    prefDir, nullDir = unitPrefNullDir(bSmooth)
-    print(unit, prefDir, nullDir)
+    unitPrefDir = unitsPrefDirMat[unitCount]
+    tempArr = abs(dirArray-unitPrefDir)
+    # direction tested closest to pref dir
+    prefDir = dirArray[np.where(tempArr == min(tempArr))[0][0]]
+    nullDir = (prefDir + 180) % 360
     orientCount = 0
     orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null', 
                  'pref+blank', 'null+blank','blank+pref', 'blank+null']
@@ -361,7 +320,12 @@ for unitCount, unit in enumerate(units):
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
     bSmooth = gaussian_filter(b, sigma=1)
-    prefDir, nullDir = unitPrefNullDir(bSmooth)
+    unitPrefDir = unitsPrefDirMat[unitCount]
+    tempArr = abs(dirArray-unitPrefDir)
+    # direction tested closest to pref dir
+    prefDir = dirArray[np.where(tempArr == min(tempArr))[0][0]]
+    nullDir = (prefDir + 180) % 360
+
 
     ## figure 
     fig = plt.figure(constrained_layout=True)
@@ -509,7 +473,6 @@ for unitCount, unit in enumerate(units):
 
     plt.savefig(f'{unit}superPlot.pdf')
     plt.close('all')
-
 
 
 ## Z-scored Correlations 
@@ -707,21 +670,9 @@ for unitCount, unit in enumerate(units):
     #     print('using normFunc0')
     #     print(unit,pOpt)
 
-'''
-167 [1.68166360e+00 2.70934606e+01 2.09929352e+02 4.48701625e+01
- 7.78935067e-01 8.24725871e-01 1.00000000e-01 2.72844713e+00]
-
-popt, pcov = curve_fit(func, xFit, yFit)
-y_pred = func(xFit, *popt)
-r2_score(yFit, y_pred)
-
-
-'''
-
-
-
-
     unitAlpha[unitCount] = pOpt[5]
+
+
 
 pairAlphaMulti = np.zeros((len(combs)))
 for pairCount, pair in enumerate(combs):
@@ -1415,3 +1366,9 @@ else:
     pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(), bounds=((0,0,0),(1,1,0.15)))
     # al0, al1, c50
     print(unit,pOpt)
+
+# master plot excess code
+    # b = meanSpikeReshaped[unitCount].reshape(7,7)
+    # bSmooth = gaussian_filter(b, sigma=1) * 1000/trueStimDurMS
+    # prefDir, nullDir = unitPrefNullDir(bSmooth)
+    # print(unit, prefDir, nullDir)

@@ -4,6 +4,7 @@ from scipy import ndimage
 from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage.filters import gaussian_filter
 from scipy import stats
+from sklearn.metrics import r2_score
 from itertools import combinations
 import itertools
 import numpy as np

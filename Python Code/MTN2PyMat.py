@@ -618,7 +618,6 @@ for pairCount, pair in enumerate(combs):
 ##new eqn with L0-L6 being a gaussian fit 
 unitAlpha = np.zeros(len(units))
 for unitCount, unit in enumerate(units):
-
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
     bReIndex = np.zeros((7,7))
 
@@ -660,6 +659,7 @@ for unitCount, unit in enumerate(units):
     stimMatReIndex[6,:6] = temp1Blank
     stimMatReIndex[6,6] = stimMat[6,6]
 
+    # # for fitting across mean spike count
     resp = bReIndex.reshape(49)
     fixedVals = []
     for i in stimMatReIndex.reshape(49):
@@ -679,6 +679,48 @@ for unitCount, unit in enumerate(units):
         (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
         print('using normFunc0')
         print(unit,pOpt)
+    
+    y_pred = normFunc1(fixedVals, *pOpt)
+    print(r2_score(resp.squeeze(),y_pred))
+
+
+    # # for fitting across every trial spike count
+    # fixedVals = []
+    # for i in np.tile(stimMatReIndex.reshape(49),blocksDone):
+    #     c0 = stimIndexDict[i][0]['contrast']
+    #     l0 = stimIndexDict[i][0]['direction']
+    #     c1 = stimIndexDict[i][1]['contrast']
+    #     l1 = stimIndexDict[i][1]['direction']
+    #     fixedVals.append((c0,l0,c1,l1))
+    # fixedVals = np.array(fixedVals)        
+
+    # tempMat = spikeCountMat[unitCount,:blocksDone,:][:,stimMatReIndex.reshape(49).astype(int)]
+    # resp = tempMat.reshape(49*blocksDone) * 1000/trueStimDurMS
+
+    # if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
+    #     pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
+    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
+    #     print(unit,pOpt)
+    # else:
+    #     pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
+    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
+    #     print('using normFunc0')
+    #     print(unit,pOpt)
+
+'''
+167 [1.68166360e+00 2.70934606e+01 2.09929352e+02 4.48701625e+01
+ 7.78935067e-01 8.24725871e-01 1.00000000e-01 2.72844713e+00]
+
+popt, pcov = curve_fit(func, xFit, yFit)
+y_pred = func(xFit, *popt)
+r2_score(yFit, y_pred)
+
+
+'''
+
+
+
+
     unitAlpha[unitCount] = pOpt[5]
 
 pairAlphaMulti = np.zeros((len(combs)))

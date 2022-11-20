@@ -18,7 +18,7 @@ import time
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221115'
+seshDate = '221110'
 fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -223,6 +223,7 @@ for count,i in enumerate(meanSpikeReshaped):
     i[:,48] = meanSpike[count][48]
 
 
+'''
 ## Filter Units
 # inclusion criteria:
 # 1. pref response > 2x null response
@@ -474,7 +475,7 @@ for unitCount, unit in enumerate(units):
     plt.savefig(f'{unit}superPlot.pdf')
     plt.close('all')
 
-
+'''
 ## Z-scored Correlations 
 # filtered units test
 # combs = [i for i in combinations(filterUnits, 2)]
@@ -578,7 +579,6 @@ for pairCount, pair in enumerate(combs):
 
 
 ## scipy curvefit Normalization parameters
-##new eqn with L0-L6 being a gaussian fit 
 unitAlpha = np.zeros(len(units))
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
@@ -587,13 +587,15 @@ for unitCount, unit in enumerate(units):
     # find direction tested that is closest to the pref dir
     # and reindex around this so that it is in the middle of the grid
 
-    # true pref dir
-    unitPrefDir = unitsPrefDirMat[unitCount]
-    tempArr = abs(dirArray-unitPrefDir)
-    # direction tested closest to pref dir
-    prefDirIndex = np.where(tempArr == min(tempArr))[0][0]
-    unitNullDir = (dirArray[prefDirIndex] + 180) % 360
-    nullDirIndex = np.where(dirArray == unitNullDir)[0][0]
+    # # true pref dir
+    # unitPrefDir = unitsPrefDirMat[unitCount]
+    # tempArr = abs(dirArray-unitPrefDir)
+    # # direction tested closest to pref dir
+    # prefDirIndex = np.where(tempArr == min(tempArr))[0][0]
+    # unitNullDir = (dirArray[prefDirIndex] + 180) % 360
+
+    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+    nullDirIndex = np.where(dirArray == nullDir)[0][0]
     reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
 
     tempMain = b[:6,:6][:,reIndex]
@@ -673,7 +675,6 @@ for unitCount, unit in enumerate(units):
     unitAlpha[unitCount] = pOpt[5]
 
 
-
 pairAlphaMulti = np.zeros((len(combs)))
 for pairCount, pair in enumerate(combs):
     n1 = np.where(units == pair[0])[0][0]
@@ -692,6 +693,229 @@ compiledArr = np.array([corrMat, np.squeeze(pairSimScore),
               pairCombinedSimScore, pairCombinedSimScoreMulti, 
               pairCombinedSimScorePrefDir, pairAlphaMulti])
 np.save(f'../../corrMaster/pairCorrelationsAndSimScores{seshDate}', compiledArr)
+
+
+## PSTH, Normalization (pref+null+blank) heatmap, and bar plot 
+pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount', 
+                                'stimSpikes', 'contrast', 'prefNullStr'])
+for unitCount, unit in enumerate(units):
+    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+
+    # unitPrefDir = unitsPrefDirMat[unitCount]
+    # tempArr = abs(dirArray-unitPrefDir)
+    # # direction tested closest to pref dir
+    # prefDir = dirArray[np.where(tempArr == min(tempArr))[0][0]]
+    # nullDir = (prefDir + 180) % 360
+    
+    orientCount = 0
+    orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null', 
+                 'pref+blank', 'null+blank','blank+pref', 'blank+null']
+    for j in [(prefDir,prefDir),(prefDir,nullDir),(nullDir,prefDir),(nullDir,nullDir),]:
+        loc0Dir, loc1Dir = j
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
+                    & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = highContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+    #Loc 0 Pref/Null only
+    for i in [(prefDir, zeroDir), (nullDir, zeroDir)]:
+        loc0Dir, loc1Dir = i  
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
+                    & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = zeroContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+    #loc 1 Pref/Null only
+    for x in [(zeroDir,prefDir), (zeroDir,nullDir)]:
+        loc0Dir, loc1Dir = x  
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == zeroContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
+                    & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = zeroContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+
+
+for unitCount, unit in enumerate(units):
+    b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
+    bSmooth = gaussian_filter(b, sigma=1)
+
+
+    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+    # unitPrefDir = unitsPrefDirMat[unitCount]
+    # tempArr = abs(dirArray-unitPrefDir)
+    # # direction tested closest to pref dir
+    # prefDir = dirArray[np.where(tempArr == min(tempArr))[0][0]]
+    # nullDir = (prefDir + 180) % 360
+
+
+    ## figure 
+    fig = plt.figure(constrained_layout=True)
+    fig.set_size_inches(16,7)
+
+    gs0 = gridspec.GridSpec(1,3)
+
+    heights = [1,1,1]
+    widths = [4,4,4]
+    gs00 = gridspec.GridSpecFromSubplotSpec(3,3, subplot_spec=gs0[0], 
+                         width_ratios=widths, height_ratios=heights)
+    gs01 = gridspec.GridSpecFromSubplotSpec(2,1, subplot_spec=gs0[1])
+    gs02 = gridspec.GridSpecFromSubplotSpec(1,1, subplot_spec=gs0[2])
+
+    locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
+            (nullDir,prefDir),(prefDir,prefDir),('blank',prefDir),
+            (nullDir,'blank'),(prefDir,'blank'),('blank','blank')]
+    yMax = 0
+    plotCount = 0
+    for row in range(3):
+        for col in range(3):
+            ax = fig.add_subplot(gs00[row,col])
+            locDir = locDirList[plotCount]
+            loc0Con = highContrast
+            loc1Con = highContrast
+            loc0Dir, loc1Dir = locDir
+            loc0Title = loc0Dir
+            loc1Title = loc1Dir
+            if loc0Dir == 'blank':
+                loc0Dir = zeroDir
+                loc0Con = zeroContrast
+            if loc1Dir == 'blank':
+                loc1Dir = zeroDir
+                loc1Con = zeroContrast
+            histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
+                                        (stimIndexDF['loc0 Contrast'] == loc0Con) & 
+                                        (stimIndexDF['loc1 Direction'] == loc1Dir) & 
+                                        (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+            dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
+            smoothPlot = gaussian_filter1d(dirPlot,5)
+            if max(smoothPlot) > yMax:
+                yMax = max(smoothPlot)
+            ax.plot(smoothPlot)
+            ax.set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize= 5)
+            ax.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax.set_xticklabels([])
+            ax.set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+            ax.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
+            ax.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
+            if plotCount == 6:
+                ax.set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+                ax.set_xlabel('Stimulus Duration (ms)', fontsize=7)
+                ax.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=7)
+            plotCount +=1
+
+        axes = fig.get_axes()
+        for ax in axes:
+            ax.set_ylim([0,yMax*1.1])
+
+
+    # Normalization Plot
+    #ReIndexing to have pref direction in the middle Gauss Smooth
+    nullIndex = np.where(dirArray==nullDir)[0][0]
+    reIndex = (np.array([0,1,2,3,4,5])+nullIndex) % 6
+    bSmoothReIndex = np.zeros((7,7))
+    tempMain = bSmooth[:6,:6][:,reIndex]
+    tempMain = tempMain[:6,:6][reIndex,:]
+    temp0Blank = bSmooth[:6,6][reIndex]
+    temp1Blank = bSmooth[6,:6][reIndex]
+    bSmoothReIndex[:6,:6] = tempMain
+    bSmoothReIndex[:6,6] = temp0Blank
+    bSmoothReIndex[6,:6] = temp1Blank
+    bSmoothReIndex[6,6] = bSmooth[6,6]
+
+    tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
+    tickLabels = np.append(tickLabels, ['blank'])
+    
+    ax2 = fig.add_subplot(gs01[0,0])
+    ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
+    ax2.set_xticks(np.arange(7)+0.5)
+    ax2.set_title(f'heatmap of normalization for {unit}')
+    ax2.set_xticklabels(tickLabels, rotation = 45)
+    ax2.set_xlabel('Location 0 Stimulus Direction')
+    ax2.xaxis.set_label_position('top') 
+    ax2.set_ylabel('Location 1 Stimulus Direction')
+    ax2.xaxis.set_ticks_position("top")
+    ax2.set_yticks(np.arange(7)+0.5)
+    ax2.set_yticklabels(tickLabels, rotation = 0)
+    
+    #Raw not smoothed
+    #reIndexing to have pref direction in the middle
+    bReIndex = np.zeros((7,7))
+    tempMain = b[:6,:6][:,reIndex]
+    tempMain = tempMain[:6,:6][reIndex,:]
+    temp0Blank = b[:6,6][reIndex]
+    temp1Blank = b[6,:6][reIndex]
+    bReIndex[:6,:6] = tempMain
+    bReIndex[:6,6] = temp0Blank
+    bReIndex[6,:6] = temp1Blank
+    bReIndex[6,6] = b[6,6]
+
+    ax3 = fig.add_subplot(gs01[1,0])
+    ax3 = sns.heatmap(bReIndex, square=True, linewidths=0.2, vmin=0, annot=True)
+    ax3.set_xticks(np.arange(7)+0.5)
+    ax3.set_title(f'Not smoothed', y=-0.1)
+    ax3.set_xticklabels(tickLabels, rotation = 45)
+    ax3.set_ylabel('Location 1 Stimulus Direction')
+    ax3.xaxis.set_ticks_position("top")
+    ax3.set_yticks(np.arange(7)+0.5)
+    ax3.set_yticklabels(tickLabels, rotation = 0)
+
+    # bar plot
+    ax4 = fig.add_subplot(gs02[0,0])
+    unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
+    #spikeCounts in spikes/sec
+    unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS 
+
+    offset = lambda p: transforms.ScaledTranslation(p/72.,0, plt.gcf().dpi_scale_trans)
+    trans = plt.gca().transData
+    offsetCount = 0
+
+    # plot category by category 
+    for pos in [0.35, 0.65]:
+        if pos == 0.35:
+            for indx in ['pref+blank','null+blank','blank+pref','blank+null']:
+                mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+                sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount), label=indx)
+                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt='o', transform=trans+offset(offsetCount))
+                offsetCount += 5
+        else:
+            offsetCount = 0
+            for indx in ['pref+pref','pref+null','null+pref','null+null']:
+                mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+                sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
+                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount), label=indx)
+                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o", transform=trans+offset(offsetCount))
+                offsetCount -= 5
+    ax4 = plt.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
+    ax4 = plt.ylim(bottom=0)
+    ax4 = plt.xticks([0.35,0.65], ['Singular Stimulus', 'Dual Stimulus'])
+    ax4 = plt.xlim(left=0.2,right=0.8)
+    ax4 = plt.ylabel('Firing Rate spikes/sec')
+    ax4 = plt.legend(loc='upper right', prop={'size': 6})
+
+    plt.savefig(f'{unit}superPlot.pdf')
+    plt.close('all')
+
 
 
 

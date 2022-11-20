@@ -398,6 +398,28 @@ def activeUnits(unitData, allTrials):
     return np.sort(units).astype(np.uint16)
 
 
+def dirClosestToPref(unitPrefDir):
+    '''
+    function will take the unit's pref direction (based off gaussian fit)
+    and return the directed tested that is closest to the preferred direction
+
+    Inputs: unitPrefDir (unit's preferred direction)
+    Outputs: prefDir, nullDir (unit's preferred and null direction)
+    '''
+
+    extDirArray = np.array([0,60,120,180,240,300,360])
+    tempArr = abs(extDirArray-unitPrefDir)
+    prefDirLoc = np.where(tempArr == min(tempArr))[0][0]
+
+    if prefDirLoc == 6:
+        prefDir = 0
+    else:
+        prefDir = extDirArray[prefDirLoc]
+    nullDir = (prefDir + 180) % 360 
+
+    return prefDir, nullDir
+
+
 def normFunc0(fixed, BO,A,MU,SIG,S,al,c50,M):
     '''
     curve fit variables for my norm function, when loc0 has a stronger response

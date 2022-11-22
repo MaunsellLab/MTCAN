@@ -420,7 +420,7 @@ def dirClosestToPref(unitPrefDir):
     return prefDir, nullDir
 
 
-def normFunc0(fixed, BO,A,MU,SIG,S,al,c50,M):
+def normFunc0(fixed, BO, A, MU, SIG, S, al, c50):
     '''
     curve fit variables for my norm function, when loc0 has a stronger response
     
@@ -438,10 +438,10 @@ def normFunc0(fixed, BO,A,MU,SIG,S,al,c50,M):
     num = (c0 * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
     denom = c0 + (al * c1) + c50
 
-    return  ((num/denom) + M).squeeze()
+    return (num/denom).squeeze()
 
 
-def normFunc1(fixed, BO, A, MU, SIG, S, al, c50, M):
+def normFunc1(fixed, BO, A, MU, SIG, S, al, c50):
     '''
     curve fit variables for my norm function, when loc1 has stronger response
 
@@ -459,7 +459,26 @@ def normFunc1(fixed, BO, A, MU, SIG, S, al, c50, M):
     num = (c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
     denom = (al * c0) + c1 + c50
 
-    return  ((num/denom) + M).squeeze()
+    return (num/denom).squeeze()
+
+def lightenColor(color, amount=0.5):
+    """
+    Lightens the given color by multiplying (1-luminosity) by the given amount.
+    Input can be matplotlib color string, hex string, or RGB tuple.
+
+    Examples:
+    >> lighten_color('g', 0.3)
+    >> lighten_color('#F034A3', 0.6)
+    >> lighten_color((.3,.55,.1), 0.5)
+    """
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
 
 
 def unitsInfo(units, corrTrials, allTrials):
@@ -581,6 +600,8 @@ def randTuningCurve(numNeurons):
 
     return tuningMat, tcDictionary
 
+
+## END HERE
 
 ''' function fitting working 
 

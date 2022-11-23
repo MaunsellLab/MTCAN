@@ -13,6 +13,7 @@ from numpy.linalg import inv
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import matplotlib.transforms as transforms
+import matplotlib.lines as lines
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Ellipse
 import math

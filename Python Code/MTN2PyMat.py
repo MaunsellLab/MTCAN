@@ -417,7 +417,7 @@ for unitCount, unit in enumerate(units):
 
     if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
         pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(),
-        bounds=((0,0,0,0,0,-5,0), (np.inf,np.inf,360,360,1,5,1)))
+        bounds=((0,0,0,0,0,0,0), (np.inf,np.inf,360,360,1,5,1)))
         print(unit,pOpt)
         y_pred = normFunc1(fixedVals, *pOpt)
         print(r2_score(resp.squeeze(), y_pred))
@@ -425,7 +425,7 @@ for unitCount, unit in enumerate(units):
         sLoc = 0
     else:
         pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(),
-        bounds=((0,0,0,0,0,-5,0), (np.inf,np.inf,360,360,1,5,1)))
+        bounds=((0,0,0,0,0,0,0), (np.inf,np.inf,360,360,1,5,1)))
         # print('using normFunc0')
         print(unit,pOpt)
         y_pred = normFunc0(fixedVals, *pOpt)
@@ -609,6 +609,10 @@ for unitCount, unit in enumerate(units):
     # ReIndexing to have pref direction in the middle Gauss Smooth
     nullIndex = np.where(dirArray==nullDir)[0][0]
     reIndex = (np.array([0,1,2,3,4,5])+nullIndex) % 6
+    tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
+    tickLabels = np.append(tickLabels, ['blank'])
+
+    # smoothed data
     bSmoothReIndex = np.zeros((7,7))
     tempMain = bSmooth[:6,:6][:,reIndex]
     tempMain = tempMain[:6,:6][reIndex,:]
@@ -619,23 +623,9 @@ for unitCount, unit in enumerate(units):
     bSmoothReIndex[6,:6] = temp1Blank
     bSmoothReIndex[6,6] = bSmooth[6,6]
 
-    tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
-    tickLabels = np.append(tickLabels, ['blank'])
-    
-    ax2 = fig.add_subplot(gs01[0,1])
-    ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0,
-                      annot=True, annot_kws={'fontsize':7}, cbar=False)
-    ax2.set_xticks(np.arange(7)+0.5)
-    ax2.set_title(f'Gaussian Smoothed', y=-0.1, fontsize=7)
-    ax2.set_xticklabels(tickLabels, rotation=45, fontsize=7)
-    ax2.xaxis.set_ticks_position('top')
-    ax2.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
-    ax2.xaxis.set_label_position('top')
-    ax2.set_yticks(np.arange(7)+0.5)
-    ax2.set_yticklabels(tickLabels, rotation=0, fontsize=7)
-    
-    #Raw not smoothed
-    #reIndexing to have pref direction in the middle
+    vMax = np.max(bSmoothReIndex)
+
+    # raw data
     bReIndex = np.zeros((7,7))
     tempMain = b[:6,:6][:,reIndex]
     tempMain = tempMain[:6,:6][reIndex,:]
@@ -646,22 +636,10 @@ for unitCount, unit in enumerate(units):
     bReIndex[6,:6] = temp1Blank
     bReIndex[6,6] = b[6,6]
 
-    ax3 = fig.add_subplot(gs01[0,0])
-    ax3 = sns.heatmap(bReIndex, square=True, linewidths=0.2, vmin=0,
-                      annot=True, annot_kws={'fontsize':7}, cbar=False)
-    ax3.set_xticks(np.arange(7)+0.5)
-    ax3.set_title(f'Raw Data', y=-0.1, fontsize=7)
-    ax3.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
-    ax3.xaxis.set_label_position('top')
-    ax3.set_xticklabels(tickLabels, rotation=45, fontsize=7)
-    ax3.set_ylabel('Location 1 Stimulus Direction', fontsize=7)
-    ax3.xaxis.set_ticks_position("top")
-    ax3.set_yticks(np.arange(7)+0.5)
-    ax3.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+    if np.max(bReIndex) > vMax:
+        vMax = np.max(bReIndex)
 
-    # Fitted responses
-    # reshape fixed variables to match dependent variables
-    # fixed (independent) variables - matrix of corresponding stim Indexes
+    #fitted data
     stimMat = np.zeros((7, 7))
     stimMat[:6, :6] = np.arange(36).reshape(6, 6)
     stimMat[6, :6] = np.arange(36, 42)
@@ -690,9 +668,56 @@ for unitCount, unit in enumerate(units):
     else:
         y_pred = normFunc0(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7, 7))
 
+    if np.max(y_pred) > vMax:
+        vMax = np.max(y_pred)
+
+    # residual (diff between real vs predicted resp)
+    residual = abs(y_pred - bReIndex)
+    if np.max(residual) > vMax:
+        vMax = np.max(residual)
+    
+    # ax2 = fig.add_subplot(gs01[0,1])
+    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0,
+    #                   vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    # ax2.set_xticks(np.arange(7)+0.5)
+    # ax2.set_title(f'Gaussian Smoothed', y=-0.1, fontsize=7)
+    # ax2.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    # ax2.xaxis.set_ticks_position('top')
+    # ax2.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
+    # ax2.xaxis.set_label_position('top')
+    # ax2.set_yticks(np.arange(7)+0.5)
+    # ax2.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
+    respReal = bReIndex.reshape(49)
+    respFit = y_pred.reshape(49)
+    ax2 = fig.add_subplot(gs01[0,1])
+    ax2.scatter(respReal, respFit)
+    ax2.set_xlabel('Real Responses (spikes/sec)', fontsize=7)
+    ax2.set_ylabel('Fit Responses (spikes/sec)', fontsize=7)
+    ax2.set_ylim([0,np.max(respReal)])
+    ax2.set_xlim([0,np.max(respReal)])
+    line = lines.Line2D([0, 1], [0, 1], color='red')
+    transform = ax2.transAxes
+    line.set_transform(transform)
+    ax2.add_line(line)
+    # ax2 = plt.axis('equal')
+
+    ax3 = fig.add_subplot(gs01[0,0])
+    ax3 = sns.heatmap(bReIndex, square=True, linewidths=0.2, vmin=0,
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    ax3.set_xticks(np.arange(7)+0.5)
+    ax3.set_title(f'Raw Data', y=-0.1, fontsize=7)
+    ax3.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
+    ax3.xaxis.set_label_position('top')
+    ax3.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    ax3.set_ylabel('Location 1 Stimulus Direction', fontsize=7)
+    ax3.xaxis.set_ticks_position("top")
+    ax3.set_yticks(np.arange(7)+0.5)
+    ax3.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
     ax6 = fig.add_subplot(gs01[1, 0])
     ax6 = sns.heatmap(y_pred, square=True, linewidths=0.2, vmin=0,
-                      annot=True, annot_kws={'fontsize':7}, cbar=False)
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
     ax6.set_xticks(np.arange(7) + 0.5)
     ax6.set_title(f'Predicted', y=-0.1, fontsize=7)
     ax6.set_xticklabels(tickLabels, rotation=45, fontsize=7)
@@ -701,18 +726,16 @@ for unitCount, unit in enumerate(units):
     ax6.set_yticks(np.arange(7) + 0.5)
     ax6.set_yticklabels(tickLabels, rotation=0, fontsize=7)
 
-    # residual (diff between real vs predicted resp)
-    residual = y_pred - bReIndex
     ax7 = fig.add_subplot(gs01[1, 1])
-    ax7 = sns.heatmap(residual, square=True, linewidths=0.2,
-                      annot=True, annot_kws={'fontsize':7}, cbar=False)
+    ax7 = sns.heatmap(residual, square=True, linewidths=0.2, vmin=0,
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+                      # cbar=True, cbar_kws={'orientation': 'horizontal'})
     ax7.set_xticks(np.arange(7) + 0.5)
     ax7.set_title(f'Residual (Predicted-Raw)', y=-0.1, fontsize=7)
     ax7.set_xticklabels(tickLabels, rotation=45, fontsize=7)
     ax7.xaxis.set_ticks_position("top")
     ax7.set_yticks(np.arange(7) + 0.5)
     ax7.set_yticklabels(tickLabels, rotation=0, fontsize=7)
-
 
 
     # bar plot
@@ -803,11 +826,8 @@ for unitCount, unit in enumerate(units):
 
     plt.tight_layout()
 
-    plt.show()
-
     plt.savefig(f'{unit}superPlot.pdf')
     plt.close('all')
-
 
 
 

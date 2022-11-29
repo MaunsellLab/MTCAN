@@ -40,7 +40,7 @@ for currTrial in allTrials:
 ## Start here
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221117'
+seshDate = '221124'
 fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
 # ascertain the position of the gabor stimuli for MTNC
@@ -157,7 +157,7 @@ for uCount, unit in enumerate(units):
     spikeCountMean = ma.mean(ma.masked_invalid(spikeCountMat), axis = 0)
     sponSpikesArr = np.array(sponSpikesArr)
     sponSpikesMean = np.mean(sponSpikesArr)
-    allTuningMat[uCount] = spikeCountMean * 1000/trueStimDurMS
+    allTuningMat[uCount] = spikeCountMean - sponSpikesMean
 
     #2D Gauss Fit 
     spikeCountFitArray = spikeCountMean - sponSpikesMean
@@ -174,11 +174,6 @@ for uCount, unit in enumerate(units):
     xMean = p.x_mean[0] + 0.5
     yMean = p.y_mean[0] + 0.5
     amp = p.amplitude[0]
-
-    rho = np.cos(theta)
-    covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
-                    [rho*xStdDev*yStdDev,yStdDev**2]])
-    meanVec = np.array([[xMean],[yMean]])
 
     ## Plot figure ##
     fig = plt.figure()
@@ -223,10 +218,12 @@ for uCount, unit in enumerate(units):
     ax_row1[0].invert_yaxis()
 
     #overlay 1SD, 2SD ellipse
-    el1SD = Ellipse((xMean,yMean),xStdDev,yStdDev,theta,fill=None,edgecolor='blue')
+    el1SD = Ellipse((xMean,yMean), xStdDev, yStdDev, theta,
+                    fill=None, edgecolor='blue')
     el1SD.set(linestyle=':')
     ax_row1[0].add_artist(el1SD)
-    el2SD = Ellipse((xMean,yMean),2*xStdDev,2*yStdDev,theta,fill=None,edgecolor='black')
+    el2SD = Ellipse((xMean,yMean), 2*xStdDev, 2*yStdDev, theta,
+                    fill=None, edgecolor='black')
     el2SD.set(linestyle='--')
     ax_row1[0].add_artist(el2SD)
 
@@ -277,11 +274,13 @@ plt.close('all')
 np.save('unitsRFLocMat', allTuningMat)
 
 
+################################## STOP HERE ###########################################
+
 ######## 2D gauss fit
 '''
 '''
 allTuningMat
-p_init = models.Gaussian2D(amplitude=1, x_mean=0, y_mean=0, x_stddev=None, 
+p_init = models.Gaussian2D(amplitude=1, x_mean=0, y_mean=0, x_stddev=None,
                            y_stddev=None, theta=None, cov_matrix=None)
 yi, xi = np.indices(spikeCountMean.shape)
 fit_p = fitting.LevMarLSQFitter()
@@ -295,7 +294,7 @@ RFLocMat = spikeCountMean
 for i in range(len(RFLocMat)):
     a = np.flip(RFLocMat[i], axis=0)
     com = ndimage.center_of_mass(a)
-    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
+    p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1,
                                 y_stddev=1, theta=None, cov_matrix=None)
     yi, xi = np.indices(a.shape)
     fit_p = fitting.LevMarLSQFitter()
@@ -332,7 +331,7 @@ ax.add_artist(ells)
 
 a = np.flip(spikeCountMean, axis=0)
 com = ndimage.center_of_mass(a)
-p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1, 
+p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=1,
                             y_stddev=1, theta=None, cov_matrix=None)
 yi, xi = np.indices(a.shape)
 fit_p = fitting.LevMarLSQFitter()
@@ -361,7 +360,7 @@ modelData = p(xi,yi)
 
 fig, ax = plt.subplots(figsize=(6, 6))
 sns.heatmap(modelData, cmap = sns.color_palette('mako', as_cmap=True), ax=ax)
-ax.contour(np.arange(.5, modelData.shape[1]), np.arange(.5, 
+ax.contour(np.arange(.5, modelData.shape[1]), np.arange(.5,
                        modelData.shape[0]), modelData, colors='yellow')
 
 plt.show()

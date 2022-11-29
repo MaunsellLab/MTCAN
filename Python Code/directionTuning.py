@@ -37,7 +37,7 @@ for currTrial in allTrials:
 #### Start Here:
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221117'
+seshDate = '221128'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 

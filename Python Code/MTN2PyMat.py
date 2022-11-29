@@ -18,7 +18,7 @@ import time
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221115'
+seshDate = '221124'
 fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -136,6 +136,7 @@ angleMat = np.arange(180,900,60)
 spikeCountMat = np.zeros((len(units),blocksDone+1,49))
 spikeCountLong = []
 sponSpikeCountLong = []
+latency = 50/1000 # time in MS for counting window latency after stim on
 histPrePostMS = 100 #100ms window pre/post stimlus on/off
 sponWindowMS = 50 #50ms window before stimulus onset
 spikeHists = np.zeros((len(units),49, trueStimDurMS+(2*histPrePostMS+1)))
@@ -163,16 +164,19 @@ for corrTrial in corrTrials:
                         unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
                         #added 50ms onset latency for spike counts (100 for offset)
                         unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
-                        stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS+0.05)) & 
-                                    (unitTimeStamps <= (stimOffTimeS+0.05)))[0]
+                        stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS + latency)) &
+                                     (unitTimeStamps <= (stimOffTimeS + latency)))[0]
                         spikeCountMat[unitCount][stCount][stimIndex] \
-                        = len(stimSpikes)
-                        spikeCountLong.append([unit, stimIndex, stimIndexCount[stimIndex], len(stimSpikes)])
+                            = len(stimSpikes)
+                        spikeCountLong.append([unit,
+                                               stimIndex,
+                                               stimIndexCount[stimIndex],
+                                               len(stimSpikes)])
 
                         #Spontaneous Spikes
                         sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS-(sponWindowMS/1000))) 
                                             & (unitTimeStamps <= stimOnTimeS))[0]
-                        sponSpikeCountLong.append([unit,len(sponSpikes)])
+                        sponSpikeCountLong.append([unit, len(sponSpikes)])
 
                         #PSTHs
                         stimOnPreSNEV = stimOnTimeS - (histPrePostMS/1000)
@@ -300,8 +304,10 @@ for pairCount, pair in enumerate(combs):
     n1 = np.where(units == pair[0])[0][0]
     n2 = np.where(units == pair[1])[0][0]
 
-    a = np.flip(RFLocMat[n1], axis=0)
-    b = np.flip(RFLocMat[n2], axis=0)
+    # a = np.flip(RFLocMat[n1], axis=0)
+    # b = np.flip(RFLocMat[n2], axis=0)
+    a = RFLocMat[n1]
+    b = RFLocMat[n2]
     m1, cov1, p = gauss2dParams(a)
     m2, cov2, p2 = gauss2dParams(b)
     BC = bhattCoef2D(m1,m2,cov1,cov2)
@@ -377,32 +383,94 @@ for unitCount, unit in enumerate(units):
     nullDirIndex = np.where(dirArray == nullDir)[0][0]
     reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
 
-    tempMain = b[:6,:6][:,reIndex]
-    tempMain = tempMain[:6,:6][reIndex,:]
-    temp0Blank = b[:6,6][reIndex]
-    temp1Blank = b[6,:6][reIndex]
-    bReIndex[:6,:6] = tempMain
-    bReIndex[:6,6] = temp0Blank
-    bReIndex[6,:6] = temp1Blank
-    # bReIndex[6,6] = b[6,6]
-    bReIndex[6,6] = b[6,6]
+    tempMain = b[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = b[:6, 6][reIndex]
+    temp1Blank = b[6, :6][reIndex]
+    bReIndex[:6, :6] = tempMain
+    bReIndex[:6, 6] = temp0Blank
+    bReIndex[6, :6] = temp1Blank
+    bReIndex[6, 6] = b[6, 6]
 
     # fixed (independent) variables - matrix of corresponding stim Indexes
-    stimMat = np.zeros((7,7))
-    stimMat[:6,:6] = np.arange(36).reshape(6,6)
-    stimMat[6,:6] = np.arange(36,42)
-    stimMat[:,6] = np.arange(42,49)
+    stimMat = np.zeros((7, 7))
+    stimMat[:6, :6] = np.arange(36).reshape(6, 6)
+    stimMat[6, :6] = np.arange(36, 42)
+    stimMat[:, 6] = np.arange(42, 49)
 
     # reshape fixed variables to match dependent variables
-    stimMatReIndex = np.zeros((7,7))
-    tempMain = stimMat[:6,:6][:,reIndex]
-    tempMain = np.squeeze(tempMain[:6,:6][reIndex,:])
-    temp0Blank = stimMat[:6,6][reIndex]
-    temp1Blank = stimMat[6,:6][reIndex]
-    stimMatReIndex[:6,:6] = tempMain
-    stimMatReIndex[:6,6] = temp0Blank
-    stimMatReIndex[6,:6] = temp1Blank
-    stimMatReIndex[6,6] = stimMat[6,6]
+    stimMatReIndex = np.zeros((7, 7))
+    tempMain = stimMat[:6, :6][:,reIndex]
+    tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
+    temp0Blank = stimMat[:6, 6][reIndex]
+    temp1Blank = stimMat[6, :6][reIndex]
+    stimMatReIndex[:6, :6] = tempMain
+    stimMatReIndex[:6, 6] = temp0Blank
+    stimMatReIndex[6, :6] = temp1Blank
+    stimMatReIndex[6, 6] = stimMat[6, 6]
+
+    '''
+    # fitting gaussian function first
+    resp = np.append(bReIndex[6, :6], bReIndex[:6, 6])
+    curveFixed = np.append(stimMatReIndex[6, :6], stimMatReIndex[:6, 6])
+    fixedVals = []
+    for i in curveFixed:
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+        fixedVals.append((c0, l0, c1, l1))
+    fixedVals = np.array(fixedVals)
+
+    pOpt, pCov = curve_fit(gaussNormFunc, fixedVals, resp.squeeze(),
+                           bounds=((0, 0, 0, 0, 0),
+                                   (np.inf, np.inf, 360, 360, np.inf)))
+    print(pOpt)
+    BO = pOpt[0]
+    A = pOpt[1]
+    MU = pOpt[2]
+    SIG = pOpt[3]
+    S = pOpt[4]
+
+    # fitting across mean spike count with gaussian params fed as fixed values
+    resp = bReIndex[:6, :6].reshape(36)
+    fixedVals = []
+    if S > 1:
+        # scale loc 1
+        for i in stimMatReIndex[:6, :6].reshape(36):
+            c0 = stimIndexDict[i][0]['contrast']
+            l0 = stimIndexDict[i][0]['direction']
+            c1 = stimIndexDict[i][1]['contrast']
+            l1 = stimIndexDict[i][1]['direction']
+            fixedVals.append((c0, l0, c1, l1))
+        fixedVals = np.array(fixedVals)
+        pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(),
+                               p0=[BO, A, MU, SIG, 1/S, 1, 0.10],
+                               bounds=((0, 0, 0, 0, 1/S, -5, 0),
+                                       (np.inf, np.inf, 360, 360, 1/S+0.01, 5, 1)))
+        print(unit,pOpt)
+        y_pred = normFunc0(fixedVals, *pOpt)
+        print(r2_score(resp.squeeze(), y_pred))
+    else:
+        # scale loc 0
+        for i in stimMatReIndex[:6, :6].reshape(36):
+            c0 = stimIndexDict[i][0]['contrast']
+            l0 = stimIndexDict[i][0]['direction']
+            c1 = stimIndexDict[i][1]['contrast']
+            l1 = stimIndexDict[i][1]['direction']
+            fixedVals.append((c0, l0, c1, l1))
+        fixedVals = np.array(fixedVals)
+        pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(),
+                               p0=[BO, A, MU, SIG, S, 1, 0.10],
+                               bounds=((0, 0, 0, 0, S, -5, 0),
+                                       (np.inf, np.inf, 360, 360, S+0.01, 5, 1)))
+        print('loc 0 scaled')
+        print(unit,pOpt)
+        y_pred = normFunc1(fixedVals, *pOpt)
+        print(r2_score(resp.squeeze(), y_pred))
+
+    '''
+
 
     ## for fitting across mean spike count
     resp = bReIndex.reshape(49)
@@ -417,7 +485,8 @@ for unitCount, unit in enumerate(units):
 
     if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
         pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(),
-        bounds=((0,0,0,0,0,0,0), (np.inf,np.inf,360,360,1,5,1)))
+                            bounds=((0, 0, 0, 0, 0, -5, 0),
+                            (np.inf, np.inf, 360, 360, 1, 5, 1)))
         print(unit,pOpt)
         y_pred = normFunc1(fixedVals, *pOpt)
         print(r2_score(resp.squeeze(), y_pred))
@@ -425,7 +494,8 @@ for unitCount, unit in enumerate(units):
         sLoc = 0
     else:
         pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(),
-        bounds=((0,0,0,0,0,0,0), (np.inf,np.inf,360,360,1,5,1)))
+                            bounds=((0, 0, 0, 0, 0, -5, 0),
+                            (np.inf, np.inf, 360, 360, 1, 5, 1)))
         # print('using normFunc0')
         print(unit,pOpt)
         y_pred = normFunc0(fixedVals, *pOpt)
@@ -538,14 +608,14 @@ for unitCount, unit in enumerate(units):
         pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
         orientCount += 1
 
-
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
     bSmooth = gaussian_filter(b, sigma=1)
     prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
 
     ## figure 
-    fig = plt.figure(constrained_layout=True)
+    # fig = plt.figure(constrained_layout=True)
+    fig = plt.figure()
     fig.set_size_inches(17,7)
 
     gs0 = gridspec.GridSpec(1,5)
@@ -556,7 +626,7 @@ for unitCount, unit in enumerate(units):
                          width_ratios=widths, height_ratios=heights)
     gs01 = gridspec.GridSpecFromSubplotSpec(2,2, subplot_spec=gs0[1:3])
     gs02 = gridspec.GridSpecFromSubplotSpec(1,1, subplot_spec=gs0[3])
-    gs03 = gridspec.GridSpecFromSubplotSpec(1,1, subplot_spec=gs0[4])
+    gs03 = gridspec.GridSpecFromSubplotSpec(2,1, subplot_spec=gs0[4])
 
     # PSTHs Plot
     locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
@@ -691,11 +761,12 @@ for unitCount, unit in enumerate(units):
     respReal = bReIndex.reshape(49)
     respFit = y_pred.reshape(49)
     ax2 = fig.add_subplot(gs01[0,1])
-    ax2.scatter(respReal, respFit)
-    ax2.set_xlabel('Real Responses (spikes/sec)', fontsize=7)
-    ax2.set_ylabel('Fit Responses (spikes/sec)', fontsize=7)
-    ax2.set_ylim([0,np.max(respReal)])
-    ax2.set_xlim([0,np.max(respReal)])
+    ax2.scatter(respFit, respReal)
+    ax2.set_ylabel('Real Responses (spikes/sec)', fontsize=7)
+    ax2.set_xlabel('Fit Responses (spikes/sec)', fontsize=7)
+    ax2.xaxis.set_label_position('top')
+    ax2.set_ylim([-2,np.max(respReal)*1.10])
+    ax2.set_xlim([-2,np.max(respReal)*1.10])
     line = lines.Line2D([0, 1], [0, 1], color='red')
     transform = ax2.transAxes
     line.set_transform(transform)
@@ -822,12 +893,151 @@ for unitCount, unit in enumerate(units):
     normalization alpha: {unitNormFitEstimate[unitCount][5]:.2f}\n\
     normalization sigma: {unitNormFitEstimate[unitCount][6]:.2f}\n\
     fit R2: {unitR2[unitCount]:.2f}', size=10, ha='center', transform=ax5.transAxes)
+    # baseline: {unitNormFitEstimate[unitCount][7]:.2f}\n\
     ax5.axis('off')
+
+    ax8 = fig.add_subplot(gs03[1,0], polar='True')
+    theta = np.radians(np.arange(0,420,60))
+    sponTheta = np.radians(np.arange(0,360,360/100))
+    sponTheta = np.append(sponTheta, sponTheta[0])
+    #loc 0
+    r0 = (np.append(meanSpike[unitCount][36:42], meanSpike[unitCount][36])) \
+         * 1000/trueStimDurMS
+    er0 = (np.append(spikeCountSEM[unitCount][36:42], spikeCountSEM[unitCount][36])) \
+           * 1000/trueStimDurMS
+    ax8.plot(theta, r0, markersize=2, color='green', label='location 0')
+    ax8.errorbar(theta, r0, yerr=er0, fmt='o', ecolor='green',
+                 color='green', markersize=2)
+
+    # loc 1
+    r1 = (np.append(meanSpike[unitCount][42:48],meanSpike[unitCount][42])) \
+        * 1000/trueStimDurMS
+    er1 = (np.append(spikeCountSEM[unitCount][42:48], spikeCountSEM[unitCount][42])) \
+        * 1000/trueStimDurMS
+    ax8.plot(theta, r1, markersize=2, color='red', label='location 1')
+    ax8.errorbar(theta, r1, yerr=er1, fmt='x', ecolor='red',
+                 color='red', markersize=2)
+    ax8.set_theta_zero_location('W')
+    ax8.set_title('Direction tuning at both locations')
+    spon = np.array([meanSpike[unitCount][48] * 1000/trueStimDurMS] * len(sponTheta))
+    ax8.plot(sponTheta, spon, linestyle='--', color='blue',
+             label='spontaneous rate')
+    ax8.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0,
+               prop={'size': 6})
 
     plt.tight_layout()
 
     plt.savefig(f'{unit}superPlot.pdf')
     plt.close('all')
+
+
+## 7x7 plot of all hists
+
+for unitCount, unit in enumerate(units):
+
+    fig, ax = plt.subplots(ncols=7, nrows=7, constrained_layout=True)
+
+    count = 0
+    yMax = 0
+    for i in range(6):
+        for j in range(6):
+            dirPlot = spikeHists[unitCount, count, :] * 1000/stimIndexCount[count]
+            smoothPlot = gaussian_filter1d(dirPlot, 5)
+            if max(smoothPlot) > yMax:
+                yMax = max(smoothPlot)
+            ax[i,j].plot(smoothPlot)
+            ax[i,j].set_xticks([0, histPrePostMS, histPrePostMS+trueStimDurMS,
+                                2*histPrePostMS+trueStimDurMS])
+            ax[i,j].set_xticklabels([])
+            ax[i,j].set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
+            ax[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS,
+                            color='grey', alpha=0.1)
+            ax[i,j].axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS,
+                            linestyle='--', color='grey')
+            count += 1
+
+    for subCount, x in enumerate(range(36,42)):
+        dirPlot = spikeHists[unitCount, x, :] * 1000 / stimIndexCount[x]
+        smoothPlot = gaussian_filter1d(dirPlot, 5)
+        if max(smoothPlot) > yMax:
+            yMax = max(smoothPlot)
+        ax[6, subCount].plot(smoothPlot)
+        ax[6, subCount].set_xticks([0, histPrePostMS, histPrePostMS + trueStimDurMS,
+                                    2 * histPrePostMS + trueStimDurMS])
+        ax[6, subCount].set_xticklabels([])
+        ax[6, subCount].set_xlim([0, trueStimDurMS + (2 * histPrePostMS + 1)])
+        ax[6, subCount].axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
+                                color='grey', alpha=0.1)
+        ax[6, subCount].axhline(y=meanSpike[unitCount][48] * 1000 / trueStimDurMS,
+                                linestyle='--', color='grey')
+        if subCount == 0:
+            ax[6, subCount].set_xlabel('Time (ms)')
+            ax[6, subCount].set_ylabel('Firing Rate (spikes/sec)')
+            ax[6, subCount].set_xticklabels([-(histPrePostMS), 0, 0 + trueStimDurMS,
+                                            trueStimDurMS + histPrePostMS], fontsize=7)
+
+    for subCount, x in enumerate(range(42,49)):
+        dirPlot = spikeHists[unitCount, x, :] * 1000 / stimIndexCount[x]
+        smoothPlot = gaussian_filter1d(dirPlot, 5)
+        if max(smoothPlot) > yMax:
+            yMax = max(smoothPlot)
+        ax[subCount, 6].plot(smoothPlot)
+        ax[subCount, 6].set_xticks([0, histPrePostMS, histPrePostMS + trueStimDurMS,
+                                    2 * histPrePostMS + trueStimDurMS])
+        ax[subCount, 6].set_xticklabels([])
+        ax[subCount, 6].set_xlim([0, trueStimDurMS + (2 * histPrePostMS + 1)])
+        ax[subCount, 6].axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
+                                color='grey', alpha=0.1)
+        ax[subCount, 6].axhline(y=meanSpike[unitCount][48] * 1000 / trueStimDurMS,
+                                linestyle='--', color='grey')
+
+    axes = fig.get_axes()
+    for ax in axes:
+        ax.set_ylim([0,yMax*1.1])
+
+    plt.show()
+
+
+
+
+## Plot Polar plot of dir tuning for each unit in both locations
+for unitCount, unit in enumerate(units):
+
+    ## figure
+    fig, ax1 = plt.subplots(subplot_kw={'projection': 'polar'})
+    theta = np.radians(np.arange(0,420,60))
+    sponTheta = np.radians(np.arange(0,360,360/100))
+    sponTheta = np.append(sponTheta, sponTheta[0])
+
+    #loc 0
+    r0 = (np.append(meanSpike[unitCount][36:42], meanSpike[unitCount][36])) \
+         * 1000/trueStimDurMS
+    er0 = (np.append(spikeCountSEM[unitCount][36:42], spikeCountSEM[unitCount][36])) \
+           * 1000/trueStimDurMS
+    ax1.plot(theta,r0, markersize=2, color='green', label='location 0')
+    ax1.errorbar(theta, r0, yerr=er0, fmt='o', ecolor='green',
+                 color='green', markersize=2)
+
+    # loc 1
+    r1 = (np.append(meanSpike[unitCount][42:48],meanSpike[unitCount][42])) \
+        * 1000/trueStimDurMS
+    er1 = (np.append(spikeCountSEM[unitCount][42:48], spikeCountSEM[unitCount][42])) \
+        * 1000/trueStimDurMS
+    ax1.plot(theta,r1, markersize=2, color='red', label='location 1')
+    ax1.errorbar(theta, r1, yerr=er1, fmt='x', ecolor='red',
+                 color='red', markersize=2)
+    ax1.set_theta_zero_location('W')
+    ax1.set_title('Direction tuning at both locations')
+    spon = np.array([meanSpike[unitCount][48]] * len(sponTheta))
+    ax1.plot(sponTheta,spon*1000/sponWindowMS, linestyle='--', color='blue',
+             label='spontaneous spikes/sec')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0)
+
+    plt.show()
+
+
+
+
 
 
 
@@ -1320,59 +1530,6 @@ for unit in units:
 #     return  ((num/denom) + M).squeeze()
 
 
-def gaussFunc(fixed,BO,A,MU,SIG,S,b):
-    '''
-    curve fit caraibles for my direction tuning gauss func and a scalar
-    at the other location
-    gBO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: gaussian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    b: baseline
-    '''
-
-    c0,l0,c1,l1 = fixed.T
-
-    # return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) + 
-    #         (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
-    return ((c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) + 
-            (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
-
-
-def normFunc0(fixed, al0,al1, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, scalar and baseline 
-    '''
-
-    c0,l0,c1,l1,BO,A,MU,SIG,S,M = fixed.T
-    num = (c0 * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
-    denom = ((al0 * c0) + (al1 * c1)+ c50)
-    return  ((num/denom) + M).squeeze()
-
-    # return ((((c0 * (A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))) / 
-    #         ((al * c0) + c1 + c50)) + M).squeeze()
-
-
-def normFunc1(fixed, al0, al1):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, scalar and baseline 
-    '''
-
-    c0,l0,c1,l1,BO,A,MU,SIG,S,M = fixed.T
-    num = (c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
-    denom = ((al0 * c0) + (al1 * c1) + 0.09)
-    return  ((num/denom) + M).squeeze()
-
-
 b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
 
 l0Ind = [36,37,38,39,40,41]
@@ -1404,9 +1561,9 @@ fixedVals = []
 for count, i in enumerate(indList):
     if count == 0:
         c0 = stimIndexDict[i][0]['contrast']
-        l0 = stimIndexDict[i][0]['direction'] 
+        l0 = stimIndexDict[i][0]['direction']
         c1 = stimIndexDict[i][1]['contrast']
-        l1 = stimIndexDict[i][1]['direction'] 
+        l1 = stimIndexDict[i][1]['direction']
     elif count > 0 and count <= 7:
         c0 = stimIndexDict[i][0]['contrast']
         l0 = dirArr[count-1]
@@ -1421,7 +1578,7 @@ for count, i in enumerate(indList):
 fixedVals = np.array(fixedVals)
 
 pOpt, pCov = curve_fit(gaussFunc, fixedVals, resp.squeeze(), bounds=(
-(0,0,180,0,0,b[6,6]), 
+(0,0,180,0,0,b[6,6]),
 (np.inf,2*max(resp),840,360,np.inf,b[6,6]+1)))
 print(unit,pOpt)
 
@@ -1473,7 +1630,7 @@ print(unit,pOpt)
 # resp = b[:6,:6].reshape(1,36)
 resp = spikeCountMat[unitCount,:blocksDone,:36].reshape(blocksDone*36)
 fixedVals = []
-if pOpt[4] > 1: 
+if pOpt[4] > 1:
     print('s>1')
     for i in np.tile(np.arange(36),blocksDone):
     # for i in range(36):

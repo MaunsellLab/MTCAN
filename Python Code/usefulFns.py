@@ -406,7 +406,8 @@ def dirClosestToPref(unitPrefDir):
     and return the directed tested that is closest to the preferred direction
 
     Inputs: unitPrefDir (unit's preferred direction)
-    Outputs: prefDir, nullDir (unit's preferred and null direction)
+    Outputs: prefDir, nullDir (unit's preferred and null direction from
+            directions tested)
     '''
 
     extDirArray = np.array([0,60,120,180,240,300,360])
@@ -478,103 +479,30 @@ def emsNormFunc1(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):
     return (loc0 + loc1 + m).squeeze()
 
 
-def normFunc0(fixed, BO, A, MU, SIG, S, al, c50):
+def fixedValsForCurveFit(prefDir, stimMatReIndex, stimIndexDict):
     '''
-    curve fit variables for my norm function, when loc0 has a stronger response
-    
-    BO: gaussian tuning curve baseline offset 
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al: alpha for normalization
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
+    function will take in the sequence of stimulus indexes to be fit
+    and return the fixed values for that position:
+    loc 0: contrast
+    loc 0: direction
+    loc 1: contrast
+    loc 1: direction
     '''
 
-    c0, l0, c1, l1 = fixed.T
-    num = (c0 * (BO + A*np.exp(-(l0-MU) ** 2 / (2 * SIG ** 2)))) + \
-          (c1 * (BO + S*A*np.exp(-(l1-MU) ** 2 / (2 * SIG ** 2))))
-    denom = c0 + (al * c1) + c50
+    fixedVals = []
+    for i in stimMatReIndex.reshape(49):
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        if abs(l0 - prefDir) > 180:
+            l0 = prefDir - (360 - (l0 - prefDir))
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+        if abs(l1 - prefDir) > 180:
+            l1 = prefDir - (360 - (l1 - prefDir))
+        fixedVals.append((c0, l0, c1, l1))
+    fixedVals = np.array(fixedVals)
 
-    return (num/denom).squeeze()
-
-
-def normFunc1(fixed, BO, A, MU, SIG, S, al, c50):
-    '''
-    curve fit variables for my norm function, when loc1 has stronger response
-
-    BO: gaussian tuning curve baseline offset 
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al: alpha for normalization
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-    num = (c0 * (BO + S*A*np.exp(-(l0-MU) ** 2 / (2 * SIG ** 2)))) + \
-          (c1 * (BO + A*np.exp(-(l1-MU) ** 2 / (2 * SIG ** 2))))
-    denom = (al * c0) + c1 + c50
-
-    return (num/denom).squeeze()
-
-
-def gaussNormFunc(fixed,BO,A,MU,SIG,S):
-    '''
-    curve fit caraibles for my direction tuning gauss func and a scalar
-    at the other location
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: gaussian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    b: baseline
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))
-    loc1 = c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))
-
-    return (loc0 + loc1).squeeze()
-
-    # return ((c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
-    #         (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2))))).squeeze()
-    # return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
-    #         (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
-
-
-def normStepFunc0(fixed, al0, al1, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    '''
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-    num = (c0 * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * S * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
-    denom = (al0 * c0) + (al1 * c1) + c50
-    return (num/denom).squeeze()
-
-
-def normStepFunc1(fixed, al0, al1, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    '''
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-    num = (c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG ** 2)))) + (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG ** 2))))
-    denom = (al0 * c0) + (al1 * c1) + c50
-    return (num/denom).squeeze()
+    return fixedVals
 
 
 def lightenColor(color, amount=0.5):
@@ -715,6 +643,107 @@ def randTuningCurve(numNeurons):
             tcDictionary[i+1][tuningMat[0][j]] = dirResp
 
     return tuningMat, tcDictionary
+
+
+def normFunc0(fixed, BO, A, MU, SIG, S, al, c50):
+    '''
+    curve fit variables for my norm function, when loc0 has a stronger response
+
+    BO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0, l0, c1, l1 = fixed.T
+    num = (c0 * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + \
+          (c1 * (BO + S * A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
+    denom = c0 + (al * c1) + c50
+
+    return (num / denom).squeeze()
+
+
+def normFunc1(fixed, BO, A, MU, SIG, S, al, c50):
+    '''
+    curve fit variables for my norm function, when loc1 has stronger response
+
+    BO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al: alpha for normalization
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+    '''
+
+    c0, l0, c1, l1 = fixed.T
+    num = (c0 * (BO + S * A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + \
+          (c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
+    denom = (al * c0) + c1 + c50
+
+    return (num / denom).squeeze()
+
+
+def gaussNormFunc(fixed, BO, A, MU, SIG, S):
+    '''
+    curve fit caraibles for my direction tuning gauss func and a scalar
+    at the other location
+    BO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: gaussian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    b: baseline
+    '''
+
+    c0, l0, c1, l1 = fixed.T
+
+    loc0 = c0 * S * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))
+    loc1 = c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2)))
+
+    return (loc0 + loc1).squeeze()
+
+    # return ((c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
+    #         (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2))))).squeeze()
+    # return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
+    #         (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
+
+
+def normStepFunc0(fixed, al0, al1, c50):
+    '''
+    curve fit variables for my norm function, when loc0 has stronger response
+
+    al: alpha for normalization
+    c50: normalization sigma
+    fixed: gaussian fit parameters, independent variables, and location scalar
+    '''
+
+    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
+    num = (c0 * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + (
+                c1 * S * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
+    denom = (al0 * c0) + (al1 * c1) + c50
+    return (num / denom).squeeze()
+
+
+def normStepFunc1(fixed, al0, al1, c50):
+    '''
+    curve fit variables for my norm function, when loc0 has stronger response
+
+    al: alpha for normalization
+    c50: normalization sigma
+    fixed: gaussian fit parameters, independent variables, and location scalar
+    '''
+
+    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
+    num = (c0 * S * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + (
+                c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
+    denom = (al0 * c0) + (al1 * c1) + c50
+    return (num / denom).squeeze()
 
 
 ## END HERE

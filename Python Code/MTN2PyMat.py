@@ -18,7 +18,7 @@ import time
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221110'
+seshDate = '221010'
 fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -283,7 +283,6 @@ for unitCount, unit in enumerate(units):
     unitGaussSig[unitCount] = params[3]
 
 
-
 ## Z-scored Correlations
 # filtered units test
 # combs = [i for i in combinations(filterUnits, 2)]
@@ -334,14 +333,37 @@ for pairCount, pair in enumerate(combs):
     pairLocSimScore[pairCount] = BC
 
 
+# direction tuning similarity b/w neurons using MTNC stim: Bhattacharyya Distance
+combs = [i for i in combinations(units, 2)]
+pairSimPrefDir = np.zeros((len(combs),1))
+pairSimScore = np.zeros((len(combs),1))
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+    m1 = unitGaussMean[n1]
+    v1 = unitGaussSig[n1]**2
+    m2 = unitGaussMean[n2]
+    v2 = unitGaussSig[n2]**2
+
+    # similarity of pref dirs only
+    if abs(m1 - m2) > 180:
+        if m1 > m2:
+            m1 = m2 - (360 - (m1 - m2))
+        else:
+            m2 = m1 - (360 - (m2 - m1))
+    pairSimPrefDir[pairCount] = 1 - (abs(m1 - m2) / 180)
+    # bhattacharyya similarity score
+    BC = bhattCoef(m1, m2, v1, v2)
+    pairSimScore[pairCount] = BC
+
+'''
 ## direction tuning similarity b/w neurons Bhattacharyya Distance
 dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
 # unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
 extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
                             dirTuningMat[:,:3]), axis=1)
 angleMat = np.arange(180,900,60)
-unitsPrefDirMat = np.zeros(len(units))
-
+# unitsPrefDirMat = np.zeros(len(units))
 combs = [i for i in combinations(units, 2)]
 pairSimPrefDir = np.zeros((len(combs),1))
 pairSimScore = np.zeros((len(combs),1))
@@ -384,9 +406,9 @@ for pairCount, pair in enumerate(combs):
     BC = bhattCoef(m1, m2, v1, v2)
     pairSimScore[pairCount] = BC
     # add unit's pref dir to unitPrefDir mat
-    unitsPrefDirMat[n1] = n1TrueMean
-    unitsPrefDirMat[n2] = n2TrueMean
-
+    # unitsPrefDirMat[n1] = n1TrueMean
+    # unitsPrefDirMat[n2] = n2TrueMean
+'''
 ## scipy curvefit Normalization parameters
 unitAlpha = np.zeros(len(units))
 unitAlphaMean = np.zeros(len(units))
@@ -401,7 +423,7 @@ for unitCount, unit in enumerate(units):
 
     # find direction tested that is closest to the pref dir
     # and reindex around this so that it is in the middle of the grid
-    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
     nullDirIndex = np.where(dirArray == nullDir)[0][0]
     reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
 
@@ -431,20 +453,14 @@ for unitCount, unit in enumerate(units):
     stimMatReIndex[6, :6] = temp1Blank
     stimMatReIndex[6, 6] = stimMat[6, 6]
 
+
     ## for fitting across mean spike count
     resp = bReIndex.reshape(49)
-    fixedVals = []
-    for i in stimMatReIndex.reshape(49):
-        c0 = stimIndexDict[i][0]['contrast']
-        l0 = stimIndexDict[i][0]['direction']
-        c1 = stimIndexDict[i][1]['contrast']
-        l1 = stimIndexDict[i][1]['direction']
-        fixedVals.append((c0,l0,c1,l1))
-    fixedVals = np.array(fixedVals)
+    fixedVals = fixedValsForCurveFit(prefDir, stimMatReIndex, stimIndexDict)
     if max(bReIndex[:6, 6])-min(bReIndex[:6, 6]) > max(bReIndex[6, :6])-min(bReIndex[6, :6]):
         pOpt, pCov = curve_fit(emsNormFunc1, fixedVals, resp.squeeze(),
-                            bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0),
-                            (np.inf, max(bReIndex[:6, 6]*2), 360, 360, 1, 10, 10, 0.25, 100)))
+                            bounds=((0, 0, prefDir-15, 0, 0, 0, 0, 0, 0),
+                            (np.inf, max(bReIndex[:6, 6]*2), prefDir+15, 360, 1, 10, 10, 1, 100)))
         print(unit,pOpt)
         y_pred = emsNormFunc1(fixedVals, *pOpt)
         print(r2_score(resp.squeeze(), y_pred))
@@ -452,8 +468,8 @@ for unitCount, unit in enumerate(units):
         sLoc = 0
     else:
         pOpt, pCov = curve_fit(emsNormFunc0, fixedVals, resp.squeeze(),
-                            bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0),
-                            (np.inf, max(bReIndex[6, :6]*2), 360, 360, 1, 10, 10, 0.25, 100)))
+                            bounds=((0, 0, prefDir-15, 0, 0, 0, 0, 0, 0),
+                            (np.inf, max(bReIndex[6, :6]*2), prefDir+15, 360, 1, 10, 10, 1, 100)))
         print('using normFunc0')
         print(unit,pOpt)
         y_pred = emsNormFunc0(fixedVals, *pOpt)
@@ -478,6 +494,19 @@ for unitCount, unit in enumerate(units):
 
     # BO, A, MU, SIG, S, al0, al1, c50, m
 
+    #
+    # fixedVals = []
+    # for i in stimMatReIndex.reshape(49):
+    #     c0 = stimIndexDict[i][0]['contrast']
+    #     l0 = stimIndexDict[i][0]['direction']
+    #     if abs(l0-prefDir) > 180:
+    #         l0 = prefDir - (360 - (l0 - prefDir))
+    #     c1 = stimIndexDict[i][1]['contrast']
+    #     l1 = stimIndexDict[i][1]['direction']
+    #     if abs(l1-prefDir) > 180:
+    #         l1 = prefDir - (360 - (l1 - prefDir))
+    #     fixedVals.append((c0,l0,c1,l1))
+    # fixedVals = np.array(fixedVals)
 
     # # for fitting across every trial spike count
     # fixedVals = []
@@ -488,7 +517,6 @@ for unitCount, unit in enumerate(units):
     #     l1 = stimIndexDict[i][1]['direction']
     #     fixedVals.append((c0,l0,c1,l1))
     # fixedVals = np.array(fixedVals)
-    #
     # tempMat = spikeCountMat[unitCount,:blocksDone,:][:,stimMatReIndex.reshape(49).astype(int)]
     # resp = tempMat.reshape(49*blocksDone) * 1000/trueStimDurMS
     #
@@ -502,67 +530,6 @@ for unitCount, unit in enumerate(units):
     #     print('using normFunc0')
     #     print(unit,pOpt)
 
-    '''
-    # fitting gaussian function first
-    resp = np.append(bReIndex[6, :6], bReIndex[:6, 6])
-    curveFixed = np.append(stimMatReIndex[6, :6], stimMatReIndex[:6, 6])
-    fixedVals = []
-    for i in curveFixed:
-        c0 = stimIndexDict[i][0]['contrast']
-        l0 = stimIndexDict[i][0]['direction']
-        c1 = stimIndexDict[i][1]['contrast']
-        l1 = stimIndexDict[i][1]['direction']
-        fixedVals.append((c0, l0, c1, l1))
-    fixedVals = np.array(fixedVals)
-
-    pOpt, pCov = curve_fit(gaussNormFunc, fixedVals, resp.squeeze(),
-                           bounds=((0, 0, 0, 0, 0),
-                                   (np.inf, np.inf, 360, 360, np.inf)))
-    print(pOpt)
-    BO = pOpt[0]
-    A = pOpt[1]
-    MU = pOpt[2]
-    SIG = pOpt[3]
-    S = pOpt[4]
-
-    # fitting across mean spike count with gaussian params fed as fixed values
-    resp = bReIndex[:6, :6].reshape(36)
-    fixedVals = []
-    if S > 1:
-        # scale loc 1
-        for i in stimMatReIndex[:6, :6].reshape(36):
-            c0 = stimIndexDict[i][0]['contrast']
-            l0 = stimIndexDict[i][0]['direction']
-            c1 = stimIndexDict[i][1]['contrast']
-            l1 = stimIndexDict[i][1]['direction']
-            fixedVals.append((c0, l0, c1, l1))
-        fixedVals = np.array(fixedVals)
-        pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(),
-                               p0=[BO, A, MU, SIG, 1/S, 1, 0.10],
-                               bounds=((0, 0, 0, 0, 1/S, -5, 0),
-                                       (np.inf, np.inf, 360, 360, 1/S+0.01, 5, 1)))
-        print(unit,pOpt)
-        y_pred = normFunc0(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
-    else:
-        # scale loc 0
-        for i in stimMatReIndex[:6, :6].reshape(36):
-            c0 = stimIndexDict[i][0]['contrast']
-            l0 = stimIndexDict[i][0]['direction']
-            c1 = stimIndexDict[i][1]['contrast']
-            l1 = stimIndexDict[i][1]['direction']
-            fixedVals.append((c0, l0, c1, l1))
-        fixedVals = np.array(fixedVals)
-        pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(),
-                               p0=[BO, A, MU, SIG, S, 1, 0.10],
-                               bounds=((0, 0, 0, 0, S, -5, 0),
-                                       (np.inf, np.inf, 360, 360, S+0.01, 5, 1)))
-        print('loc 0 scaled')
-        print(unit,pOpt)
-        y_pred = normFunc1(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
-
-    '''
 
 totR2 = np.array(totR2)
 totR2 = totR2[np.where(totR2 > 0.6)[0]]
@@ -588,10 +555,15 @@ pairCombinedSimScorePrefDir = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2)
 
 
 ## compile similarity scores and correlation matrix into one matrix
-compiledArr = np.array([corrMat, np.squeeze(pairSimScore), 
-              np.squeeze(pairSimPrefDir), np.squeeze(pairLocSimScore),
-              pairCombinedSimScore, pairCombinedSimScoreMulti, 
-              pairCombinedSimScorePrefDir, pairAlphaMulti])
+compiledArr = np.array([corrMat,
+                        np.squeeze(pairSimScore),
+                        np.squeeze(pairSimPrefDir),
+                        np.squeeze(pairLocSimScore),
+                        pairCombinedSimScore,
+                        pairCombinedSimScoreMulti,
+                        pairCombinedSimScorePrefDir,
+                        pairAlphaMulti,
+                        pairAlpha])
 np.save(f'../../corrMaster/pairCorrelationsAndSimScores{seshDate}', compiledArr)
 
 
@@ -601,7 +573,7 @@ pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount',
                                 'stimSpikes', 'contrast', 'prefNullStr'])
 for unitCount, unit in enumerate(units):
     # find direction tested that is closest to unit's preferred and null direction
-    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
     orientCount = 0
     orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null', 
                  'pref+blank', 'null+blank','blank+pref', 'blank+null']
@@ -653,7 +625,7 @@ unitWithinNMI = np.zeros(len(units))
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
     bSmooth = gaussian_filter(b, sigma=1)
-    prefDir, nullDir = dirClosestToPref(unitsPrefDirMat[unitCount])
+    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
 
     ## figure 
     # fig = plt.figure(constrained_layout=True)
@@ -771,8 +743,12 @@ for unitCount, unit in enumerate(units):
     for i in stimMatReIndex.reshape(49):
         c0 = stimIndexDict[i][0]['contrast']
         l0 = stimIndexDict[i][0]['direction']
+        if abs(l0-prefDir) > 180:
+            l0 = prefDir - (360 - (l0 - prefDir))
         c1 = stimIndexDict[i][1]['contrast']
         l1 = stimIndexDict[i][1]['direction']
+        if abs(l1-prefDir) > 180:
+            l1 = prefDir - (360 - (l1 - prefDir))
         fixedVals.append((c0, l0, c1, l1))
     fixedVals = np.array(fixedVals)
     if scaledLoc[unitCount] == 0:
@@ -880,8 +856,12 @@ for unitCount, unit in enumerate(units):
                 fixedVals = []
                 c0 = stimIndexDict[stimIndex][0]['contrast']
                 l0 = stimIndexDict[stimIndex][0]['direction']
+                if abs(l0 - prefDir) > 180:
+                    l0 = prefDir - (360 - (l0 - prefDir))
                 c1 = stimIndexDict[stimIndex][1]['contrast']
                 l1 = stimIndexDict[stimIndex][1]['direction']
+                if abs(l1 - prefDir) > 180:
+                    l1 = prefDir - (360 - (l1 - prefDir))
                 fixedVals.append((c0, l0, c1, l1))
                 fixedVals = np.array(fixedVals)
                 if scaledLoc[unitCount] == 0:
@@ -908,8 +888,12 @@ for unitCount, unit in enumerate(units):
                 fixedVals = []
                 c0 = stimIndexDict[stimIndex][0]['contrast']
                 l0 = stimIndexDict[stimIndex][0]['direction']
+                if abs(l0 - prefDir) > 180:
+                    l0 = prefDir - (360 - (l0 - prefDir))
                 c1 = stimIndexDict[stimIndex][1]['contrast']
                 l1 = stimIndexDict[stimIndex][1]['direction']
+                if abs(l1 - prefDir) > 180:
+                    l1 = prefDir - (360 - (l1 - prefDir))
                 fixedVals.append((c0, l0, c1, l1))
                 fixedVals = np.array(fixedVals)
                 if scaledLoc[unitCount] == 0:

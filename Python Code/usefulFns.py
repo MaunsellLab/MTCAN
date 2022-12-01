@@ -224,6 +224,7 @@ def gauss2dParams(neuronTuningMat):
     function will return the parameters to fit a 2D gaussian
     onto the neuron RF location heatmap
     returns mean vector (meanVec) and covariance matrix (covMat)
+    http://prob140.org/sp18/textbook/notebooks-md/24_01_Bivariate_Normal_Distribution.html
     '''
 
     com = ndimage.center_of_mass(neuronTuningMat)
@@ -421,30 +422,60 @@ def dirClosestToPref(unitPrefDir):
     return prefDir, nullDir
 
 
-def gaussNormFunc(fixed,BO,A,MU,SIG,S):
+def emsNormFunc0(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):
     '''
-    curve fit caraibles for my direction tuning gauss func and a scalar
-    at the other location
+    curve fit variables for Ami Ni EMS normalization function, when loc0
+    has a stronger response
+
     BO: gaussian tuning curve baseline offset
     A: gaussian tuning curve amplitude
-    MU: gaussian tuning curve mean
+    MU: guassian tuning curve mean
     SIG: gaussian tuning curve std dev
     S: scalar for other location gauss function
-    b: baseline
+    al0: alpha for normalization at loc 0
+    al1: alpha for normalization at loc 1
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+
     '''
 
     c0, l0, c1, l1 = fixed.T
 
-    loc0 = c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))
-    loc1 = c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))
+    loc0 = (c0 * (BO + A*np.exp(-(l0-MU) ** 2 / (2 * SIG ** 2)))) / (
+            c0 + (c1 * al1) + c50)
 
-    return (loc0 + loc1).squeeze()
+    loc1 = (c1 * (BO + S*A*np.exp(-(l1-MU) ** 2 / (2 * SIG ** 2)))) / (
+           (c0 * al0) + c1 + c50)
+    # s loc 1
+    return (loc0 + loc1 + m).squeeze()
 
-    # return ((c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
-    #         (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2))))).squeeze()
-    # return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
-    #         (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
 
+def emsNormFunc1(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):
+    '''
+    curve fit variables for Ami Ni EMS normalization function, when loc1
+    has a stronger response
+
+    BO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: guassian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    al0: alpha for normalization at loc 0
+    al1: alpha for normalization at loc 1
+    c50: normalization sigma
+    M: baseline resp (blank stimulus)
+
+    '''
+
+    c0, l0, c1, l1 = fixed.T
+
+    loc0 = (c0 * (BO + S*A*np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) / (
+            c0 + (c1 * al1) + c50)
+    # s loc 0
+    loc1 = (c1 * (BO + A*np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2)))) / (
+           (c0 * al0) + c1 + c50)
+
+    return (loc0 + loc1 + m).squeeze()
 
 
 def normFunc0(fixed, BO, A, MU, SIG, S, al, c50):
@@ -489,6 +520,31 @@ def normFunc1(fixed, BO, A, MU, SIG, S, al, c50):
     denom = (al * c0) + c1 + c50
 
     return (num/denom).squeeze()
+
+
+def gaussNormFunc(fixed,BO,A,MU,SIG,S):
+    '''
+    curve fit caraibles for my direction tuning gauss func and a scalar
+    at the other location
+    BO: gaussian tuning curve baseline offset
+    A: gaussian tuning curve amplitude
+    MU: gaussian tuning curve mean
+    SIG: gaussian tuning curve std dev
+    S: scalar for other location gauss function
+    b: baseline
+    '''
+
+    c0, l0, c1, l1 = fixed.T
+
+    loc0 = c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))
+    loc1 = c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))
+
+    return (loc0 + loc1).squeeze()
+
+    # return ((c0 * S * (BO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
+    #         (c1 * (BO + A*np.exp(-(l1-MU)**2/(2*SIG**2))))).squeeze()
+    # return ((c0 * S * (gBO + A*np.exp(-(l0-MU)**2/(2*SIG**2)))) +
+    #         (c1 * (gBO + A*np.exp(-(l1-MU)**2/(2*SIG**2)))) + b).squeeze()
 
 
 def normStepFunc0(fixed, al0, al1, c50):
@@ -724,6 +780,8 @@ for unitCount, unit in enumerate(units):
     #                 stimCount[eleIndex][aziIndex] = stimCount[eleIndex][aziIndex] + 1
     #                 map0Count += 1
 
-
-#testing time to open file
-# t0 = time.time(); a = mat73.loadmat('./Documents/Grad School/Maunsell Lab/Analysis/MTCAN/Matlab Data/Meetz_2022_0114_MTNAN_m73.mat', use_attrdict = True); print(time.time() - t0)
+#
+# a = meanSpike[unitCount][36:42] * 1000/trueStimDurMS
+# b = np.concatenate((a[3:],a[:4]), axis=0)
+# degList = np.radians(np.arange(-180,240,60) % 360)
+# popt, pcov = curve_fit(vonMises, degList, b)

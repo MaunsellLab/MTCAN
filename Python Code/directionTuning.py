@@ -142,7 +142,6 @@ for uCount, unit in enumerate(units):
     angleMat = np.arange(180,900,60)
     extTunMat = np.concatenate((spikeCountMean[3:], spikeCountMean, 
                             spikeCountMean[:3]), axis=0)
-    spikeCountMax = np.max(spikeCountMean)                  
     nMax = int(np.argwhere(spikeCountMean == np.max(spikeCountMean))[0])+3
     nX = angleMat[nMax-3:nMax+4]
     # nY = extTunMat[nMax-3:nMax+4]/max(extTunMat[nMax-3:nMax+3])

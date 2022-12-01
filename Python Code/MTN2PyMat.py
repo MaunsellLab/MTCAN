@@ -18,7 +18,7 @@ import time
 ####### START HERE ######
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221124'
+seshDate = '221110'
 fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
 
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -264,7 +264,27 @@ for unitCount, unit in enumerate(units):
     if respList[0] > 2*respList[1] or respList[2] > 2*respList[3]:
         filterUnits.append(unit)
 '''
-## Z-scored Correlations 
+
+# Unit's preferred direction based off of
+# gaussian fit of MTNC stimuli:
+angleMat = np.arange(180,900,60)
+unitGaussMean = np.zeros(len(units))
+unitGaussSig = np.zeros(len(units))
+for unitCount, unit in enumerate(units):
+    loc0Resp = meanSpike[unitCount][36:42]
+    loc1Resp = meanSpike[unitCount][42:48]
+    combResp = (loc0Resp + loc1Resp) / 2
+    extRespMat = np.concatenate((combResp[3:], combResp, combResp[:3]), axis=0)
+    maxIndex = np.where(combResp == np.max(combResp))[0][0] + 3
+    x = angleMat[maxIndex-3:maxIndex+4]
+    y = extRespMat[maxIndex-3:maxIndex+4]
+    params = gaussFit(x, y)
+    unitGaussMean[unitCount] = params[2] % 360
+    unitGaussSig[unitCount] = params[3]
+
+
+
+## Z-scored Correlations
 # filtered units test
 # combs = [i for i in combinations(filterUnits, 2)]
 
@@ -367,9 +387,11 @@ for pairCount, pair in enumerate(combs):
     unitsPrefDirMat[n1] = n1TrueMean
     unitsPrefDirMat[n2] = n2TrueMean
 
-
 ## scipy curvefit Normalization parameters
 unitAlpha = np.zeros(len(units))
+unitAlphaMean = np.zeros(len(units))
+unitAlphaVar = np.zeros(len(units))
+totR2 = []
 unitNormFitEstimate = [[] for i in range(len(units))]
 scaledLoc = np.zeros(len(units))
 unitR2 = np.zeros(len(units))
@@ -408,6 +430,77 @@ for unitCount, unit in enumerate(units):
     stimMatReIndex[:6, 6] = temp0Blank
     stimMatReIndex[6, :6] = temp1Blank
     stimMatReIndex[6, 6] = stimMat[6, 6]
+
+    ## for fitting across mean spike count
+    resp = bReIndex.reshape(49)
+    fixedVals = []
+    for i in stimMatReIndex.reshape(49):
+        c0 = stimIndexDict[i][0]['contrast']
+        l0 = stimIndexDict[i][0]['direction']
+        c1 = stimIndexDict[i][1]['contrast']
+        l1 = stimIndexDict[i][1]['direction']
+        fixedVals.append((c0,l0,c1,l1))
+    fixedVals = np.array(fixedVals)
+    if max(bReIndex[:6, 6])-min(bReIndex[:6, 6]) > max(bReIndex[6, :6])-min(bReIndex[6, :6]):
+        pOpt, pCov = curve_fit(emsNormFunc1, fixedVals, resp.squeeze(),
+                            bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0),
+                            (np.inf, max(bReIndex[:6, 6]*2), 360, 360, 1, 10, 10, 0.25, 100)))
+        print(unit,pOpt)
+        y_pred = emsNormFunc1(fixedVals, *pOpt)
+        print(r2_score(resp.squeeze(), y_pred))
+        r2 = r2_score(resp.squeeze(), y_pred)
+        sLoc = 0
+    else:
+        pOpt, pCov = curve_fit(emsNormFunc0, fixedVals, resp.squeeze(),
+                            bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0),
+                            (np.inf, max(bReIndex[6, :6]*2), 360, 360, 1, 10, 10, 0.25, 100)))
+        print('using normFunc0')
+        print(unit,pOpt)
+        y_pred = emsNormFunc0(fixedVals, *pOpt)
+        print(r2_score(resp.squeeze(), y_pred))
+        r2 = r2_score(resp.squeeze(), y_pred)
+        sLoc = 1
+
+    totR2.append(r2)
+
+    scaledLoc[unitCount] = sLoc
+    unitNormFitEstimate[unitCount] = pOpt
+    unitR2[unitCount] = r2
+    unitAlphaMean[unitCount] = (pOpt[5] + pOpt[6]) / 2
+    unitAlphaVar[unitCount] = (np.std([pOpt[5],pOpt[6]])) ** 2
+    unitAlpha[unitCount] = np.sqrt(pOpt[5] + pOpt[6])
+
+    # if pOpt[5] < pOpt[6]:
+    #     unitAlpha[unitCount] = pOpt[6] / (pOpt[5] + pOpt[6])
+    # else:
+    #     unitAlpha[unitCount] = pOpt[5] / (pOpt[5] + pOpt[6])
+
+
+    # BO, A, MU, SIG, S, al0, al1, c50, m
+
+
+    # # for fitting across every trial spike count
+    # fixedVals = []
+    # for i in np.tile(stimMatReIndex.reshape(49),blocksDone):
+    #     c0 = stimIndexDict[i][0]['contrast']
+    #     l0 = stimIndexDict[i][0]['direction']
+    #     c1 = stimIndexDict[i][1]['contrast']
+    #     l1 = stimIndexDict[i][1]['direction']
+    #     fixedVals.append((c0,l0,c1,l1))
+    # fixedVals = np.array(fixedVals)
+    #
+    # tempMat = spikeCountMat[unitCount,:blocksDone,:][:,stimMatReIndex.reshape(49).astype(int)]
+    # resp = tempMat.reshape(49*blocksDone) * 1000/trueStimDurMS
+    #
+    # if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
+    #     pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
+    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
+    #     print(unit,pOpt)
+    # else:
+    #     pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
+    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
+    #     print('using normFunc0')
+    #     print(unit,pOpt)
 
     '''
     # fitting gaussian function first
@@ -471,74 +564,22 @@ for unitCount, unit in enumerate(units):
 
     '''
 
-
-    ## for fitting across mean spike count
-    resp = bReIndex.reshape(49)
-    fixedVals = []
-    for i in stimMatReIndex.reshape(49):
-        c0 = stimIndexDict[i][0]['contrast']
-        l0 = stimIndexDict[i][0]['direction']
-        c1 = stimIndexDict[i][1]['contrast']
-        l1 = stimIndexDict[i][1]['direction']
-        fixedVals.append((c0,l0,c1,l1))
-    fixedVals = np.array(fixedVals)
-
-    if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
-        pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(),
-                            bounds=((0, 0, 0, 0, 0, -5, 0),
-                            (np.inf, np.inf, 360, 360, 1, 5, 1)))
-        print(unit,pOpt)
-        y_pred = normFunc1(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
-        r2 = r2_score(resp.squeeze(), y_pred)
-        sLoc = 0
-    else:
-        pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(),
-                            bounds=((0, 0, 0, 0, 0, -5, 0),
-                            (np.inf, np.inf, 360, 360, 1, 5, 1)))
-        # print('using normFunc0')
-        print(unit,pOpt)
-        y_pred = normFunc0(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
-        r2 = r2_score(resp.squeeze(), y_pred)
-        sLoc = 1
-
-
-    # # for fitting across every trial spike count
-    # fixedVals = []
-    # for i in np.tile(stimMatReIndex.reshape(49),blocksDone):
-    #     c0 = stimIndexDict[i][0]['contrast']
-    #     l0 = stimIndexDict[i][0]['direction']
-    #     c1 = stimIndexDict[i][1]['contrast']
-    #     l1 = stimIndexDict[i][1]['direction']
-    #     fixedVals.append((c0,l0,c1,l1))
-    # fixedVals = np.array(fixedVals)
-    #
-    # tempMat = spikeCountMat[unitCount,:blocksDone,:][:,stimMatReIndex.reshape(49).astype(int)]
-    # resp = tempMat.reshape(49*blocksDone) * 1000/trueStimDurMS
-    #
-    # if max(bReIndex[:6,6])-min(bReIndex[:6,6]) > max(bReIndex[6,:6])-min(bReIndex[6,:6]):
-    #     pOpt, pCov = curve_fit(normFunc1, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
-    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
-    #     print(unit,pOpt)
-    # else:
-    #     pOpt, pCov = curve_fit(normFunc0, fixedVals, resp.squeeze(), bounds=((0,0,0,0,0,0,0,0),
-    #     (np.inf,np.inf,360,360,1,1,0.10,b[6,6]+1)))
-    #     print('using normFunc0')
-    #     print(unit,pOpt)
-
-    unitNormFitEstimate[unitCount] = pOpt
-    unitR2[unitCount] = r2
-    unitAlpha[unitCount] = pOpt[5]
-    scaledLoc[unitCount] = sLoc
+totR2 = np.array(totR2)
+totR2 = totR2[np.where(totR2 > 0.6)[0]]
+print(f'average R2 is {np.mean(totR2)}')
 
 
 ## generate pair's combined Norm Value
 pairAlphaMulti = np.zeros((len(combs)))
+pairAlpha = np.zeros((len(combs)))
 for pairCount, pair in enumerate(combs):
     n1 = np.where(units == pair[0])[0][0]
     n2 = np.where(units == pair[1])[0][0]
-    pairAlphaMulti[pairCount] = np.sqrt(unitAlpha[n1] * unitAlpha[n2])
+
+    BC = bhattCoef(unitAlphaMean[n1], unitAlphaMean[n2],
+                   unitAlphaVar[n1], unitAlphaVar[n2])
+    pairAlpha[pairCount] = BC
+    pairAlphaMulti[pairCount] = (unitAlpha[n1] + unitAlpha[n2]) / 2
 
 
 pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
@@ -608,6 +649,7 @@ for unitCount, unit in enumerate(units):
         pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
         orientCount += 1
 
+unitWithinNMI = np.zeros(len(units))
 for unitCount, unit in enumerate(units):
     b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
     bSmooth = gaussian_filter(b, sigma=1)
@@ -734,9 +776,9 @@ for unitCount, unit in enumerate(units):
         fixedVals.append((c0, l0, c1, l1))
     fixedVals = np.array(fixedVals)
     if scaledLoc[unitCount] == 0:
-        y_pred = normFunc1(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7, 7))
+        y_pred = emsNormFunc1(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7, 7))
     else:
-        y_pred = normFunc0(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7, 7))
+        y_pred = emsNormFunc0(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7, 7))
 
     if np.max(y_pred) > vMax:
         vMax = np.max(y_pred)
@@ -821,7 +863,8 @@ for unitCount, unit in enumerate(units):
     offsetCount = 0
 
     colorList = ['b','g','r','c']
-    # plot category by category 
+    # plot category by category
+    yMax = 0
     for pos in [0.35, 0.65]:
         if pos == 0.35:
             for count, indx in enumerate(['pref+blank','null+blank','blank+pref','blank+null']):
@@ -842,12 +885,14 @@ for unitCount, unit in enumerate(units):
                 fixedVals.append((c0, l0, c1, l1))
                 fixedVals = np.array(fixedVals)
                 if scaledLoc[unitCount] == 0:
-                    y_pred = normFunc1(fixedVals, *unitNormFitEstimate[unitCount])
+                    y_pred = emsNormFunc1(fixedVals, *unitNormFitEstimate[unitCount])
                 else:
-                    y_pred = normFunc0(fixedVals, *unitNormFitEstimate[unitCount])
+                    y_pred = emsNormFunc0(fixedVals, *unitNormFitEstimate[unitCount])
                 ax4 = plt.scatter(pos, y_pred, transform=trans+offset(offsetCount),
                                   label=indx, color=lightenColor(colorList[count], 0.5))
                 offsetCount += 5
+                if mean > yMax:
+                    yMax = mean
         else:
             offsetCount = 0
             for count, indx in enumerate(['pref+pref','pref+null','null+pref','null+null']):
@@ -868,14 +913,16 @@ for unitCount, unit in enumerate(units):
                 fixedVals.append((c0, l0, c1, l1))
                 fixedVals = np.array(fixedVals)
                 if scaledLoc[unitCount] == 0:
-                    y_pred = normFunc1(fixedVals, *unitNormFitEstimate[unitCount])
+                    y_pred = emsNormFunc1(fixedVals, *unitNormFitEstimate[unitCount])
                 else:
-                    y_pred = normFunc0(fixedVals, *unitNormFitEstimate[unitCount])
+                    y_pred = emsNormFunc0(fixedVals, *unitNormFitEstimate[unitCount])
                 ax4 = plt.scatter(pos, y_pred, transform=trans+offset(offsetCount),
                                   label=indx, color=lightenColor(colorList[count], 0.5))
                 offsetCount += 5
+                if mean > yMax:
+                    yMax = mean
     ax4 = plt.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
-    ax4 = plt.ylim(bottom=0)
+    ax4 = plt.ylim([0,yMax*1.5])
     ax4 = plt.xticks([0.35,0.65], ['Singular Stimulus', 'Dual Stimulus'])
     ax4 = plt.xlim(left=0.2,right=0.8)
     ax4 = plt.ylabel('Firing Rate spikes/sec')
@@ -890,11 +937,13 @@ for unitCount, unit in enumerate(units):
     gaussian mean: {unitNormFitEstimate[unitCount][2]:.2f}\n\
     gaussian sigma: {unitNormFitEstimate[unitCount][3]:.2f}\n\
     location scalar: {unitNormFitEstimate[unitCount][4]:.2f}\n\
-    normalization alpha: {unitNormFitEstimate[unitCount][5]:.2f}\n\
-    normalization sigma: {unitNormFitEstimate[unitCount][6]:.2f}\n\
+    normalization alpha 0: {unitNormFitEstimate[unitCount][5]:.2f}\n\
+    normalization alpha 1: {unitNormFitEstimate[unitCount][6]:.2f}\n\
+    normalization sigma: {unitNormFitEstimate[unitCount][7]:.2f}\n\
+    baseline: {unitNormFitEstimate[unitCount][8]:.2f}\n\
     fit R2: {unitR2[unitCount]:.2f}', size=10, ha='center', transform=ax5.transAxes)
-    # baseline: {unitNormFitEstimate[unitCount][7]:.2f}\n\
     ax5.axis('off')
+    # baseline: {unitNormFitEstimate[unitCount][8]:.2f}\n\
 
     ax8 = fig.add_subplot(gs03[1,0], polar='True')
     theta = np.radians(np.arange(0,420,60))

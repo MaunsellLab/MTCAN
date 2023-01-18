@@ -16,728 +16,976 @@ import matplotlib.ticker as ticker
 import time
 
 ####### START HERE ######
-# Load relevant file here with pyMat reader 
-monkeyName = 'Meetz'
-seshDate = '221108'
-fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
+# for loop to run through all files
+t0 = time.time()
+totUnits = []
+totR2 = []
+fileList = ['221010', '221108', '221110', '221115', '221117', '221124',
+            '221128', '221010', '221208']
+# fileList = ['221115', '221117', '221124',
+#             '221128', '221010', '221208']
 
-allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
+for fileIterator in fileList:
 
-if not os.path.exists('Normalization'):
-    os.makedirs('Normalization')
-os.chdir('Normalization/')
+    # Load relevant file here with pyMat reader
+    monkeyName = 'Meetz'
+    seshDate = fileIterator
+    fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
 
+    allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
-## list of indices of correctTrials (non-instruct, valid trialCertify)
-corrTrials = correctTrialsMTX(allTrials)
+    if not os.path.exists('Normalization'):
+        os.makedirs('Normalization')
+    os.chdir('Normalization/')
 
-## generate list of unique active units, and their channel
-units = activeUnits('spikeData', allTrials)
-unitCluster = allTrials[corrTrials[0]]['spikeTempInfo']['cgs']
-unitsChannel = unitsInfo(units, corrTrials, allTrials)
+    # list of indices of correctTrials (non-instruct, valid trialCertify)
+    corrTrials = correctTrialsMTX(allTrials)
 
+    # generate list of unique active units, and their channel
+    units = activeUnits('spikeData', allTrials)
+    unitCluster = allTrials[corrTrials[0]]['spikeTempInfo']['cgs']
+    unitsChannel = unitsInfo(units, corrTrials, allTrials)
 
-## change stimDesc to be list of dictionaries
-for corrTrial in corrTrials:
-    currTrial = allTrials[corrTrial]
-    nStim = len(currTrial['stimDesc']['data']['listType'])
-    currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()}
-                                    for i in range(nStim)]
+    # change stimDesc to be list of dictionaries
+    for corrTrial in corrTrials:
+        currTrial = allTrials[corrTrial]
+        nStim = len(currTrial['stimDesc']['data']['listType'])
+        currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()}
+                                        for i in range(nStim)]
 
-
-## assert: stim sequence list is frozen
-seqList = []
-for corrTrial in corrTrials:
-    currTrial = allTrials[corrTrial]
-    stimDesc = currTrial['stimDesc']['data']
-    for stim in stimDesc:
-        if stim['stimLoc'] == 0 and stim['listType'] == 1:
-            if len(seqList) < 49:
-                seqList.append(stim['stimIndex'])
-                seqArr = np.array(seqList)
-                lastIndex = stim['stimIndex']
-            else:
-                posLastIndex = np.where(seqArr==lastIndex)[0][0]
-                if posLastIndex == len(seqArr)-1:
-                    if stim['stimIndex'] != seqArr[0]:
-                        print('out of sequence')
-                    else:
-                        lastIndex = stim['stimIndex']
-                else:
-                    if stim['stimIndex'] != seqArr[posLastIndex+1]:
-                        print('out of sequence')
-                    else:
-                        lastIndex = stim['stimIndex']
-
-
-## assert: are there correct trials without spikeData
-noSpikeData = []
-for trialCount, currTrial in enumerate(allTrials):
-    trial = currTrial['trial']['data']
-    extendedEOT = currTrial['extendedEOT']['data']
-    if extendedEOT == 0 and trial['instructTrial'] != 1:
-        if 'spikeData' not in currTrial:
-            noSpikeData.append(trialCount)
-
-
-## assert: frame consistency during stimlus duration
-frameRateHz = header['frameRateHz']['data']
-stimDurFrame = []
-for corrTrial in corrTrials:
-    currTrial = allTrials[corrTrial]
-    stimDesc = currTrial['stimDesc']['data']
-    for stim in stimDesc:
-        if stim['stimLoc'] == 0:
-            frameDiff = stim['stimOffFrame'] - stim['stimOnFrame']
-            stimDurFrame.append(frameDiff)
-if len(set(stimDurFrame)) != 1:
-    print('stimulus frame duration not consistent for mapping stimuli')
-else:
-    trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
-
-
-# generates a dictionary, numpy array, and Pandas Dataframe of stim Index
-# and corresponding directions/contrasts
-stimIndexDict = {}
-for corrTrial in corrTrials:
-    currTrial = allTrials[corrTrial]
-    stimDesc = currTrial['stimDesc']['data']
-    for stim in stimDesc:
-        if stim['stimLoc'] != 2:
-            index = stim['stimIndex']
-            if index not in stimIndexDict:
-                stimIndexDict[index] = {}
-                if stim['stimLoc'] not in stimIndexDict[index]:
-                    stimIndexDict[index][stim['stimLoc']] = \
-                    {'direction': stim['directionDeg'],
-                        'contrast': np.around(stim['contrast'],2)}
-            else:
-                if stim['stimLoc'] not in stimIndexDict[index]:
-                    stimIndexDict[index][stim['stimLoc']] = \
-                    {'direction': stim['directionDeg'],
-                        'contrast': np.around(stim['contrast'],2)}
-stimIndexArray = np.zeros((49,4))
-for i in range(len(stimIndexDict)):
-    stimIndexArray[i][0] = stimIndexDict[i][0]['direction']
-    stimIndexArray[i][1] = stimIndexDict[i][0]['contrast']
-    stimIndexArray[i][2] = stimIndexDict[i][1]['direction']
-    stimIndexArray[i][3] = stimIndexDict[i][1]['contrast']
-stimIndexDF = pd.DataFrame(stimIndexArray, columns=['loc0 Direction', 'loc0 Contrast',
-                                            'loc1 Direction', 'loc1 Contrast'])
-
-
-#initialize lists/arrays/dataframes for counting spikeCounts and for analysis
-blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
-highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
-                             min(stimIndexDF['loc0 Contrast'].unique())
-zeroDir = 0
-dirArray = np.array([0,60,120,180,240,300])
-angleMat = np.arange(180,900,60)
-spikeCountMat = np.zeros((len(units),blocksDone+1,49))
-spikeCountLong = []
-sponSpikeCountLong = []
-latency = 50/1000 # time in MS for counting window latency after stim on
-histPrePostMS = 100 #100ms window pre/post stimlus on/off
-sponWindowMS = 50 #50ms window before stimulus onset
-spikeHists = np.zeros((len(units),49, trueStimDurMS+(2*histPrePostMS+1)))
-stimIndexCount = np.zeros(49)
-
-
-# insert spike counts into matrix of unique stimulus sets
-for corrTrial in corrTrials:
-    currTrial = allTrials[corrTrial]
-    if 'spikeData' in currTrial:
+    # assert: stim sequence list is frozen
+    seqList = []
+    for corrTrial in corrTrials:
+        currTrial = allTrials[corrTrial]
         stimDesc = currTrial['stimDesc']['data']
-        stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
-        fixateTimeS = currTrial['taskEvents']['fixate']['time']
         for stim in stimDesc:
             if stim['stimLoc'] == 0 and stim['listType'] == 1:
-                stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
-                                /1000) + stim1TimeS
-                stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
-                                /1000) + stim1TimeS
-                stimIndex = np.int32(stim['stimIndex'])
-                stCount = int(stimIndexCount[stimIndex])
-                stimIndexCount[stimIndex] += 1
-                for unitCount, unit in enumerate(units):
-                    if unit in currTrial['spikeData']['unit']:
-                        unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
-                        #added 50ms onset latency for spike counts (100 for offset)
-                        unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
-                        stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS + latency)) &
-                                     (unitTimeStamps <= (stimOffTimeS + latency)))[0]
-                        spikeCountMat[unitCount][stCount][stimIndex] \
-                            = len(stimSpikes)
-                        spikeCountLong.append([unit,
-                                               stimIndex,
-                                               stimIndexCount[stimIndex],
-                                               len(stimSpikes)])
+                if len(seqList) < 49:
+                    seqList.append(stim['stimIndex'])
+                    seqArr = np.array(seqList)
+                    lastIndex = stim['stimIndex']
+                else:
+                    posLastIndex = np.where(seqArr==lastIndex)[0][0]
+                    if posLastIndex == len(seqArr)-1:
+                        if stim['stimIndex'] != seqArr[0]:
+                            print('out of sequence')
+                        else:
+                            lastIndex = stim['stimIndex']
+                    else:
+                        if stim['stimIndex'] != seqArr[posLastIndex+1]:
+                            print('out of sequence')
+                        else:
+                            lastIndex = stim['stimIndex']
 
-                        #Spontaneous Spikes
-                        sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS-(sponWindowMS/1000)))
-                                            & (unitTimeStamps <= stimOnTimeS))[0]
-                        sponSpikeCountLong.append([unit, len(sponSpikes)])
+    # assert: are there correct trials without spikeData
+    noSpikeData = []
+    for trialCount, currTrial in enumerate(allTrials):
+        trial = currTrial['trial']['data']
+        extendedEOT = currTrial['extendedEOT']['data']
+        if extendedEOT == 0 and trial['instructTrial'] != 1:
+            if 'spikeData' not in currTrial:
+                noSpikeData.append(trialCount)
 
-                        #PSTHs
-                        stimOnPreSNEV = stimOnTimeS - (histPrePostMS/1000)
-                        stimOffPostSNEV = stimOffTimeS + (histPrePostMS/1000)
-                        histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)\
-                                    & (unitTimeStamps <= stimOffPostSNEV))] - stimOnPreSNEV
-                        histStimSpikes = np.int32(histStimSpikes*1000)
-                        # spikeHists[unitCount, stimIndex, histStimSpikes] += 1
-                        spikeHists[unitCount][stimIndex][histStimSpikes] += 1
-
-
-# mean, SEM, and reshaping of spikeCount matrices
-# create pandas dataframe of spikeCount with corresponding unit, stimIndex
-spikeCountDF = pd.DataFrame(spikeCountLong, columns=['unit', 'stimIndex',
-                                                     'stimCount', 'stimSpikes'])
-sponSpikeCountDF = pd.DataFrame(sponSpikeCountLong, columns =['unit', 'sponSpikes'])
-
-sponSpikesMean = np.zeros(len(units)) # spikes in 50ms window
-sponSpikesSEM = np.zeros(len(units))
-for unitCount, unit in enumerate(units):
-    sponSpikesMean[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].mean()[1]
-    sponSpikesSEM[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].sem()[1]
-meanSpike = np.mean(spikeCountMat[:,:blocksDone,:], axis=1)
-spikeCountSD = np.std(spikeCountMat[:,:blocksDone,:], axis=1)
-spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
-meanSpikeReshaped = np.zeros((len(units),1,49))
-for count,i in enumerate(meanSpikeReshaped):
-    #row1 of 7x7 grid when reshaped
-    i[:,0:6] = meanSpike[count][0:6]
-    i[:,6] = meanSpike[count][42]
-    #row2
-    i[:,7:13] = meanSpike[count][6:12]
-    i[:,13] = meanSpike[count][43]
-    #row3
-    i[:,14:20] = meanSpike[count][12:18]
-    i[:,20] = meanSpike[count][44]
-    #row4
-    i[:,21:27] = meanSpike[count][18:24]
-    i[:,27] = meanSpike[count][45]
-    #row5
-    i[:,28:34] = meanSpike[count][24:30]
-    i[:,34] = meanSpike[count][46]
-    #row6
-    i[:,35:41] = meanSpike[count][30:36]
-    i[:,41] = meanSpike[count][47]
-    #row7
-    i[:,42:48] = meanSpike[count][36:42]
-    i[:,48] = meanSpike[count][48]
-
-
-'''
-## Filter Units
-# inclusion criteria:
-# 1. pref response > 2x null response
-# 2. pref response > baseline (need to incorporate this)
-filterUnits = []
-for unitCount, unit in enumerate(units):
-    b = meanSpikeReshaped[unitCount].reshape(7,7)
-    bSmooth = gaussian_filter(b, sigma=1)
-    prefDir, nullDir = unitPrefNullDir(bSmooth)
-
-    orientList = [(prefDir,'blank'),(nullDir,'blank'),
-                  ('blank',prefDir),('blank',nullDir)] 
-    respList = []
-    for i in orientList:
-        loc0Dir, loc1Dir = i
-        loc0Con = highContrast
-        loc1Con = highContrast
-        if loc0Dir == 'blank':
-            loc0Dir = 0
-            loc0Con = 0
-        if loc1Dir == 'blank':
-            loc1Dir = 0
-            loc1Con = 0
-        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
-                                   (stimIndexDF['loc0 Contrast'] == loc0Con) &
-                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
-                                   (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
-        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
-                    & (spikeCountDF['stimIndex'] == sIndex)]
-        unitDF = unitDF.iloc[:blocksDone].mean()
-        meanResp = unitDF[3] * 1000/trueStimDurMS
-        respList.append(meanResp)
-    
-    if respList[0] > 2*respList[1] or respList[2] > 2*respList[3]:
-        filterUnits.append(unit)
-'''
-
-# Unit's preferred direction based off of
-# gaussian fit of MTNC stimuli:
-angleMat = np.arange(180,900,60)
-unitGaussMean = np.zeros(len(units))
-unitGaussSig = np.zeros(len(units))
-for unitCount, unit in enumerate(units):
-    loc0Resp = meanSpike[unitCount][36:42]
-    loc1Resp = meanSpike[unitCount][42:48]
-    combResp = (loc0Resp + loc1Resp) / 2
-    extRespMat = np.concatenate((combResp[3:], combResp, combResp[:3]), axis=0)
-    maxIndex = np.where(combResp == np.max(combResp))[0][0] + 3
-    x = angleMat[maxIndex-3:maxIndex+4]
-    y = extRespMat[maxIndex-3:maxIndex+4]
-    params = gaussFit(x, y)
-    unitGaussMean[unitCount] = params[2] % 360
-    unitGaussSig[unitCount] = params[3]
-
-
-## Z-scored Correlations
-# filtered units test
-# combs = [i for i in combinations(filterUnits, 2)]
-
-# unfiltered units
-combs = [i for i in combinations(units, 2)]
-corrMat = np.zeros(len(combs))
-
-# z-scored spikeCountMat
-zSpikeCountMat = stats.zscore(spikeCountMat[:,:blocksDone,:], axis=1, nan_policy='omit')
-zSpikeCountMat = np.nan_to_num(zSpikeCountMat)
-zSpikeCountMat = np.reshape(zSpikeCountMat, (len(units), blocksDone*49))
-for count, i in enumerate(combs):
-    n1 = np.where(units == i[0])[0][0]
-    n2 = np.where(units == i[1])[0][0]
-    pairCorr = stats.pearsonr(zSpikeCountMat[n1], zSpikeCountMat[n2])
-    corrMat[count] = pairCorr[0]
-
-popCorr = np.mean(corrMat)
-
-
-# correlations for each paired stimulus condition across pairs:
-tempMat = stats.zscore(spikeCountMat[:,:blocksDone,:], axis=1, nan_policy='omit')
-individualCorrMat = np.zeros((len(combs), 36))
-for count, i in enumerate(combs):
-    n1 = np.where(units == i[0])[0][0]
-    n2 = np.where(units == i[1])[0][0]
-    for x in range(36):
-        pairStimCorr = stats.pearsonr(tempMat[n1, :, x], tempMat[n2, :, x])
-        individualCorrMat[count][x] = pairStimCorr[0]
-individualCorrMat = individualCorrMat.reshape(len(combs) * 36)
-
-
-# distance of neuron pair (based on channel number)
-pairChannelDistance = []
-for count, i in enumerate(combs):
-    n1Chan = int(unitsChannel[np.where(units == i[0])[0][0]])
-    n2Chan = int(unitsChannel[np.where(units == i[1])[0][0]])
-    channelDiff = abs(n1Chan-n2Chan)
-    pairChannelDistance.append(channelDiff)
-
-pairChannelDistance = np.array(pairChannelDistance)
-
-
-## RF location tuning similarity b/w neurons Bhattacharyya Distance 2D
-RFLocMat = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
-pairLocSimScore = np.zeros((len(combs),1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-
-    # a = np.flip(RFLocMat[n1], axis=0)
-    # b = np.flip(RFLocMat[n2], axis=0)
-    a = RFLocMat[n1]
-    b = RFLocMat[n2]
-    m1, cov1, p = gauss2dParams(a)
-    m2, cov2, p2 = gauss2dParams(b)
-    BC = bhattCoef2D(m1,m2,cov1,cov2)
-    pairLocSimScore[pairCount] = BC
-
-
-# direction tuning similarity b/w neurons using MTNC stim: Bhattacharyya Distance
-pairSimPrefDir = np.zeros((len(combs), 1))
-pairSimScore = np.zeros((len(combs), 1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-    m1 = unitGaussMean[n1]
-    v1 = unitGaussSig[n1]**2
-    m2 = unitGaussMean[n2]
-    v2 = unitGaussSig[n2]**2
-
-    # similarity of pref dirs only
-    if abs(m1 - m2) > 180:
-        if m1 > m2:
-            m1 = m2 - (360 - (m1 - m2))
-        else:
-            m2 = m1 - (360 - (m2 - m1))
-    pairSimPrefDir[pairCount] = 1 - (abs(m1 - m2) / 180)
-    # bhattacharyya similarity score
-    BC = bhattCoef(m1, m2, v1, v2)
-    pairSimScore[pairCount] = BC
-
-'''
-## direction tuning similarity b/w neurons Bhattacharyya Distance
-dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
-# unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
-extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
-                            dirTuningMat[:,:3]), axis=1)
-angleMat = np.arange(180,900,60)
-# unitsPrefDirMat = np.zeros(len(units))
-combs = [i for i in combinations(units, 2)]
-pairSimPrefDir = np.zeros((len(combs),1))
-pairSimScore = np.zeros((len(combs),1))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-    n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0][0] + 3)
-    n1X = angleMat[n1Max-3:n1Max+4]
-    # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
-    n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
-    n1XFull = np.linspace(n1X[0],n1X[-1],1000)
-    params = gaussFit(n1X, n1Y)
-    # n1YFull = gauss(n1XFull, *params)
-    m1 = params[2] # mean neuron 1
-    v1 = params[3]**2 # var neuron 1
-    n1TrueMean = m1 % 360
-    
-    n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0][0] + 3)
-    n2X = angleMat[n2Max-3:n2Max+4]
-    # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
-    n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
-    n2XFull = np.linspace(n2X[0], n2X[-1],1000)
-    params = gaussFit(n2X, n2Y)
-    # n2YFull = gauss(n2XFull, *params)
-    m2 = params[2]
-    v2 = params[3]**2
-    n2TrueMean = m2 % 360
-
-    m1 = m1%360
-    m2 = m2%360
-    if abs(m1-m2) > 180:
-        if m1 > m2:
-            m1 = m2-(360-(m1-m2))
-        else:
-            m2 = m1-(360-(m2-m1))
-
-    # similarity of pref dirs only
-    pairSimPrefDir[pairCount] = 1 - (abs(m1-m2)/180)
-    # bhattacharyya similarity score 
-    BC = bhattCoef(m1, m2, v1, v2)
-    pairSimScore[pairCount] = BC
-    # add unit's pref dir to unitPrefDir mat
-    # unitsPrefDirMat[n1] = n1TrueMean
-    # unitsPrefDirMat[n2] = n2TrueMean
-'''
-
-## scipy curvefit Normalization parameters
-unitAlphaIndex = np.zeros(len(units))
-unitGaussFit = []
-unitPairedNormFit = []
-unitGaussR2 = np.zeros(len(units))
-unitPairedEV = np.zeros(len(units))
-unitPairedNormR2 = np.zeros(len(units))
-unitNormFitEstimate = [[] for i in range(len(units))]
-scaledLoc = np.zeros(len(units))
-for unitCount, unit in enumerate(units):
-    b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
-    bReIndex = np.zeros((7,7))
-
-    # find direction tested that is closest to the pref dir
-    # and reindex around this so that it is in the middle of the grid
-    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-    nullDirIndex = np.where(dirArray == nullDir)[0][0]
-    reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
-
-    tempMain = b[:6, :6][:, reIndex]
-    tempMain = tempMain[:6, :6][reIndex, :]
-    temp0Blank = b[:6, 6][reIndex]
-    temp1Blank = b[6, :6][reIndex]
-    bReIndex[:6, :6] = tempMain
-    bReIndex[:6, 6] = temp0Blank
-    bReIndex[6, :6] = temp1Blank
-    bReIndex[6, 6] = b[6, 6]
-
-    # fixed (independent) variables - matrix of corresponding stim Indexes
-    stimMat = np.zeros((7, 7))
-    stimMat[:6, :6] = np.arange(36).reshape(6, 6)
-    stimMat[6, :6] = np.arange(36, 42)
-    stimMat[:, 6] = np.arange(42, 49)
-
-    # reshape fixed variables to match dependent variables
-    stimMatReIndex = np.zeros((7, 7))
-    tempMain = stimMat[:6, :6][:, reIndex]
-    tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
-    temp0Blank = stimMat[:6, 6][reIndex]
-    temp1Blank = stimMat[6, :6][reIndex]
-    stimMatReIndex[:6, :6] = tempMain
-    stimMatReIndex[:6, 6] = temp0Blank
-    stimMatReIndex[6, :6] = temp1Blank
-    stimMatReIndex[6, 6] = stimMat[6, 6]
-
-    print(unit)
-
-    # step 1: fitting gaussian function to single presentations
-    # to extract gaussian fit and scaling factor (scalar on loc0)
-    # if scalar >1 then loc0 has stronger resp
-    resp = np.concatenate((bReIndex[6, :6], bReIndex[:6, 6]), axis=0)
-    singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]),
-                                axis=0)
-    fixedVals = fixedValsForCurveFit(prefDir, singleStim, stimIndexDict)
-
-    pOpt, pCov = curve_fit(gaussNormFunc, fixedVals, resp.squeeze(),
-                           bounds=((0, 0, 0, 0, 0),
-                                   (np.inf, np.inf, 360, 360, np.inf)))
-
-    y_pred = gaussNormFunc(fixedVals, *pOpt)
-    print(f'first step fit R2 {r2_score(resp.squeeze(), y_pred)}')
-    unitGaussFit.append(pOpt)
-    unitGaussR2[unitCount] = r2_score(resp.squeeze(), y_pred)
-
-    # step 2, fitting normalization eqn with fixed gauss tuning curve
-    # only two free parameters (a0, a1)
-    resp = bReIndex[:6, :6].reshape(36)
-    pairedStim = stimMatReIndex[:6, :6].reshape(36)
-    pairedStim = pairedStim.astype(int)
-    fixedVals = fixedValsCurveFitForPairedStim(prefDir, pairedStim, stimIndexDict, pOpt)
-    if pOpt[4] > 1:
-        pOpt, pCov = curve_fit(EMSGaussNormStepFunc0, fixedVals, resp.squeeze())
-        y_pred = EMSGaussNormStepFunc0(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
-        r2 = r2_score(resp.squeeze(), y_pred)
-        EV = explained_variance_score(resp.squeeze(), y_pred)
-        print(f'explained variance {EV}')
-        print(pOpt)
-        sLoc = 1
+    # assert: frame consistency during stimlus duration
+    frameRateHz = header['frameRateHz']['data']
+    stimDurFrame = []
+    for corrTrial in corrTrials:
+        currTrial = allTrials[corrTrial]
+        stimDesc = currTrial['stimDesc']['data']
+        for stim in stimDesc:
+            if stim['stimLoc'] == 0:
+                frameDiff = stim['stimOffFrame'] - stim['stimOnFrame']
+                stimDurFrame.append(frameDiff)
+    if len(set(stimDurFrame)) != 1:
+        print('stimulus frame duration not consistent for mapping stimuli')
     else:
-        pOpt, pCov = curve_fit(EMSGaussNormStepFunc1, fixedVals, resp.squeeze())
-        y_pred = EMSGaussNormStepFunc1(fixedVals, *pOpt)
-        print(r2_score(resp.squeeze(), y_pred))
+        trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
+
+    # generates a dictionary, numpy array, and Pandas Dataframe of stim Index
+    # and corresponding directions/contrasts
+    stimIndexDict = {}
+    for corrTrial in corrTrials:
+        currTrial = allTrials[corrTrial]
+        stimDesc = currTrial['stimDesc']['data']
+        for stim in stimDesc:
+            if stim['stimLoc'] != 2:
+                index = stim['stimIndex']
+                if index not in stimIndexDict:
+                    stimIndexDict[index] = {}
+                    if stim['stimLoc'] not in stimIndexDict[index]:
+                        stimIndexDict[index][stim['stimLoc']] = \
+                        {'direction': stim['directionDeg'],
+                            'contrast': np.around(stim['contrast'],2)}
+                else:
+                    if stim['stimLoc'] not in stimIndexDict[index]:
+                        stimIndexDict[index][stim['stimLoc']] = \
+                        {'direction': stim['directionDeg'],
+                            'contrast': np.around(stim['contrast'],2)}
+    stimIndexArray = np.zeros((49,4))
+    for i in range(len(stimIndexDict)):
+        stimIndexArray[i][0] = stimIndexDict[i][0]['direction']
+        stimIndexArray[i][1] = stimIndexDict[i][0]['contrast']
+        stimIndexArray[i][2] = stimIndexDict[i][1]['direction']
+        stimIndexArray[i][3] = stimIndexDict[i][1]['contrast']
+    stimIndexDF = pd.DataFrame(stimIndexArray, columns=['loc0 Direction', 'loc0 Contrast',
+                                                'loc1 Direction', 'loc1 Contrast'])
+
+    # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
+    blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
+    highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
+                                 min(stimIndexDF['loc0 Contrast'].unique())
+    zeroDir = 0
+    dirArray = np.array([0,60,120,180,240,300])
+    angleMat = np.arange(180,900,60)
+    spikeCountMat = np.zeros((len(units),blocksDone+1,49))
+    spikeCountLong = []
+    sponSpikeCountLong = []
+    onLatency = 25/1000  # time in MS for counting window latency after stim on
+    offLatency = 100/1000  # time in MS for counting window latency after stim off
+    histPrePostMS = 100  # 100ms window pre/post stimulus on/off
+    sponWindowMS = 50  # 50ms window before stimulus onset
+    spikeHists = np.zeros((len(units),49, trueStimDurMS + (2*histPrePostMS+1)))
+    stimIndexCount = np.zeros(49)
+
+    # insert spike counts into matrix of unique stimulus sets
+    for corrTrial in corrTrials:
+        currTrial = allTrials[corrTrial]
+        if 'spikeData' in currTrial:
+            stimDesc = currTrial['stimDesc']['data']
+            stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
+            fixateTimeS = currTrial['taskEvents']['fixate']['time']
+            for stim in stimDesc:
+                if stim['stimLoc'] == 0 and stim['listType'] == 1:
+                    stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
+                                    / 1000) + stim1TimeS
+                    stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
+                                    / 1000) + stim1TimeS
+                    stimIndex = np.int32(stim['stimIndex'])
+                    stCount = int(stimIndexCount[stimIndex])
+                    stimIndexCount[stimIndex] += 1
+                    for unitCount, unit in enumerate(units):
+                        if unit in currTrial['spikeData']['unit']:
+                            unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
+                            # added 50ms onset latency for spike counts (100 for offset)
+                            unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
+                            stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS + onLatency)) &
+                                         (unitTimeStamps <= (stimOffTimeS + offLatency)))[0]
+                            spikeCountMat[unitCount][stCount][stimIndex] \
+                                = len(stimSpikes)
+                            spikeCountLong.append([unit,
+                                                   stimIndex,
+                                                   stimIndexCount[stimIndex],
+                                                   len(stimSpikes)])
+
+                            # Spontaneous Spikes
+                            sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS-(sponWindowMS/1000)))
+                                                  & (unitTimeStamps <= stimOnTimeS))[0]
+                            sponSpikeCountLong.append([unit, len(sponSpikes)])
+
+                            # PSTHs
+                            stimOnPreSNEV = stimOnTimeS - (histPrePostMS/1000)
+                            stimOffPostSNEV = stimOffTimeS + (histPrePostMS/1000)
+                            histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV)
+                                                            & (unitTimeStamps <= stimOffPostSNEV)
+                                                             )] - stimOnPreSNEV
+                            histStimSpikes = np.int32(histStimSpikes*1000)
+                            # spikeHists[unitCount, stimIndex, histStimSpikes] += 1
+                            spikeHists[unitCount][stimIndex][histStimSpikes] += 1
+
+    # mean, SEM, and reshaping of spikeCount matrices
+    # create pandas dataframe of spikeCount with corresponding unit, stimIndex
+    spikeCountDF = pd.DataFrame(spikeCountLong, columns=['unit', 'stimIndex',
+                                                         'stimCount', 'stimSpikes'])
+    sponSpikeCountDF = pd.DataFrame(sponSpikeCountLong, columns=['unit', 'sponSpikes'])
+    sponSpikesMean = np.zeros(len(units)) # spikes in 50ms window
+    sponSpikesSEM = np.zeros(len(units))
+    for unitCount, unit in enumerate(units):
+        sponSpikesMean[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].mean()[1]
+        sponSpikesSEM[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].sem()[1]
+    meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
+    spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
+    spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
+    meanSpikeReshaped = np.zeros((len(units), 1, 49))
+    for count, i in enumerate(meanSpikeReshaped):
+        # row1 of 7x7 grid when reshaped
+        i[:, 0:6] = meanSpike[count][0:6]
+        i[:, 6] = meanSpike[count][42]
+        # row2
+        i[:, 7:13] = meanSpike[count][6:12]
+        i[:, 13] = meanSpike[count][43]
+        # row3
+        i[:, 14:20] = meanSpike[count][12:18]
+        i[:, 20] = meanSpike[count][44]
+        # row4
+        i[:, 21:27] = meanSpike[count][18:24]
+        i[:, 27] = meanSpike[count][45]
+        # row5
+        i[:, 28:34] = meanSpike[count][24:30]
+        i[:, 34] = meanSpike[count][46]
+        # row6
+        i[:, 35:41] = meanSpike[count][30:36]
+        i[:, 41] = meanSpike[count][47]
+        # row7
+        i[:, 42:48] = meanSpike[count][36:42]
+        i[:, 48] = meanSpike[count][48]
+
+
+    '''
+    ## Filter Units
+    # inclusion criteria:
+    # 1. pref response > 2x null response
+    # 2. pref response > baseline (need to incorporate this)
+    filterUnits = []
+    for unitCount, unit in enumerate(units):
+        b = meanSpikeReshaped[unitCount].reshape(7,7)
+        bSmooth = gaussian_filter(b, sigma=1)
+        prefDir, nullDir = unitPrefNullDir(bSmooth)
+    
+        orientList = [(prefDir,'blank'),(nullDir,'blank'),
+                      ('blank',prefDir),('blank',nullDir)] 
+        respList = []
+        for i in orientList:
+            loc0Dir, loc1Dir = i
+            loc0Con = highContrast
+            loc1Con = highContrast
+            if loc0Dir == 'blank':
+                loc0Dir = 0
+                loc0Con = 0
+            if loc1Dir == 'blank':
+                loc1Dir = 0
+                loc1Con = 0
+            sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                       (stimIndexDF['loc0 Contrast'] == loc0Con) &
+                                       (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                       (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+            unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
+                        & (spikeCountDF['stimIndex'] == sIndex)]
+            unitDF = unitDF.iloc[:blocksDone].mean()
+            meanResp = unitDF[3] * 1000/trueStimDurMS
+            respList.append(meanResp)
+        
+        if respList[0] > 2*respList[1] or respList[2] > 2*respList[3]:
+            filterUnits.append(unit)
+    '''
+
+    # Unit's preferred direction based off of
+    # gaussian fit of MTNC stimuli:
+    angleMat = np.arange(180, 900, 60)
+    unitGaussMean = np.zeros(len(units))
+    unitGaussSig = np.zeros(len(units))
+    for unitCount, unit in enumerate(units):
+        loc0Resp = meanSpike[unitCount][36:42]
+        loc1Resp = meanSpike[unitCount][42:48]
+        combResp = (loc0Resp + loc1Resp) / 2
+        extRespMat = np.concatenate((combResp[3:], combResp, combResp[:3]), axis=0)
+        maxIndex = np.where(combResp == np.max(combResp))[0][0] + 3
+        x = angleMat[maxIndex-3:maxIndex+4]
+        y = extRespMat[maxIndex-3:maxIndex+4]
+        params = gaussFit(x, y)
+        unitGaussMean[unitCount] = params[2] % 360
+        unitGaussSig[unitCount] = params[3]
+
+    # Z-scored Correlations
+    # filtered units test
+    # combs = [i for i in combinations(filterUnits, 2)]
+
+    # unfiltered units
+    combs = [i for i in combinations(units, 2)]
+    corrMat = np.zeros(len(combs))
+
+    # z-scored spikeCountMat
+    zSpikeCountMat = stats.zscore(spikeCountMat[:, :blocksDone, :], axis=1, nan_policy='omit')
+    zSpikeCountMat = np.nan_to_num(zSpikeCountMat)
+    zSpikeCountMat = np.reshape(zSpikeCountMat, (len(units), blocksDone*49))
+    for count, i in enumerate(combs):
+        n1 = np.where(units == i[0])[0][0]
+        n2 = np.where(units == i[1])[0][0]
+        pairCorr = stats.pearsonr(zSpikeCountMat[n1], zSpikeCountMat[n2])
+        corrMat[count] = pairCorr[0]
+
+    popCorr = np.mean(corrMat)
+
+    # distance of neuron pair (based on channel number)
+    pairChannelDistance = []
+    for count, i in enumerate(combs):
+        n1Chan = int(unitsChannel[np.where(units == i[0])[0][0]])
+        n2Chan = int(unitsChannel[np.where(units == i[1])[0][0]])
+        channelDiff = abs(n1Chan-n2Chan)
+        pairChannelDistance.append(channelDiff)
+
+    pairChannelDistance = np.array(pairChannelDistance)
+
+    ## RF location tuning similarity b/w neurons Bhattacharyya Distance 2D
+    RFLocMat = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
+    pairLocSimScore = np.zeros((len(combs),1))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+
+        # a = np.flip(RFLocMat[n1], axis=0)
+        # b = np.flip(RFLocMat[n2], axis=0)
+        a = RFLocMat[n1]
+        b = RFLocMat[n2]
+        m1, cov1, p = gauss2dParams(a)
+        m2, cov2, p2 = gauss2dParams(b)
+        BC = bhattCoef2D(m1,m2,cov1,cov2)
+        pairLocSimScore[pairCount] = BC
+
+    # direction tuning similarity b/w neurons using MTNC stim: Bhattacharyya Distance
+    pairSimPrefDir = np.zeros((len(combs), 1))
+    pairSimScore = np.zeros((len(combs), 1))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+        m1 = unitGaussMean[n1]
+        v1 = unitGaussSig[n1]**2
+        m2 = unitGaussMean[n2]
+        v2 = unitGaussSig[n2]**2
+
+        # similarity of pref dirs only
+        if abs(m1 - m2) > 180:
+            if m1 > m2:
+                m1 = m2 - (360 - (m1 - m2))
+            else:
+                m2 = m1 - (360 - (m2 - m1))
+        pairSimPrefDir[pairCount] = 1 - (abs(m1 - m2) / 180)
+        # bhattacharyya similarity score
+        BC = bhattCoef(m1, m2, v1, v2)
+        pairSimScore[pairCount] = BC
+
+    '''
+    ## direction tuning similarity b/w neurons Bhattacharyya Distance
+    dirTuningMat = np.load('../Direction Tuning/unitsDirTuningMat.npy') #load from directions folder
+    # unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
+    extTunMat = np.concatenate((dirTuningMat[:,3:], dirTuningMat[:,:], 
+                                dirTuningMat[:,:3]), axis=1)
+    angleMat = np.arange(180,900,60)
+    # unitsPrefDirMat = np.zeros(len(units))
+    combs = [i for i in combinations(units, 2)]
+    pairSimPrefDir = np.zeros((len(combs),1))
+    pairSimScore = np.zeros((len(combs),1))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+        n1Max = int(np.where(dirTuningMat[n1] == np.max(dirTuningMat[n1]))[0][0] + 3)
+        n1X = angleMat[n1Max-3:n1Max+4]
+        # n1Y = extTunMat[n1][n1Max-3:n1Max+4]
+        n1Y = extTunMat[n1][n1Max-3:n1Max+4]/max(extTunMat[n1][n1Max-3:n1Max+4])
+        n1XFull = np.linspace(n1X[0],n1X[-1],1000)
+        params = gaussFit(n1X, n1Y)
+        # n1YFull = gauss(n1XFull, *params)
+        m1 = params[2] # mean neuron 1
+        v1 = params[3]**2 # var neuron 1
+        n1TrueMean = m1 % 360
+        
+        n2Max = int(np.where(dirTuningMat[n2] == np.max(dirTuningMat[n2]))[0][0] + 3)
+        n2X = angleMat[n2Max-3:n2Max+4]
+        # n2Y = extTunMat[n2][n2Max-3:n2Max+4]
+        n2Y = extTunMat[n2][n2Max-3:n2Max+4]/max(extTunMat[n2][n2Max-3:n2Max+4])
+        n2XFull = np.linspace(n2X[0], n2X[-1],1000)
+        params = gaussFit(n2X, n2Y)
+        # n2YFull = gauss(n2XFull, *params)
+        m2 = params[2]
+        v2 = params[3]**2
+        n2TrueMean = m2 % 360
+    
+        m1 = m1%360
+        m2 = m2%360
+        if abs(m1-m2) > 180:
+            if m1 > m2:
+                m1 = m2-(360-(m1-m2))
+            else:
+                m2 = m1-(360-(m2-m1))
+    
+        # similarity of pref dirs only
+        pairSimPrefDir[pairCount] = 1 - (abs(m1-m2)/180)
+        # bhattacharyya similarity score 
+        BC = bhattCoef(m1, m2, v1, v2)
+        pairSimScore[pairCount] = BC
+        # add unit's pref dir to unitPrefDir mat
+        # unitsPrefDirMat[n1] = n1TrueMean
+        # unitsPrefDirMat[n2] = n2TrueMean
+    '''
+
+    # scipy curvefit Normalization parameters
+    unitAlphaIndex = np.zeros(len(units))
+    unitGaussFit = []
+    unitPairedNormFit = []
+    unitGaussR2 = np.zeros(len(units))
+    unitPairedEV = np.zeros(len(units))
+    unitPairedNormR2 = np.zeros(len(units))
+    unitNormFitEstimate = [[] for i in range(len(units))]
+    scaledLoc = np.zeros(len(units))
+    scalar = np.zeros(len(units))
+    for unitCount, unit in enumerate(units):
+        b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
+        bReIndex = np.zeros((7, 7))
+
+        # find direction tested that is closest to the pref dir
+        # and reindex around this so that it is in the middle of the grid
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+        nullDirIndex = np.where(dirArray == nullDir)[0][0]
+        reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
+
+        tempMain = b[:6, :6][:, reIndex]
+        tempMain = tempMain[:6, :6][reIndex, :]
+        temp0Blank = b[:6, 6][reIndex]
+        temp1Blank = b[6, :6][reIndex]
+        bReIndex[:6, :6] = tempMain
+        bReIndex[:6, 6] = temp0Blank
+        bReIndex[6, :6] = temp1Blank
+        bReIndex[6, 6] = b[6, 6]
+
+        # fixed (independent) variables - matrix of corresponding stim Indexes
+        stimMat = np.zeros((7, 7))
+        stimMat[:6, :6] = np.arange(36).reshape(6, 6)
+        stimMat[6, :6] = np.arange(36, 42)
+        stimMat[:, 6] = np.arange(42, 49)
+
+        # reshape fixed variables to match dependent variables
+        stimMatReIndex = np.zeros((7, 7))
+        tempMain = stimMat[:6, :6][:, reIndex]
+        tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
+        temp0Blank = stimMat[:6, 6][reIndex]
+        temp1Blank = stimMat[6, :6][reIndex]
+        stimMatReIndex[:6, :6] = tempMain
+        stimMatReIndex[:6, 6] = temp0Blank
+        stimMatReIndex[6, :6] = temp1Blank
+        stimMatReIndex[6, 6] = stimMat[6, 6]
+
+        # Generic Normalization (L1+L2)/(al1+al2+sig) w.o scalar
+        # fits L0-L6 for both locations separately loc0 and loc1 will
+        # have different L0-L6 values
+        resp = b.reshape(49)
+        fixedVals = fixedValsForGenericNorm(stimMat.reshape(49), stimIndexDict)
+        pOpt, pCov = curve_fit(genericNormNoScalar, fixedVals, resp.squeeze(),
+                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                                       (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+                                        np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+                                        3, 3, .10)))
+        print(unit, pOpt)
+        y_pred = genericNormNoScalar(fixedVals, *pOpt)
         r2 = r2_score(resp.squeeze(), y_pred)
-        EV = explained_variance_score(resp.squeeze(), y_pred)
-        print(f'explained variance {EV}')
-        print(pOpt)
-        sLoc = 0
+        print(r2)
 
-    unitPairedEV[unitCount] = EV
-    unitPairedNormR2[unitCount] = r2
-    scaledLoc[unitCount] = sLoc
-    unitPairedNormFit.append(pOpt)
+        # Generic Normalization (L1+L2)/(al1+al0+sig) w Scalar
 
-    # for fitting across mean spike count
-    # resp = bReIndex.reshape(49)[:-1]
-    # fixedVals = fixedValsForEMSGen(stimMatReIndex.reshape(49)[:-1], stimIndexDict)
-    #
-    # if max(bReIndex[:6, 6])-min(bReIndex[:6, 6]) > max(bReIndex[6, :6])-min(bReIndex[6, :6]):
-    #     pOpt, pCov = curve_fit(emsNormGen1, fixedVals, resp, bounds=(
-    #         (0, 0, 0, 0, 0, 0, 0, 0, 0),
-    #         (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
-    #     print(unit, pOpt)
-    #     y_pred = emsNormGen1(fixedVals, *pOpt)
-    #     print(r2_score(resp.squeeze(), y_pred))
-    #     r2 = r2_score(resp.squeeze(), y_pred)
-    #     sLoc = 0
-    # else:
-    #     print('using norm func 0')
-    #     pOpt, pCov = curve_fit(emsNormGen0, fixedVals, resp, bounds=(
-    #         (0, 0, 0, 0, 0, 0, 0, 0, 0),
-    #         (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
-    #     print(unit, pOpt)
-    #     y_pred = emsNormGen0(fixedVals, *pOpt)
-    #     print(r2_score(resp.squeeze(), y_pred))
-    #     r2 = r2_score(resp.squeeze(), y_pred)
-    #     sLoc = 1
+        # resp = b.reshape(49)
+        # fixedVals = fixedValsForGenericNorm(stimMat.reshape(49), stimIndexDict)
+        # if max(bReIndex[:6, 6]) > max(bReIndex[6, :6]):
+        #     pOpt, pCov = curve_fit(genericNorm1, fixedVals, resp.squeeze(), bounds=(
+        #         (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #         (np.inf, np.inf, np.inf, np.inf, np.inf,
+        #          np.inf, 1, 5, 5, np.inf)))
+        #     print(unit, pOpt)
+        #     y_pred = genericNorm1(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     sLoc = 0
+        # else:
+        #     print('using norm func 0')
+        #     pOpt, pCov = curve_fit(genericNorm0, fixedVals, resp.squeeze(), bounds=(
+        #         (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #         (np.inf, np.inf, np.inf, np.inf, np.inf,
+        #          np.inf, 1, 5, 5, np.inf)))
+        #     print(unit, pOpt)
+        #     y_pred = genericNorm0(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     sLoc = 1
 
+        # for fitting EMS normalization generic (without Gauss tuning)
 
-# unitR2 = unitR2[np.where(unitR2 > 0.6)[0]]
-# print(f'average R2 is {np.mean(totR2)}')
+        # resp = bReIndex.reshape(49)[:-1]
+        # fixedVals = fixedValsForEMSGen(stimMatReIndex.reshape(49)[:-1], stimIndexDict)
+        #
+        # if max(bReIndex[:6, 6])-min(bReIndex[:6, 6]) > max(bReIndex[6, :6])-min(bReIndex[6, :6]):
+        #     pOpt, pCov = curve_fit(emsNormGen1, fixedVals, resp, bounds=(
+        #         (0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #         (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
+        #     print(unit, pOpt)
+        #     y_pred = emsNormGen1(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     sLoc = 0
+        # else:
+        #     print('using norm func 0')
+        #     pOpt, pCov = curve_fit(emsNormGen0, fixedVals, resp, bounds=(
+        #         (0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #         (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
+        #     print(unit, pOpt)
+        #     y_pred = emsNormGen0(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     sLoc = 1
 
+        # # EMS normalization two steps with Gauss tuning curve
 
-## generate pair's combined Norm Value
-pairAlphaMulti = np.zeros((len(combs)))
-pairR2 = np.zeros(len(combs))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-
-    pairR2[pairCount] = np.sqrt(unitR2[n1] * unitR2[n2])
-    pairAlphaMulti[pairCount] = np.sqrt(unitAlphaIndex[n1] * unitAlphaIndex[n2])
-
-
-# print(stats.pearsonr(pairAlphaMulti, corrMat))
-# print(stats.pearsonr(pairSimPrefDir.flatten(), corrMat))
-# print(stats.pearsonr((pairSimPrefDir.flatten()+pairAlphaMulti)/2, corrMat))
-# plt.scatter((pairSimPrefDir.flatten()+pairAlphaMulti)/2, corrMat); plt.show()
-
-pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
-pairCombinedSimScoreMulti = np.squeeze((pairLocSimScore * pairSimScore))
-pairCombinedSimScorePrefDir = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2)
-pairCombinedPrefDirAlpha = (pairSimPrefDir.flatten() + pairAlphaMulti) / 2
-
-## Create subset of Pandas DF for P, N, P+N conditions for all units
-pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount', 
-                                'stimSpikes', 'contrast', 'prefNullStr'])
-for unitCount, unit in enumerate(units):
-    # find direction tested that is closest to unit's preferred and null direction
-    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-    orientCount = 0
-    orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null', 
-                 'pref+blank', 'null+blank','blank+pref', 'blank+null']
-    for j in [(prefDir,prefDir),(prefDir,nullDir),(nullDir,prefDir),(nullDir,nullDir),]:
-        loc0Dir, loc1Dir = j
-        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
-                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
-                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
-                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
-                    & (spikeCountDF['stimIndex'] == sIndex)]
-        unitDF = unitDF.iloc[:blocksDone]
-        unitDF['contrast'] = highContrast
-        unitDF['prefNullStr'] = orientList[orientCount]
-        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
-        orientCount += 1
-
-    #Loc 0 Pref/Null only
-    for i in [(prefDir, zeroDir), (nullDir, zeroDir)]:
-        loc0Dir, loc1Dir = i  
-        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
-                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
-                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
-                                   (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
-        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
-                    & (spikeCountDF['stimIndex'] == sIndex)]
-        unitDF = unitDF.iloc[:blocksDone]
-        unitDF['contrast'] = zeroContrast
-        unitDF['prefNullStr'] = orientList[orientCount]
-        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
-        orientCount += 1
-
-    #loc 1 Pref/Null only
-    for x in [(zeroDir,prefDir), (zeroDir,nullDir)]:
-        loc0Dir, loc1Dir = x  
-        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
-                                   (stimIndexDF['loc0 Contrast'] == zeroContrast) &
-                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
-                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
-        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit) 
-                    & (spikeCountDF['stimIndex'] == sIndex)]
-        unitDF = unitDF.iloc[:blocksDone]
-        unitDF['contrast'] = zeroContrast
-        unitDF['prefNullStr'] = orientList[orientCount]
-        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
-        orientCount += 1
-
-## generate within unit NMI score for P+N and N+P condition only
-unitWithinNMI = np.zeros(len(units))
-unitNMI0 = np.zeros(len(units))
-unitNMI1 = np.zeros(len(units))
-for unitCount, unit in enumerate(units):
-    unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
-    #spikeCounts in spikes/sec
-    unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS
-    singleResp = np.zeros(4)
-    doubleResp = np.zeros(4)
-    for count, indx in enumerate(['pref+blank', 'null+blank', 'blank+pref', 'blank+null']):
-        mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
-        singleResp[count] = mean
-    for count, indx in enumerate(['pref+pref', 'pref+null', 'null+pref', 'null+null']):
-        mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
-        doubleResp[count] = mean
-
-    # NMI
-    # avgP = (singleResp[0] + singleResp[2]) / 2
-    # avgN = (singleResp[1] + singleResp[3]) / 2
-    # avgPN = (doubleResp[1] + doubleResp[2]) / 2
-    # unitWithinNMI[unitCount] = avgPN / avgP + avgN + avgPN
-
-    #NMI loc 0
-    NMI0 = (doubleResp[0] + doubleResp[3] - doubleResp[1]) / \
-           (doubleResp[0] + doubleResp[3] + doubleResp[1])
-    #NMI loc 1
-    NMI1 = (doubleResp[0] + doubleResp[3] - doubleResp[2]) / \
-           (doubleResp[0] + doubleResp[3] + doubleResp[2])
-    unitNMI0[unitCount] = NMI0
-    unitNMI1[unitCount] = NMI1
-    unitWithinNMI[unitCount] = NMI0 + NMI1
-
-    # NMI loc 0
-    # NMI0 = (singleResp[0] - singleResp[3] - doubleResp[1] - singleResp[3]) / (
-    #         singleResp[0] - singleResp[3] + doubleResp[1] - singleResp[3])
-    # NMI1 = (singleResp[1] - singleResp[2] - doubleResp[2] - singleResp[2]) / (
-    #         singleResp[1] - singleResp[2] + doubleResp[2] - singleResp[2])
-    # unitWithinNMI[unitCount] = (NMI0 + NMI1) / 2
-
-    # # #NMI loc 0
-    # NMI0 = (doubleResp[0] + doubleResp[3] - doubleResp[1]) / (
-    #         doubleResp[0] + doubleResp[3] + doubleResp[1])
-    # NMI1 = (doubleResp[0] + doubleResp[3] - doubleResp[2]) / (
-    #         doubleResp[0] + doubleResp[3] + doubleResp[2])
-    # unitWithinNMI[unitCount] = (NMI0 + NMI1) / 2
-
-    # #NMI loc 0
-    # NMI0 = doubleResp[1] / doubleResp[0]
-    # NMI1 = doubleResp[2] / doubleResp[0]
-    # unitWithinNMI[unitCount] = min([NMI0, NMI1])
-
-# NMI P+N/N+P across pairs
-pairNMI = np.zeros(len(combs))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
-
-    pairNMI[pairCount] = (unitNMI0[n1] + unitNMI0[n2]) - (unitNMI1[n1] + unitNMI1[n2]) / (
-                          unitNMI0[n1] + unitNMI0[n2]) + (unitNMI1[n2] + unitNMI1[n2])
-
-# print(stats.pearsonr(pairNMI, corrMat))
-# print(stats.pearsonr(pairSimPrefDir.flatten(), corrMat))
-# print(stats.pearsonr((pairSimPrefDir.flatten() + pairNMI)/2, corrMat))
-# plt.scatter((pairSimPrefDir.flatten() + pairNMI)/2, corrMat) ; plt.show()
+        # # step 1: fitting gaussian function to single presentations
+        # # to extract gaussian fit and scaling factor (scalar on loc0)
+        # # if scalar >1 then loc0 has stronger resp
+        # resp = np.concatenate((bReIndex[6, :6], bReIndex[:6, 6]), axis=0)
+        # singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]),
+        #                             axis=0)
+        # fixedVals = fixedValsForCurveFit(prefDir, singleStim, stimIndexDict)
+        # if max(bReIndex[6, :6]) > max(bReIndex[:6, 6]):
+        #     pOptGauss, pCov = curve_fit(gaussNormFunc0, fixedVals, resp.squeeze(),
+        #                                 bounds=((0, 0, 0, 0, 0),
+        #                                 (np.inf, max(resp)*1.5, 360, 360, 1)))
+        #     y_pred = gaussNormFunc0(fixedVals, *pOptGauss)
+        #     print(f'first step fit R2 {r2_score(resp.squeeze(), y_pred)}')
+        #     sLoc = 1
+        # else:
+        #     pOptGauss, pCov = curve_fit(gaussNormFunc1, fixedVals, resp.squeeze(),
+        #                                 bounds=((0, 0, 0, 0, 0),
+        #                                 (np.inf, max(resp)*1.5, 360, 360, 1)))
+        #     y_pred = gaussNormFunc1(fixedVals, *pOptGauss)
+        #     print(f'first step fit R2 {r2_score(resp.squeeze(), y_pred)}')
+        #     print('scaled loc=0')
+        #     sLoc = 0
+        # unitGaussR2[unitCount] = r2_score(resp.squeeze(), y_pred)
+        # unitGaussFit.append(pOptGauss)
+        # scalar[unitCount] = pOptGauss[4]
+        #
+        # # step 2: fitting  EMS normalization eqn with fixed gauss tuning curve
+        # # to paired stimuli
+        # # only two free parameters (a0, a1)
+        # resp = bReIndex[:6, :6].reshape(36)
+        # pairedStim = stimMatReIndex[:6, :6].reshape(36)
+        # pairedStim = pairedStim.astype(int)
+        # fixedVals = fixedValsCurveFitForPairedStim(prefDir, pairedStim, stimIndexDict, pOptGauss)
+        # if sLoc == 1:
+        #     pOpt, pCov = curve_fit(EMSGaussNormStepFunc0, fixedVals, resp.squeeze(),
+        #                            bounds=((-1, -1), (5, 5)))
+        #     y_pred = EMSGaussNormStepFunc0(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     EV = explained_variance_score(resp.squeeze(), y_pred)
+        #     print(f'explained variance {EV}')
+        #     print(pOpt)
+        #     print('using EMS Func0, sLoc==1')
+        # else:
+        #     pOpt, pCov = curve_fit(EMSGaussNormStepFunc1, fixedVals, resp.squeeze(),
+        #                            bounds=((-1, -1), (5, 5)))
+        #     y_pred = EMSGaussNormStepFunc1(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     EV = explained_variance_score(resp.squeeze(), y_pred)
+        #     print(f'explained variance {EV}')
+        #     print(pOpt)
 
 
-# generate within unit NMI for every paired stimulus
-unitAllNMI = np.zeros((len(units), 36))
-for unitCount, unit in enumerate(units):
-    b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
-    pairedMat = b[:6,:6].reshape(36)
-    loc0Single = b[6,:6]
-    loc1Single = b[:6,6]
-    directionSet = np.array([0, 60, 120, 180, 240, 300])
+        # # Fitting two step EMS Normalization Equation with L0-L6
+        # # instead of guassian
 
-    for i in range(36):
-        loc0Dir = stimIndexDict[i][0]['direction']
-        loc1Dir = stimIndexDict[i][1]['direction']
-        loc0SingleResp = loc0Single[np.where(directionSet == loc0Dir)[0]][0]
-        loc1SingleResp = loc1Single[np.where(directionSet == loc1Dir)[0]][0]
-        NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
-              (loc0SingleResp + loc1SingleResp) + pairedMat[i])
-        unitAllNMI[unitCount][i] = NMI
+        # # step 1, fitting single stimulus with L0-L6 for direction tuning
+        # resp = np.concatenate((bReIndex[6, :6], bReIndex[:6, 6]), axis=0)
+        # singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]),
+        #                             axis=0)
+        # fixedVals = fixedValsForEMSGen(singleStim, stimIndexDict)
+        # if max(bReIndex[6, :6]) > max(bReIndex[:6, 6]):
+        #     pOpt, pCov = curve_fit(emsSingleStim0, fixedVals, resp.squeeze(),
+        #                            bounds=((0, 0, 0, 0, 0, 0, 0),
+        #                                    (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
+        #     y_pred = emsSingleStim0(fixedVals, *pOpt)
+        #     print(f'first step fit R2 {r2_score(resp.squeeze(), y_pred)}')
+        #     sLoc = 1
+        # else:
+        #     pOpt, pCov = curve_fit(emsSingleStim1, fixedVals, resp.squeeze(),
+        #                            bounds=((0, 0, 0, 0, 0, 0, 0),
+        #                                    (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf)))
+        #     y_pred = emsSingleStim1(fixedVals, *pOpt)
+        #     print(f'first step fit R2 {r2_score(resp.squeeze(), y_pred)}')
+        #     print('scaled loc=0')
+        #     sLoc = 0
+        #
+        # # step 2, fitting paired stimulus to EMS normalization eqn with
+        # # fixed L0-L6 and S values. Only two free parameters (a0,a1)
+        # resp = bReIndex[:6, :6].reshape(36)
+        # pairedStim = stimMatReIndex[:6, :6].reshape(36)
+        # pairedStim = pairedStim.astype(int)
+        # fixedVals = fixedValsForPairedStimL0L6(pairedStim, stimIndexDict, pOpt)
+        # if sLoc == 1:
+        #     pOpt, pCov = curve_fit(EMSGenNormPaired0, fixedVals, resp.squeeze())
+        #     y_pred = EMSGenNormPaired0(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     EV = explained_variance_score(resp.squeeze(), y_pred)
+        #     print(f'explained variance {EV}')
+        #     print(pOpt)
+        #     print('using EMS Func0, sLoc==1')
+        # else:
+        #     pOpt, pCov = curve_fit(EMSGenNormPaired1, fixedVals, resp.squeeze())
+        #     y_pred = EMSGenNormPaired1(fixedVals, *pOpt)
+        #     print(r2_score(resp.squeeze(), y_pred))
+        #     r2 = r2_score(resp.squeeze(), y_pred)
+        #     EV = explained_variance_score(resp.squeeze(), y_pred)
+        #     print(f'explained variance {EV}')
+        #     print(pOpt)
 
-pairAllNMI = np.zeros(len(combs))
-for pairCount, pair in enumerate(combs):
-    n1 = np.where(units == pair[0])[0][0]
-    n2 = np.where(units == pair[1])[0][0]
+        totR2.append(r2)
+        # unitPairedEV[unitCount] = EV
+        unitPairedNormR2[unitCount] = r2
+        # scaledLoc[unitCount] = sLoc
+        unitPairedNormFit.append(pOpt)
+        unitNormFitEstimate[unitCount] = pOpt
+        unitAlphaIndex[unitCount] = (pOpt[0] + pOpt[1]) / 2
 
-    m1 = np.mean(unitAllNMI[n1])
-    v1 = np.std(unitAllNMI[n1]) ** 2
-    m2 = np.mean(unitAllNMI[n2])
-    v2 = np.std(unitAllNMI[n2]) ** 2
-    BC = bhattCoef(m1, m2, v1, v2)
-    pairAllNMI[pairCount] = BC
-    # pairAllNMI[pairCount] = (m1 + m2) / 2
+    # generate paired stimulus correlation, selectivity index,
+    # suppression, and NMI index for each gabor pair for each pair
+    # of neurons (similar to Bram fig 2c)
+    pairPairedCorr = []
+    pairSelectivityIndex = []
+    pairNonPrefSuppIndex = []
+    pairNMIIndex = []
+    pairSimpleNMIIndex = []
 
-print(stats.pearsonr(pairNMI, corrMat))
-print(stats.pearsonr(pairAllNMI, corrMat))
-print(stats.pearsonr(pairSimPrefDir.flatten(), corrMat))
-print(stats.pearsonr((pairSimPrefDir.flatten() + pairLocSimScore.flatten())/2, corrMat))
-print(stats.pearsonr((pairSimPrefDir.flatten() + pairAllNMI + pairLocSimScore.flatten())/3, corrMat))
-plt.scatter((pairSimPrefDir.flatten() + pairAllNMI + pairLocSimScore.flatten())/3, corrMat) ; plt.show()
+    pairSingleCorr = []
+    pairSingleGaborNMI = []
+    pairSingleGaborSelectivity = []
+
+    tempMat = stats.zscore(spikeCountMat[:, :blocksDone, :], axis=1, nan_policy='omit')
+    stimIndexMat = np.arange(36).reshape(6, 6)
+    upperTriangle = upperTriMasking(stimIndexMat)
+
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+
+        neuronPairAvgSelectivity = []
+        neuronPairAvgNMIloc0 = []
+        neuronPairAvgNMIloc1 = []
+        # indices and correlations for paired Gabor stimuli
+        for i in range(36):
+            # correlation for that Gabor pair b/w 2 units
+            # pairStimCorr = stats.pearsonr(tempMat[n1, :, i], tempMat[n2, :, i])
+            pairStimCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, i],
+                                          spikeCountMat[n2, :blocksDone, i])
+
+            # extract directions of the gabor pair
+            loc0Dir = stimIndexDict[i][0]['direction']
+            loc1Dir = stimIndexDict[i][1]['direction']
+
+            # n1 selectivity and suppression index
+            loc0Resp = unitNormFitEstimate[n1][np.where(dirArray == loc0Dir)[0][0]]
+            loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0] + 6]
+            if loc0Resp > loc1Resp:
+                n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+                n1NonPrefSupp = unitNormFitEstimate[n1][13] / (
+                    unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+                n1PrefResp = 0
+            else:
+                n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+                n1NonPrefSupp = unitNormFitEstimate[n1][12] / (
+                    unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+                n1PrefResp = 1
+
+            # n2 selectivity and suppression index
+            loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
+            loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0] + 6]
+            if loc0Resp > loc1Resp:
+                n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+                n2NonPrefSupp = unitNormFitEstimate[n2][13] / (
+                    unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+                n2PrefResp = 0
+            else:
+                n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+                n2NonPrefSupp = unitNormFitEstimate[n2][12] / (
+                    unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+                n2PrefResp = 1
+
+            # n1 NMI
+            b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
+            pairedMat = b[:6, :6].reshape(36)
+            loc0Single = b[6, :6]
+            loc1Single = b[:6, 6]
+            loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
+            loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
+            n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
+                  (loc0SingleResp + loc1SingleResp) + pairedMat[i])
+            n1SimpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
+
+            # n2 NMI
+            b = meanSpikeReshaped[n2].reshape(7, 7) * 1000/trueStimDurMS
+            pairedMat = b[:6, :6].reshape(36)
+            loc0Single = b[6, :6]
+            loc1Single = b[:6, 6]
+            loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
+            loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
+            n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
+                  (loc0SingleResp + loc1SingleResp) + pairedMat[i])
+            n2simpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
+
+            # pair selectivity, suppression, and NMI index
+            pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
+            if n1PrefResp != n2PrefResp:
+                pairSelectivity = -pairSelectivity
+            pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+            pairNMI = (n1NMI + n2NMI) / 2
+            pairSimpleNMI = np.sqrt(n1SimpleNMI * n2simpleNMI)
+
+            pairPairedCorr.append(pairStimCorr[0])
+            pairSelectivityIndex.append(pairSelectivity)
+            pairNonPrefSuppIndex.append(pairSuppression)
+            pairNMIIndex.append(pairNMI)
+            pairSimpleNMIIndex.append(pairSimpleNMI)
+
+            # appending pair Selectivity and pair NMI to get average
+            # for the single Gabor figure
+            neuronPairAvgSelectivity.append(pairSelectivity)
+            if i in upperTriangle:
+                neuronPairAvgNMIloc0.append(pairNMI)
+            else:
+                neuronPairAvgNMIloc1.append(pairNMI)
+
+        # indices and correlations for single Gabor b/w pair of neuron
+        for j in range(36, 48):
+            pairSingCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, j],
+                                          spikeCountMat[n2, :blocksDone, j])
+
+            # extract location and direction of tested gabor
+            loc0Dir = stimIndexDict[j][0]['direction']
+            loc0Con = stimIndexDict[j][0]['contrast']
+            loc1Dir = stimIndexDict[j][1]['direction']
+            loc1Con = stimIndexDict[j][1]['contrast']
+            if loc0Con == 1:
+                avgNMI = np.mean(neuronPairAvgNMIloc1)
+            else:
+                avgNMI = np.mean(neuronPairAvgNMIloc0)
+
+            pairSingleGaborNMI.append(avgNMI)
+            pairSingleGaborSelectivity.append(np.mean(neuronPairAvgSelectivity))
+            pairSingleCorr.append(pairSingCorr[0])
+
+    pairPairedCorr = np.array(pairPairedCorr)
+    pairSelectivityIndex = np.array(pairSelectivityIndex)
+    pairNonPrefSuppIndex = np.array(pairNonPrefSuppIndex)
+    pairNMIIndex = np.array(pairNMIIndex)
+    pairSimpleNMIIndex = np.array(pairSimpleNMIIndex)
+    pairSingleCorr = np.array(pairSingleCorr)
+    pairSingleGaborNMI = np.array(pairSingleGaborNMI)
+    pairSingleGaborSelectivity = np.array(pairSingleGaborSelectivity)
+
+    # cm = plt.cm.get_cmap('seismic')
+    # y = pairSelectivityIndex # pair selectivity
+    # x = pairNMIIndex # pair non-pref alpha index
+    # z = pairCorr # noise correlations
+    # sc = plt.scatter(x, y, c=z, s=35, cmap=cm, vmin=-0.6, vmax=0.6)
+    # # vmin=-0.6, vmax=0.6
+    # plt.colorbar(sc)
+    # plt.xlabel('non-preferred suppression')
+    # plt.ylabel('pair selectivity')
+    # plt.show()
+
+    # generate pair's combined Norm Value
+    pairAlphaMulti = np.zeros((len(combs)))
+    pairR2 = np.zeros(len(combs))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+
+        pairR2[pairCount] = np.sqrt(unitPairedNormR2[n1] * unitPairedNormR2[n2])
+
+        pairAlphaMulti[pairCount] = (unitAlphaIndex[n1] + unitAlphaIndex[n2]) / 2
+
+    pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
+    pairCombinedSimScoreMulti = np.squeeze((pairLocSimScore * pairSimScore))
+    pairCombinedSimScorePrefDir = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2)
+    pairCombinedPrefDirAlpha = (pairSimPrefDir.flatten() + pairAlphaMulti) / 2
+
+    ## Create subset of Pandas DF for P, N, P+N conditions for all units
+    pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount',
+                                    'stimSpikes', 'contrast', 'prefNullStr'])
+    for unitCount, unit in enumerate(units):
+        # find direction tested that is closest to unit's preferred and null direction
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+        orientCount = 0
+        orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null',
+                     'pref+blank', 'null+blank','blank+pref', 'blank+null']
+        for j in [(prefDir,prefDir),(prefDir,nullDir),(nullDir,prefDir),(nullDir,nullDir),]:
+            loc0Dir, loc1Dir = j
+            sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                       (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                       (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                       (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+            unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                        & (spikeCountDF['stimIndex'] == sIndex)]
+            unitDF = unitDF.iloc[:blocksDone]
+            unitDF['contrast'] = highContrast
+            unitDF['prefNullStr'] = orientList[orientCount]
+            pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+            orientCount += 1
+
+        #Loc 0 Pref/Null only
+        for i in [(prefDir, zeroDir), (nullDir, zeroDir)]:
+            loc0Dir, loc1Dir = i
+            sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                       (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                       (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                       (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+            unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                        & (spikeCountDF['stimIndex'] == sIndex)]
+            unitDF = unitDF.iloc[:blocksDone]
+            unitDF['contrast'] = zeroContrast
+            unitDF['prefNullStr'] = orientList[orientCount]
+            pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+            orientCount += 1
+
+        #loc 1 Pref/Null only
+        for x in [(zeroDir,prefDir), (zeroDir,nullDir)]:
+            loc0Dir, loc1Dir = x
+            sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                       (stimIndexDF['loc0 Contrast'] == zeroContrast) &
+                                       (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                       (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+            unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                        & (spikeCountDF['stimIndex'] == sIndex)]
+            unitDF = unitDF.iloc[:blocksDone]
+            unitDF['contrast'] = zeroContrast
+            unitDF['prefNullStr'] = orientList[orientCount]
+            pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+            orientCount += 1
+
+    ## generate within unit NMI score for P+N and N+P condition only
+    unitWithinNMI = np.zeros(len(units))
+    unitNMI0 = np.zeros(len(units))
+    unitNMI1 = np.zeros(len(units))
+    for unitCount, unit in enumerate(units):
+        unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
+        #spikeCounts in spikes/sec
+        unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS
+        singleResp = np.zeros(4)
+        doubleResp = np.zeros(4)
+        for count, indx in enumerate(['pref+blank', 'null+blank', 'blank+pref', 'blank+null']):
+            mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+            singleResp[count] = mean
+        for count, indx in enumerate(['pref+pref', 'pref+null', 'null+pref', 'null+null']):
+            mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+            doubleResp[count] = mean
+
+        # NMI
+        # avgP = (singleResp[0] + singleResp[2]) / 2
+        # avgN = (singleResp[1] + singleResp[3]) / 2
+        # avgPN = (doubleResp[1] + doubleResp[2]) / 2
+        # unitWithinNMI[unitCount] = avgPN / avgP + avgN + avgPN
+
+        #NMI loc 0
+        NMI0 = (doubleResp[0] + doubleResp[3] - doubleResp[1]) / \
+               (doubleResp[0] + doubleResp[3] + doubleResp[1])
+        #NMI loc 1
+        NMI1 = (doubleResp[0] + doubleResp[3] - doubleResp[2]) / \
+               (doubleResp[0] + doubleResp[3] + doubleResp[2])
+        unitNMI0[unitCount] = NMI0
+        unitNMI1[unitCount] = NMI1
+        unitWithinNMI[unitCount] = NMI0 + NMI1
+
+        # NMI loc 0
+        # NMI0 = (singleResp[0] - singleResp[3] - doubleResp[1] - singleResp[3]) / (
+        #         singleResp[0] - singleResp[3] + doubleResp[1] - singleResp[3])
+        # NMI1 = (singleResp[1] - singleResp[2] - doubleResp[2] - singleResp[2]) / (
+        #         singleResp[1] - singleResp[2] + doubleResp[2] - singleResp[2])
+        # unitWithinNMI[unitCount] = (NMI0 + NMI1) / 2
+
+        # # #NMI loc 0
+        # NMI0 = (doubleResp[0] + doubleResp[3] - doubleResp[1]) / (
+        #         doubleResp[0] + doubleResp[3] + doubleResp[1])
+        # NMI1 = (doubleResp[0] + doubleResp[3] - doubleResp[2]) / (
+        #         doubleResp[0] + doubleResp[3] + doubleResp[2])
+        # unitWithinNMI[unitCount] = (NMI0 + NMI1) / 2
+
+        # #NMI loc 0
+        # NMI0 = doubleResp[1] / doubleResp[0]
+        # NMI1 = doubleResp[2] / doubleResp[0]
+        # unitWithinNMI[unitCount] = min([NMI0, NMI1])
+
+    # NMI P+N/N+P across pairs
+    pairNMI = np.zeros(len(combs))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+
+        pairNMI[pairCount] = (unitNMI0[n1] + unitNMI0[n2]) - (unitNMI1[n1] + unitNMI1[n2]) / (
+                              unitNMI0[n1] + unitNMI0[n2]) + (unitNMI1[n2] + unitNMI1[n2])
 
 
-## compile similarity scores and correlation matrix into one matrix
-compiledArr = np.array([corrMat,
-                        np.squeeze(pairSimScore),
-                        np.squeeze(pairSimPrefDir),
-                        np.squeeze(pairLocSimScore),
-                        pairCombinedSimScore,
-                        pairCombinedSimScoreMulti,
-                        pairCombinedSimScorePrefDir,
-                        pairAlphaMulti,
-                        pairR2,
-                        pairNMI,
-                        pairCombinedPrefDirAlpha,
-                        pairAllNMI])
-np.save(f'../../corrMaster/pairCorrelationsAndSimScores{seshDate}', compiledArr)
+    # generate within unit NMI for every paired stimulus
+    unitAllNMI = np.zeros((len(units), 36))
+    for unitCount, unit in enumerate(units):
+        b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
+        pairedMat = b[:6,:6].reshape(36)
+        loc0Single = b[6,:6]
+        loc1Single = b[:6,6]
+        directionSet = np.array([0, 60, 120, 180, 240, 300])
 
+        for i in range(36):
+            loc0Dir = stimIndexDict[i][0]['direction']
+            loc1Dir = stimIndexDict[i][1]['direction']
+            loc0SingleResp = loc0Single[np.where(directionSet == loc0Dir)[0]][0]
+            loc1SingleResp = loc1Single[np.where(directionSet == loc1Dir)[0]][0]
+            # NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
+            #       (loc0SingleResp + loc1SingleResp) + pairedMat[i])
+            NMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
+            unitAllNMI[unitCount][i] = NMI
+
+    pairAllNMI = np.zeros(len(combs))
+    for pairCount, pair in enumerate(combs):
+        n1 = np.where(units == pair[0])[0][0]
+        n2 = np.where(units == pair[1])[0][0]
+
+        m1 = np.median(unitAllNMI[n1])
+        v1 = np.std(unitAllNMI[n1]) ** 2
+        m2 = np.median(unitAllNMI[n2])
+        v2 = np.std(unitAllNMI[n2]) ** 2
+        BC = bhattCoef(m1, m2, v1, v2)
+        # pairAllNMI[pairCount] = BC
+        pairAllNMI[pairCount] = (m1 * m2)
+
+    # cm = plt.cm.get_cmap('seismic')
+    # x = np.squeeze((pairLocSimScore + pairSimPrefDir) / 2) # RFoverlap and same dir pref
+    # y = pairAllNMI # pair NMI mean
+    # z = corrMat # noise correlations
+    # sc = plt.scatter(x, y, c=z, s=35, cmap=cm, vmin=-0.5, vmax=0.5)
+    # plt.colorbar(sc)
+    # plt.show()
+    # print(stats.pearsonr(pairAllNMI, corrMat))
+    # print(stats.pearsonr(pairSimPrefDir.flatten(), corrMat))
+    # print(stats.pearsonr((pairSimPrefDir.flatten() + pairLocSimScore.flatten())/2, corrMat))
+    # print(stats.pearsonr((pairSimPrefDir.flatten() + pairAllNMI + pairLocSimScore.flatten())/3, corrMat))
+    # plt.scatter((pairSimPrefDir.flatten() + pairAllNMI + pairLocSimScore.flatten())/3, corrMat); plt.show()
+
+
+    ## compile similarity scores and correlation matrix into one matrix
+    compiledArr = np.array([corrMat,
+                            np.squeeze(pairSimScore),
+                            np.squeeze(pairSimPrefDir),
+                            np.squeeze(pairLocSimScore),
+                            pairCombinedSimScore,
+                            pairCombinedSimScoreMulti,
+                            pairCombinedSimScorePrefDir,
+                            pairAlphaMulti,
+                            pairR2,
+                            pairNMI,
+                            pairCombinedPrefDirAlpha,
+                            pairAllNMI])
+    gaborPairCompiledArr = np.array([pairPairedCorr,
+                                     pairSelectivityIndex,
+                                     pairNonPrefSuppIndex,
+                                     pairNMIIndex,
+                                     pairSimpleNMIIndex])
+    gaborSingleCompiledArr = np.array([pairSingleCorr,
+                                       pairSingleGaborNMI,
+                                       pairSingleGaborSelectivity])
+    np.save(f'../../gaborSingleCorrMaster/pairCorrelationsAndIndices{seshDate}',
+            gaborSingleCompiledArr)
+    np.save(f'../../corrMaster/pairCorrelationsAndSimScores{seshDate}',
+            compiledArr)
+    np.save(f'../../gaborPairCorrMaster/pairCorrelationsAndIndices{seshDate}',
+            gaborPairCompiledArr)
+    os.chdir('../../../Python Code')
+
+    totUnits.append(len(units))
+
+print(time.time()-t0)
 
 ## SUPERPLOT OF PSTH, Normalization (pref+null+blank) heatmap, and bar plot
 ## Create subset of Pandas DF for P, N, P+N conditions for all units
@@ -928,7 +1176,11 @@ for unitCount, unit in enumerate(units):
     # fitting Gaussian to single stimuli
     singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]), axis=0)
     fixedVals = fixedValsForCurveFit(prefDir, singleStim, stimIndexDict)
-    pred = gaussNormFunc(fixedVals, *unitGaussFit[unitCount])
+
+    if scaledLoc[unitCount] == 1:
+        pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
+    else:
+        pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
     y_pred[6, :6] = pred[:6]
     y_pred[:6, 6] = pred[6:]
 
@@ -1046,7 +1298,10 @@ for unitCount, unit in enumerate(units):
 
                 # using gaussian EMS for single stim
                 fixedVals = fixedValsForCurveFit(prefDir, stimIndex, stimIndexDict)
-                y_pred = gaussNormFunc(fixedVals, *unitGaussFit[unitCount])
+                if scaledLoc[unitCount] == 1:
+                    y_pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
+                else:
+                    y_pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
                 ax4 = plt.scatter(pos, y_pred, transform=trans+offset(offsetCount),
                                   label=indx, color=lightenColor(colorList[count], 0.5))
                 offsetCount += 5
@@ -1236,7 +1491,16 @@ EXTRA CODE
 
 '''
 
-
+# correlations for each paired stimulus condition across pairs:
+tempMat = stats.zscore(spikeCountMat[:,:blocksDone,:], axis=1, nan_policy='omit')
+individualCorrMat = np.zeros((len(combs), 36))
+for count, i in enumerate(combs):
+    n1 = np.where(units == i[0])[0][0]
+    n2 = np.where(units == i[1])[0][0]
+    for x in range(36):
+        pairStimCorr = stats.pearsonr(tempMat[n1, :, x], tempMat[n2, :, x])
+        individualCorrMat[count][x] = pairStimCorr[0]
+individualCorrMat = individualCorrMat.reshape(len(combs) * 36)
 
 ## Plot Polar plot of dir tuning for each unit in both locations
 for unitCount, unit in enumerate(units):
@@ -1279,7 +1543,7 @@ for unitCount, unit in enumerate(units):
 #                           'pairCombinedSimScoreMulti','pairCombinedSimScorePrefDir',])
 
 
-## Plot Noise Correlations as a function of combined location similarity
+# Plot Noise Correlations as a function of combined location similarity
 pairCombinedSimScore = np.squeeze((pairLocSimScore + pairSimScore) / 2)
 plt.scatter(pairCombinedSimScore, corrMat)
 
@@ -1298,7 +1562,7 @@ plt.xlabel('Averaged Sim Score (dir tuning and RF location')
 plt.ylabel("Pearson's Correlation")
 plt.show()
 
-## unit Direction Selectivity
+# unit Direction Selectivity
 unitsBaselineMat = np.load('../Direction Tuning/unitsBaselineMat.npy')
 unitSelectivity = np.zeros(len(units))
 for unit in filterUnits:
@@ -1312,8 +1576,7 @@ for unit in filterUnits:
     DS = 1 - ((nullResp-baseResp)/(prefResp-baseResp))
     unitSelectivity[unitIndex] = DS
 
-
-#pair Selectivity
+# pair Selectivity
 combs = [i for i in combinations(filterUnits, 2)]
 pairSelScore = np.zeros((len(combs),1))
 for pairCount, pair in enumerate(combs):
@@ -1323,22 +1586,72 @@ for pairCount, pair in enumerate(combs):
     pairSelScore[pairCount] = geoMean
 
 
-## selectivity for direction (similar to Bram)
-unitSelectivity = np.zeros((len(units),49))
-unitSelectivity[:,:] = np.nan
-for uCount, unit in enumerate(units):
-    for stim in range(49):
-        loc0Contrast = stimIndexDict[stim][0]['contrast']
-        loc1Contrast = stimIndexDict[stim][1]['contrast']
-        if loc0Contrast != 0 and loc0Contrast != 0:
-            dir1 = stimIndexDict[stim][0]['direction']
-            con1 = stimIndexDict[stim][0]['contrast']
-            l1Index = np.where((stimIndexArray[:,0]== dir1) & (stimIndexArray[:,1] == con1)
-                              & (stimIndexArray[:,3]==0))
-            l1 = meanSpike[uCount][l1Index[0]]
-            dir2 = stimIndexDict[stim][1]['direction']
-            con2 = stimIndexDict[stim][1]['contrast']
-            l2Index = np.where((stimIndexArray[:,2]== dir2) & (stimIndexArray[:,3] == con2)
-                              & (stimIndexArray[:,1]==0))
-            l2 = meanSpike[uCount][l2Index[0]]
-            unitSelectivity[uCount][stim] = (l1-l2)/(l1+l2)
+# generate paired stimulus correlation, selectivity index,
+# and suppression index for each gabor pair for each pair
+# of neurons (similar to Bram fig 2c)
+pairCorr = []
+pairSelectivityIndex = []
+pairNonPrefSuppIndex = []
+tempMat = stats.zscore(spikeCountMat[:, :blocksDone, :], axis=1, nan_policy='omit')
+for pairCount, pair in enumerate(combs):
+    n1 = np.where(units == pair[0])[0][0]
+    n2 = np.where(units == pair[1])[0][0]
+    for i in range(36):
+        # correlation for that pair b/w 2 units
+        # pairStimCorr = stats.pearsonr(tempMat[n1, :, i], tempMat[n2, :, i])
+        pairStimCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, i],
+                                      spikeCountMat[n2, :blocksDone, i])
+
+        # extract directions of the gabor pair
+        loc0Dir = stimIndexDict[i][0]['direction']
+        loc1Dir = stimIndexDict[i][1]['direction']
+
+        # n1 selectivity and suppression index
+        n1ScaledLoc = int(scaledLoc[n1])
+        n1Scalar = unitNormFitEstimate[n1][6]
+        loc0Resp = unitNormFitEstimate[n1][np.where(dirArray == loc0Dir)[0][0]]
+        loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0]]
+        if n1ScaledLoc == 0:
+            loc0Resp = loc0Resp * n1Scalar
+        else:
+            loc1Resp = loc1Resp * n1Scalar
+        if loc0Resp > loc1Resp:
+            n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+            n1NonPrefSupp = unitNormFitEstimate[n1][8] / (
+                unitNormFitEstimate[n1][8] + unitNormFitEstimate[n1][7])
+            n1PrefResp = 0
+        else:
+            n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+            n1NonPrefSupp = unitNormFitEstimate[n1][7] / (
+                unitNormFitEstimate[n1][8] + unitNormFitEstimate[n1][7])
+            n1PrefResp = 1
+
+        # n2 selectivity and suppression index
+        n2ScaledLoc = int(scaledLoc[n2])
+        n2Scalar = unitNormFitEstimate[n2][6]
+        loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
+        loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0]]
+        if n2ScaledLoc == 0:
+            loc0Resp = loc0Resp * n2Scalar
+        else:
+            loc1Resp = loc1Resp * n2Scalar
+        if loc0Resp > loc1Resp:
+            n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+            n2NonPrefSupp = unitNormFitEstimate[n2][8] / (
+                unitNormFitEstimate[n2][8] + unitNormFitEstimate[n2][7])
+            n2PrefResp = 0
+        else:
+            n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+            n2NonPrefSupp = unitNormFitEstimate[n2][7] / (
+                unitNormFitEstimate[n2][8] + unitNormFitEstimate[n2][7])
+            n2PrefResp = 1
+
+        # pair selectivity and suppression index
+        pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
+        if n1PrefResp != n2PrefResp:
+            pairSelectivity = -pairSelectivity
+        pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+
+        pairCorr.append(pairStimCorr[0])
+        pairSelectivityIndex.append(pairSelectivity)
+        pairNonPrefSuppIndex.append(pairSuppression)

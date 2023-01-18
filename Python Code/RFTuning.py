@@ -40,7 +40,7 @@ for currTrial in allTrials:
 ## Start here
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221124'
+seshDate = '221208'
 fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
 # ascertain the position of the gabor stimuli for MTNC

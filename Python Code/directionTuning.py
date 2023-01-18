@@ -37,7 +37,7 @@ for currTrial in allTrials:
 #### Start Here:
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221128'
+seshDate = '221208'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -235,6 +235,7 @@ for uCount, unit in enumerate(units):
     continue
 plt.close('all')
 np.save('unitsDirTuningMat', allTuningMat)
+
 
 
 '''

@@ -21,7 +21,7 @@ t0 = time.time()
 totUnits = []
 totR2 = []
 fileList = ['221010', '221108', '221110', '221115', '221117', '221124',
-            '221128', '221010', '221208']
+            '221128', '221010', '221208', '221229']
 # fileList = ['221115', '221117', '221124',
 #             '221128', '221010', '221208']
 
@@ -456,13 +456,13 @@ for fileIterator in fileList:
         # Generic Normalization (L1+L2)/(al1+al2+sig) w.o scalar
         # fits L0-L6 for both locations separately loc0 and loc1 will
         # have different L0-L6 values
-        resp = b.reshape(49)
-        fixedVals = fixedValsForGenericNorm(stimMat.reshape(49), stimIndexDict)
+        resp = b.reshape(49)[:-1]
+        fixedVals = fixedValsForGenericNorm(stimMat.reshape(49)[:-1], stimIndexDict)
         pOpt, pCov = curve_fit(genericNormNoScalar, fixedVals, resp.squeeze(),
-                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                                        (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
                                         np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
-                                        3, 3, .10)))
+                                        1, 1)))
         print(unit, pOpt)
         y_pred = genericNormNoScalar(fixedVals, *pOpt)
         r2 = r2_score(resp.squeeze(), y_pred)
@@ -1042,29 +1042,30 @@ for unitCount, unit in enumerate(units):
         orientCount += 1
 
 for unitCount, unit in enumerate(units):
-    b = meanSpikeReshaped[unitCount].reshape(7,7) * 1000/trueStimDurMS
+    b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
     bSmooth = gaussian_filter(b, sigma=1)
     prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
 
     ## figure 
     # fig = plt.figure(constrained_layout=True)
     fig = plt.figure()
-    fig.set_size_inches(17,7)
+    fig.set_size_inches(17, 7)
 
-    gs0 = gridspec.GridSpec(1,5)
+    gs0 = gridspec.GridSpec(1, 5)
 
-    heights = [1,1,1]
-    widths = [4,4,4]
-    gs00 = gridspec.GridSpecFromSubplotSpec(3,3, subplot_spec=gs0[0],
-                         width_ratios=widths, height_ratios=heights)
-    gs01 = gridspec.GridSpecFromSubplotSpec(2,2, subplot_spec=gs0[1:3])
-    gs02 = gridspec.GridSpecFromSubplotSpec(1,1, subplot_spec=gs0[3])
-    gs03 = gridspec.GridSpecFromSubplotSpec(2,1, subplot_spec=gs0[4])
+    heights = [1, 1, 1]
+    widths = [4, 4, 4]
+    gs00 = gridspec.GridSpecFromSubplotSpec(3, 3, subplot_spec=gs0[0],
+                                            width_ratios=widths,
+                                            height_ratios=heights)
+    gs01 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:3])
+    gs02 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[3])
+    gs03 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[4])
 
     # PSTHs Plot
-    locDirList = [(nullDir,nullDir),(prefDir,nullDir),('blank',nullDir),
-            (nullDir,prefDir),(prefDir,prefDir),('blank',prefDir),
-            (nullDir,'blank'),(prefDir,'blank'),('blank','blank')]
+    locDirList = [(nullDir, nullDir), (prefDir, nullDir), ('blank', nullDir),
+                  (nullDir, prefDir), (prefDir, prefDir), ('blank', prefDir),
+                  (nullDir, 'blank'), (prefDir, 'blank'), ('blank', 'blank')]
     yMax = 0
     plotCount = 0
     for row in range(3):
@@ -1083,66 +1084,73 @@ for unitCount, unit in enumerate(units):
                 loc1Dir = zeroDir
                 loc1Con = zeroContrast
             histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) & 
-                                        (stimIndexDF['loc0 Contrast'] == loc0Con) & 
-                                        (stimIndexDF['loc1 Direction'] == loc1Dir) & 
-                                        (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
-            dirPlot = spikeHists[unitCount,histIndex,:] * 1000/stimIndexCount[histIndex]
-            smoothPlot = gaussian_filter1d(dirPlot,5)
+                                          (stimIndexDF['loc0 Contrast'] == loc0Con) &
+                                          (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                          (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+            dirPlot = spikeHists[unitCount, histIndex, :] * 1000/stimIndexCount[histIndex]
+            smoothPlot = gaussian_filter1d(dirPlot, 5)
             if max(smoothPlot) > yMax:
                 yMax = max(smoothPlot)
             ax.plot(smoothPlot)
-            ax.set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize= 5)
-            ax.set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,2*histPrePostMS+trueStimDurMS])
+            ax.set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize=5)
+            ax.set_xticks([0,
+                           histPrePostMS,
+                           histPrePostMS+trueStimDurMS,
+                           2*histPrePostMS+trueStimDurMS])
             ax.set_xticklabels([])
-            ax.set_xlim([0,trueStimDurMS+(2*histPrePostMS+1)])
-            ax.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, color='grey', alpha=0.1)
-            ax.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS, linestyle='--', color='grey')
+            ax.set_xlim([0, trueStimDurMS+(2*histPrePostMS+1)])
+            ax.axvspan(histPrePostMS, histPrePostMS+trueStimDurMS,
+                       color='grey', alpha=0.1)
+            ax.axhline(y=meanSpike[unitCount][48]*1000/trueStimDurMS,
+                       linestyle='--', color='grey')
             if plotCount == 6:
                 ax.set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
                 ax.set_xlabel('Stimulus Duration (ms)', fontsize=7)
-                ax.set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, trueStimDurMS+histPrePostMS], fontsize=7)
-            plotCount +=1
+                ax.set_xticklabels([-histPrePostMS, 0, 0+trueStimDurMS,
+                                    trueStimDurMS+histPrePostMS],
+                                   fontsize=7)
+            plotCount += 1
 
         axes = fig.get_axes()
         for ax in axes:
-            ax.set_ylim([0,yMax*1.1])
+            ax.set_ylim([0, yMax*1.1])
 
 
     # Normalization Plot
     # ReIndexing to have pref direction in the middle Gauss Smooth
     nullIndex = np.where(dirArray == nullDir)[0][0]
-    reIndex = (np.array([0,1,2,3,4,5])+nullIndex) % 6
-    tickLabels = np.array(['0','60','120','180','240','300'])[reIndex]
+    reIndex = (np.array([0, 1, 2, 3, 4, 5])+nullIndex) % 6
+    tickLabels = np.array(['0', '60', '120', '180', '240', '300'])[reIndex]
     tickLabels = np.append(tickLabels, ['blank'])
 
     # smoothed data
-    bSmoothReIndex = np.zeros((7,7))
-    tempMain = bSmooth[:6,:6][:,reIndex]
-    tempMain = tempMain[:6,:6][reIndex,:]
-    temp0Blank = bSmooth[:6,6][reIndex]
-    temp1Blank = bSmooth[6,:6][reIndex]
-    bSmoothReIndex[:6,:6] = tempMain
-    bSmoothReIndex[:6,6] = temp0Blank
-    bSmoothReIndex[6,:6] = temp1Blank
-    bSmoothReIndex[6,6] = bSmooth[6,6]
+    bSmoothReIndex = np.zeros((7, 7))
+    tempMain = bSmooth[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = bSmooth[:6, 6][reIndex]
+    temp1Blank = bSmooth[6, :6][reIndex]
+    bSmoothReIndex[:6, :6] = tempMain
+    bSmoothReIndex[:6, 6] = temp0Blank
+    bSmoothReIndex[6, :6] = temp1Blank
+    bSmoothReIndex[6, 6] = bSmooth[6, 6]
 
     vMax = np.max(bSmoothReIndex)
 
     # raw data
-    bReIndex = np.zeros((7,7))
-    tempMain = b[:6,:6][:,reIndex]
-    tempMain = tempMain[:6,:6][reIndex,:]
-    temp0Blank = b[:6,6][reIndex]
-    temp1Blank = b[6,:6][reIndex]
-    bReIndex[:6,:6] = tempMain
-    bReIndex[:6,6] = temp0Blank
-    bReIndex[6,:6] = temp1Blank
-    bReIndex[6,6] = b[6,6]
+    bReIndex = np.zeros((7, 7))
+    tempMain = b[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = b[:6, 6][reIndex]
+    temp1Blank = b[6, :6][reIndex]
+    bReIndex[:6, :6] = tempMain
+    bReIndex[:6, 6] = temp0Blank
+    bReIndex[6, :6] = temp1Blank
+    bReIndex[6, 6] = b[6, 6]
 
     if np.max(bReIndex) > vMax:
         vMax = np.max(bReIndex)
 
-    #fitted data
+    # fitted data
     stimMat = np.zeros((7, 7))
     stimMat[:6, :6] = np.arange(36).reshape(6, 6)
     stimMat[6, :6] = np.arange(36, 42)
@@ -1158,38 +1166,14 @@ for unitCount, unit in enumerate(units):
     stimMatReIndex[6, :6] = temp1Blank
     stimMatReIndex[6, 6] = stimMat[6, 6]
 
-    y_pred = np.zeros((7, 7))
+    y_pred = np.zeros(49)
     # fitting Gaussian EMS to paired stimuli
-    pairedStim = stimMatReIndex[:6, :6].reshape(36)
-    fixedVals = fixedValsCurveFitForPairedStim(prefDir,
-                                               pairedStim,
-                                               stimIndexDict,
-                                               unitGaussFit[unitCount])
-    if scaledLoc[unitCount] == 0:
-        pred = EMSGaussNormStepFunc1(fixedVals, *unitPairedNormFit[unitCount]
-                                     ).reshape((6, 6))
-    else:
-        pred = EMSGaussNormStepFunc0(fixedVals, *unitPairedNormFit[unitCount]
-                                     ).reshape((6, 6))
-    y_pred[:6, :6] = pred
+    fixedVals = fixedValsForGenericNorm(stimMatReIndex.reshape(49)[:-1],
+                                        stimIndexDict)
 
-    # fitting Gaussian to single stimuli
-    singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]), axis=0)
-    fixedVals = fixedValsForCurveFit(prefDir, singleStim, stimIndexDict)
-
-    if scaledLoc[unitCount] == 1:
-        pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
-    else:
-        pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
-    y_pred[6, :6] = pred[:6]
-    y_pred[:6, 6] = pred[6:]
-
-    # # using EMS generic, L0-L6
-    # fixedVals = fixedValsForEMSGen(stimMatReIndex.reshape(49), stimIndexDict)
-    # if scaledLoc[unitCount] == 0:
-    #     y_pred = emsNormGen1(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7,7))
-    # else:
-    #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7,7))
+    y_pred[:-1] = genericNormNoScalar(fixedVals, *unitNormFitEstimate[unitCount])
+    y_pred[-1] = b[6, 6]
+    y_pred = y_pred.reshape((7, 7))
 
     if np.max(y_pred) > vMax:
         vMax = np.max(y_pred)
@@ -1198,19 +1182,8 @@ for unitCount, unit in enumerate(units):
     residual = abs(y_pred - bReIndex)
     if np.max(residual) > vMax:
         vMax = np.max(residual)
-    
-    # ax2 = fig.add_subplot(gs01[0,1])
-    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0,
-    #                   vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
-    # ax2.set_xticks(np.arange(7)+0.5)
-    # ax2.set_title(f'Gaussian Smoothed', y=-0.1, fontsize=7)
-    # ax2.set_xticklabels(tickLabels, rotation=45, fontsize=7)
-    # ax2.xaxis.set_ticks_position('top')
-    # ax2.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
-    # ax2.xaxis.set_label_position('top')
-    # ax2.set_yticks(np.arange(7)+0.5)
-    # ax2.set_yticklabels(tickLabels, rotation=0, fontsize=7)
 
+    # scatter plot of fit responses vs real responses
     respReal = bReIndex.reshape(49)
     respFit = y_pred.reshape(49)
     ax2 = fig.add_subplot(gs01[0,1])
@@ -1269,21 +1242,22 @@ for unitCount, unit in enumerate(units):
     #spikeCounts in spikes/sec
     unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000/trueStimDurMS 
 
-    offset = lambda p: transforms.ScaledTranslation(p/72.,0, plt.gcf().dpi_scale_trans)
+    offset = lambda p: transforms.ScaledTranslation(p/72., 0, plt.gcf().dpi_scale_trans)
     trans = plt.gca().transData
     offsetCount = 0
 
-    colorList = ['b','g','r','c']
+    colorList = ['b', 'g', 'r', 'c']
     # plot category by category
     yMax = 0
     for pos in [0.35, 0.65]:
         if pos == 0.35:
-            for count, indx in enumerate(['pref+blank','null+blank','blank+pref','blank+null']):
+            for count, indx in enumerate(['pref+blank', 'null+blank',
+                                          'blank+pref', 'blank+null']):
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
-                ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount),
+                ax4 = plt.scatter(pos, mean, transform=trans+offset(offsetCount),
                                   label=indx, color=colorList[count])
-                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt='o',
+                ax4 = plt.errorbar(pos, mean, yerr=sem, fmt='o',
                                    transform=trans+offset(offsetCount),
                                    color=colorList[count])
                 offsetCount += 5
@@ -1297,11 +1271,8 @@ for unitCount, unit in enumerate(units):
                 #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount])
 
                 # using gaussian EMS for single stim
-                fixedVals = fixedValsForCurveFit(prefDir, stimIndex, stimIndexDict)
-                if scaledLoc[unitCount] == 1:
-                    y_pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
-                else:
-                    y_pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
+                fixedVals = fixedValsForGenericNorm(stimIndex, stimIndexDict)
+                y_pred = genericNormNoScalar(fixedVals, *unitNormFitEstimate[unitCount])
                 ax4 = plt.scatter(pos, y_pred, transform=trans+offset(offsetCount),
                                   label=indx, color=lightenColor(colorList[count], 0.5))
                 offsetCount += 5
@@ -1309,31 +1280,19 @@ for unitCount, unit in enumerate(units):
                     yMax = mean
         else:
             offsetCount = 0
-            for count, indx in enumerate(['pref+pref','pref+null','null+pref','null+null']):
+            for count, indx in enumerate(['pref+pref', 'pref+null',
+                                          'null+pref', 'null+null']):
                 mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
                 sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
                 ax4 = plt.scatter(pos,mean, transform=trans+offset(offsetCount),
                                   label=indx, color=colorList[count])
-                ax4 = plt.errorbar(pos,mean, yerr=sem, fmt="o",
+                ax4 = plt.errorbar(pos, mean, yerr=sem, fmt="o",
                                    transform=trans+offset(offsetCount),
                                    color=colorList[count])
                 offsetCount += 5
                 stimIndex = unitDF.loc[(unitDF['prefNullStr'] == indx), 'stimIndex'].iloc[0]
-                # fixedVals = fixedValsForEMSGen(stimIndex, stimIndexDict)
-                # if scaledLoc[unitCount] == 0:
-                #     y_pred = emsNormGen1(fixedVals, *unitNormFitEstimate[unitCount])
-                # else:
-                #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount])
-                fixedVals = fixedValsCurveFitForPairedStim(prefDir,
-                                                           stimIndex,
-                                                           stimIndexDict,
-                                                           unitGaussFit[unitCount])
-                if scaledLoc[unitCount] == 0:
-                    y_pred = EMSGaussNormStepFunc1(fixedVals,
-                                                   *unitPairedNormFit[unitCount])
-                else:
-                    y_pred = EMSGaussNormStepFunc0(fixedVals,
-                                                   *unitPairedNormFit[unitCount])
+                fixedVals = fixedValsForGenericNorm(stimIndex, stimIndexDict)
+                y_pred = genericNormNoScalar(fixedVals, *unitNormFitEstimate[unitCount])
                 ax4 = plt.scatter(pos, y_pred, transform=trans+offset(offsetCount),
                                   label=indx, color=lightenColor(colorList[count], 0.5))
                 offsetCount += 5
@@ -1346,54 +1305,42 @@ for unitCount, unit in enumerate(units):
     ax4 = plt.ylabel('Firing Rate spikes/sec')
     ax4 = plt.legend(loc='upper right', prop={'size': 6}, bbox_to_anchor=(1.25, 1.0))
 
-    # Normalization Fit Parameters for EMS with Gaussian
+    # norm fit parameters with EMS generic (l1-l6)
     ax5 = fig.add_subplot(gs03[0,0])
     ax5.text(0.5,0.5, f'the scaled location is: {int(scaledLoc[unitCount])}\n\
-    gaussian offset: {unitGaussFit[unitCount][0]:.2f}\n\
-    gaussian amplitude: {unitGaussFit[unitCount][1]:.2f}\n\
-    gaussian mean: {unitGaussFit[unitCount][2]:.2f}\n\
-    gaussian sigma: {unitGaussFit[unitCount][3]:.2f}\n\
-    location scalar: {unitGaussFit[unitCount][4]:.2f}\n\
-    normalization alpha 0: {unitPairedNormFit[unitCount][0]:.2f}\n\
-    normalization alpha 1: {unitPairedNormFit[unitCount][1]:.2f}\n\
-    gauss fit R2: {unitGaussR2[unitCount]:.2f}\n\
-    EMS norm fit R2: {unitPairedNormR2[unitCount]:.2f}', size=10,
-             ha='center', transform=ax5.transAxes)
+    L0_0: {unitNormFitEstimate[unitCount][0]:.2f}\n\
+    L0_60: {unitNormFitEstimate[unitCount][1]:.2f}\n\
+    L0_120: {unitNormFitEstimate[unitCount][2]:.2f}\n\
+    L0_180: {unitNormFitEstimate[unitCount][3]:.2f}\n\
+    L0_240: {unitNormFitEstimate[unitCount][4]:.2f}\n\
+    L0_300: {unitNormFitEstimate[unitCount][5]:.2f}\n\
+    L1_0: {unitNormFitEstimate[unitCount][6]:.2f}\n\
+    L1_60: {unitNormFitEstimate[unitCount][7]:.2f}\n\
+    L1_120: {unitNormFitEstimate[unitCount][8]:.2f}\n\
+    L1_180: {unitNormFitEstimate[unitCount][9]:.2f}\n\
+    L1_240: {unitNormFitEstimate[unitCount][10]:.2f}\n\
+    L1_300: {unitNormFitEstimate[unitCount][11]:.2f}\n\
+    alpha loc0: {unitNormFitEstimate[unitCount][12]:.2f}\n\
+    alpha loc1: {unitNormFitEstimate[unitCount][13]:.2f}\n\
+    fit R2: {unitPairedNormR2[unitCount]:.2f}', size=10, ha='center', transform=ax5.transAxes)
     ax5.axis('off')
-    # baseline: {unitNormFitEstimate[unitCount][8]:.2f}\n\
 
-    # norm fit parameters with EMS generic (l1-l6)
-    # ax5 = fig.add_subplot(gs03[0,0])
-    # ax5.text(0.5,0.5, f'the scaled location is: {int(scaledLoc[unitCount])}\n\
-    # L0: {unitNormFitEstimate[unitCount][0]:.2f}\n\
-    # L60: {unitNormFitEstimate[unitCount][1]:.2f}\n\
-    # L120: {unitNormFitEstimate[unitCount][2]:.2f}\n\
-    # L180: {unitNormFitEstimate[unitCount][3]:.2f}\n\
-    # L240: {unitNormFitEstimate[unitCount][4]:.2f}\n\
-    # L300: {unitNormFitEstimate[unitCount][5]:.2f}\n\
-    # Scalar: {unitNormFitEstimate[unitCount][6]:.2f}\n\
-    # alpha 1: {unitNormFitEstimate[unitCount][7]:.2f}\n\
-    # alpha 2: {unitNormFitEstimate[unitCount][8]:.2f}\n\
-    # sigma: {unitNormFitEstimate[unitCount][9]:.2f}\n\
-    # baseline: {unitNormFitEstimate[unitCount][10]:.2f}\n\
-    # fit R2: {unitR2[unitCount]:.2f}', size=10, ha='center', transform=ax5.transAxes)
-    # ax5.axis('off')
-
-    ax8 = fig.add_subplot(gs03[1,0], polar='True')
-    theta = np.radians(np.arange(0,420,60))
-    sponTheta = np.radians(np.arange(0,360,360/100))
+    ax8 = fig.add_subplot(gs03[1, 0], polar='True')
+    theta = np.radians(np.arange(0, 420, 60))
+    sponTheta = np.radians(np.arange(0, 360, 360/100))
     sponTheta = np.append(sponTheta, sponTheta[0])
-    #loc 0
+
+    # loc 0
     r0 = (np.append(meanSpike[unitCount][36:42], meanSpike[unitCount][36])) \
-         * 1000/trueStimDurMS
+          * 1000/trueStimDurMS
     er0 = (np.append(spikeCountSEM[unitCount][36:42], spikeCountSEM[unitCount][36])) \
-           * 1000/trueStimDurMS
+          * 1000/trueStimDurMS
     ax8.plot(theta, r0, markersize=2, color='green', label='location 0')
     ax8.errorbar(theta, r0, yerr=er0, fmt='o', ecolor='green',
                  color='green', markersize=2)
 
     # loc 1
-    r1 = (np.append(meanSpike[unitCount][42:48],meanSpike[unitCount][42])) \
+    r1 = (np.append(meanSpike[unitCount][42:48], meanSpike[unitCount][42])) \
         * 1000/trueStimDurMS
     er1 = (np.append(spikeCountSEM[unitCount][42:48], spikeCountSEM[unitCount][42])) \
         * 1000/trueStimDurMS
@@ -1655,3 +1602,438 @@ for pairCount, pair in enumerate(combs):
         pairCorr.append(pairStimCorr[0])
         pairSelectivityIndex.append(pairSelectivity)
         pairNonPrefSuppIndex.append(pairSuppression)
+
+
+## superPlot Original with EMS gauss and two step fitting
+## SUPERPLOT OF PSTH, Normalization (pref+null+blank) heatmap, and bar plot
+## Create subset of Pandas DF for P, N, P+N conditions for all units
+pnContrastPlotDF = pd.DataFrame(columns=['unit', 'stimIndex', 'stimCount',
+                                         'stimSpikes', 'contrast', 'prefNullStr'])
+for unitCount, unit in enumerate(units):
+    # find direction tested that is closest to unit's preferred and null direction
+    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+    orientCount = 0
+    orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null',
+                  'pref+blank', 'null+blank', 'blank+pref', 'blank+null']
+    for j in [(prefDir, prefDir), (prefDir, nullDir), (nullDir, prefDir), (nullDir, nullDir), ]:
+        loc0Dir, loc1Dir = j
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                                  & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = highContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+    # Loc 0 Pref/Null only
+    for i in [(prefDir, zeroDir), (nullDir, zeroDir)]:
+        loc0Dir, loc1Dir = i
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == highContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == zeroContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                                  & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = zeroContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+    # loc 1 Pref/Null only
+    for x in [(zeroDir, prefDir), (zeroDir, nullDir)]:
+        loc0Dir, loc1Dir = x
+        sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                   (stimIndexDF['loc0 Contrast'] == zeroContrast) &
+                                   (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                   (stimIndexDF['loc1 Contrast'] == highContrast)][0]
+        unitDF = spikeCountDF.loc[(spikeCountDF['unit'] == unit)
+                                  & (spikeCountDF['stimIndex'] == sIndex)]
+        unitDF = unitDF.iloc[:blocksDone]
+        unitDF['contrast'] = zeroContrast
+        unitDF['prefNullStr'] = orientList[orientCount]
+        pnContrastPlotDF = pd.concat([pnContrastPlotDF, unitDF])
+        orientCount += 1
+
+for unitCount, unit in enumerate(units):
+    b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000 / trueStimDurMS
+    bSmooth = gaussian_filter(b, sigma=1)
+    prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+
+    ## figure
+    # fig = plt.figure(constrained_layout=True)
+    fig = plt.figure()
+    fig.set_size_inches(17, 7)
+
+    gs0 = gridspec.GridSpec(1, 5)
+
+    heights = [1, 1, 1]
+    widths = [4, 4, 4]
+    gs00 = gridspec.GridSpecFromSubplotSpec(3, 3, subplot_spec=gs0[0],
+                                            width_ratios=widths,
+                                            height_ratios=heights)
+    gs01 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:3])
+    gs02 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[3])
+    gs03 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[4])
+
+    # PSTHs Plot
+    locDirList = [(nullDir, nullDir), (prefDir, nullDir), ('blank', nullDir),
+                  (nullDir, prefDir), (prefDir, prefDir), ('blank', prefDir),
+                  (nullDir, 'blank'), (prefDir, 'blank'), ('blank', 'blank')]
+    yMax = 0
+    plotCount = 0
+    for row in range(3):
+        for col in range(3):
+            ax = fig.add_subplot(gs00[row, col])
+            locDir = locDirList[plotCount]
+            loc0Con = highContrast
+            loc1Con = highContrast
+            loc0Dir, loc1Dir = locDir
+            loc0Title = loc0Dir
+            loc1Title = loc1Dir
+            if loc0Dir == 'blank':
+                loc0Dir = zeroDir
+                loc0Con = zeroContrast
+            if loc1Dir == 'blank':
+                loc1Dir = zeroDir
+                loc1Con = zeroContrast
+            histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
+                                          (stimIndexDF['loc0 Contrast'] == loc0Con) &
+                                          (stimIndexDF['loc1 Direction'] == loc1Dir) &
+                                          (stimIndexDF['loc1 Contrast'] == loc1Con)][0]
+            dirPlot = spikeHists[unitCount, histIndex, :] * 1000 / stimIndexCount[histIndex]
+            smoothPlot = gaussian_filter1d(dirPlot, 5)
+            if max(smoothPlot) > yMax:
+                yMax = max(smoothPlot)
+            ax.plot(smoothPlot)
+            ax.set_title(f'loc0: {loc0Title}, loc1: {loc1Title}', fontsize=5)
+            ax.set_xticks([0,
+                           histPrePostMS,
+                           histPrePostMS + trueStimDurMS,
+                           2 * histPrePostMS + trueStimDurMS])
+            ax.set_xticklabels([])
+            ax.set_xlim([0, trueStimDurMS + (2 * histPrePostMS + 1)])
+            ax.axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
+                       color='grey', alpha=0.1)
+            ax.axhline(y=meanSpike[unitCount][48] * 1000 / trueStimDurMS,
+                       linestyle='--', color='grey')
+            if plotCount == 6:
+                ax.set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+                ax.set_xlabel('Stimulus Duration (ms)', fontsize=7)
+                ax.set_xticklabels([-histPrePostMS, 0, 0 + trueStimDurMS,
+                                    trueStimDurMS + histPrePostMS],
+                                   fontsize=7)
+            plotCount += 1
+
+        axes = fig.get_axes()
+        for ax in axes:
+            ax.set_ylim([0, yMax * 1.1])
+
+    # Normalization Plot
+    # ReIndexing to have pref direction in the middle Gauss Smooth
+    nullIndex = np.where(dirArray == nullDir)[0][0]
+    reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullIndex) % 6
+    tickLabels = np.array(['0', '60', '120', '180', '240', '300'])[reIndex]
+    tickLabels = np.append(tickLabels, ['blank'])
+
+    # smoothed data
+    bSmoothReIndex = np.zeros((7, 7))
+    tempMain = bSmooth[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = bSmooth[:6, 6][reIndex]
+    temp1Blank = bSmooth[6, :6][reIndex]
+    bSmoothReIndex[:6, :6] = tempMain
+    bSmoothReIndex[:6, 6] = temp0Blank
+    bSmoothReIndex[6, :6] = temp1Blank
+    bSmoothReIndex[6, 6] = bSmooth[6, 6]
+
+    vMax = np.max(bSmoothReIndex)
+
+    # raw data
+    bReIndex = np.zeros((7, 7))
+    tempMain = b[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = b[:6, 6][reIndex]
+    temp1Blank = b[6, :6][reIndex]
+    bReIndex[:6, :6] = tempMain
+    bReIndex[:6, 6] = temp0Blank
+    bReIndex[6, :6] = temp1Blank
+    bReIndex[6, 6] = b[6, 6]
+
+    if np.max(bReIndex) > vMax:
+        vMax = np.max(bReIndex)
+
+    # fitted data
+    stimMat = np.zeros((7, 7))
+    stimMat[:6, :6] = np.arange(36).reshape(6, 6)
+    stimMat[6, :6] = np.arange(36, 42)
+    stimMat[:, 6] = np.arange(42, 49)
+
+    stimMatReIndex = np.zeros((7, 7))
+    tempMain = stimMat[:6, :6][:, reIndex]
+    tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
+    temp0Blank = stimMat[:6, 6][reIndex]
+    temp1Blank = stimMat[6, :6][reIndex]
+    stimMatReIndex[:6, :6] = tempMain
+    stimMatReIndex[:6, 6] = temp0Blank
+    stimMatReIndex[6, :6] = temp1Blank
+    stimMatReIndex[6, 6] = stimMat[6, 6]
+
+    y_pred = np.zeros((7, 7))
+    # fitting Gaussian EMS to paired stimuli
+    pairedStim = stimMatReIndex[:6, :6].reshape(36)
+    fixedVals = fixedValsCurveFitForPairedStim(prefDir,
+                                               pairedStim,
+                                               stimIndexDict,
+                                               unitGaussFit[unitCount])
+    if scaledLoc[unitCount] == 0:
+        pred = EMSGaussNormStepFunc1(fixedVals, *unitPairedNormFit[unitCount]
+                                     ).reshape((6, 6))
+    else:
+        pred = EMSGaussNormStepFunc0(fixedVals, *unitPairedNormFit[unitCount]
+                                     ).reshape((6, 6))
+    y_pred[:6, :6] = pred
+
+    # fitting Gaussian to single stimuli
+    singleStim = np.concatenate((stimMatReIndex[6, :6], stimMatReIndex[:6, 6]), axis=0)
+    fixedVals = fixedValsForCurveFit(prefDir, singleStim, stimIndexDict)
+
+    if scaledLoc[unitCount] == 1:
+        pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
+    else:
+        pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
+    y_pred[6, :6] = pred[:6]
+    y_pred[:6, 6] = pred[6:]
+
+    # # using EMS generic, L0-L6
+    # fixedVals = fixedValsForEMSGen(stimMatReIndex.reshape(49), stimIndexDict)
+    # if scaledLoc[unitCount] == 0:
+    #     y_pred = emsNormGen1(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7,7))
+    # else:
+    #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount]).reshape((7,7))
+
+    if np.max(y_pred) > vMax:
+        vMax = np.max(y_pred)
+
+    # residual (diff between real vs predicted resp)
+    residual = abs(y_pred - bReIndex)
+    if np.max(residual) > vMax:
+        vMax = np.max(residual)
+
+    # ax2 = fig.add_subplot(gs01[0,1])
+    # ax2 = sns.heatmap(bSmoothReIndex, square=True, linewidths=0.2, vmin=0,
+    #                   vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    # ax2.set_xticks(np.arange(7)+0.5)
+    # ax2.set_title(f'Gaussian Smoothed', y=-0.1, fontsize=7)
+    # ax2.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    # ax2.xaxis.set_ticks_position('top')
+    # ax2.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
+    # ax2.xaxis.set_label_position('top')
+    # ax2.set_yticks(np.arange(7)+0.5)
+    # ax2.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
+    respReal = bReIndex.reshape(49)
+    respFit = y_pred.reshape(49)
+    ax2 = fig.add_subplot(gs01[0, 1])
+    ax2.scatter(respFit, respReal)
+    ax2.set_ylabel('Real Responses (spikes/sec)', fontsize=7)
+    ax2.set_xlabel('Fit Responses (spikes/sec)', fontsize=7)
+    ax2.xaxis.set_label_position('top')
+    ax2.set_ylim([-2, np.max(respReal) * 1.10])
+    ax2.set_xlim([-2, np.max(respReal) * 1.10])
+    line = lines.Line2D([0, 1], [0, 1], color='red')
+    transform = ax2.transAxes
+    line.set_transform(transform)
+    ax2.add_line(line)
+    # ax2 = plt.axis('equal')
+
+    ax3 = fig.add_subplot(gs01[0, 0])
+    ax3 = sns.heatmap(bReIndex, square=True, linewidths=0.2, vmin=0,
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    ax3.set_xticks(np.arange(7) + 0.5)
+    ax3.set_title(f'Raw Data', y=-0.1, fontsize=7)
+    ax3.set_xlabel('Location 0 Stimulus Direction', fontsize=7)
+    ax3.xaxis.set_label_position('top')
+    ax3.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    ax3.set_ylabel('Location 1 Stimulus Direction', fontsize=7)
+    ax3.xaxis.set_ticks_position("top")
+    ax3.set_yticks(np.arange(7) + 0.5)
+    ax3.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
+    ax6 = fig.add_subplot(gs01[1, 0])
+    ax6 = sns.heatmap(y_pred, square=True, linewidths=0.2, vmin=0,
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    ax6.set_xticks(np.arange(7) + 0.5)
+    ax6.set_title(f'Predicted', y=-0.1, fontsize=7)
+    ax6.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    ax6.set_ylabel('Location 1 Stimulus Direction', fontsize=7)
+    ax6.xaxis.set_ticks_position("top")
+    ax6.set_yticks(np.arange(7) + 0.5)
+    ax6.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
+    ax7 = fig.add_subplot(gs01[1, 1])
+    ax7 = sns.heatmap(residual, square=True, linewidths=0.2, vmin=0,
+                      vmax=vMax, annot=True, annot_kws={'fontsize': 7}, cbar=False)
+    # cbar=True, cbar_kws={'orientation': 'horizontal'})
+    ax7.set_xticks(np.arange(7) + 0.5)
+    ax7.set_title(f'Residual (Predicted-Raw)', y=-0.1, fontsize=7)
+    ax7.set_xticklabels(tickLabels, rotation=45, fontsize=7)
+    ax7.xaxis.set_ticks_position("top")
+    ax7.set_yticks(np.arange(7) + 0.5)
+    ax7.set_yticklabels(tickLabels, rotation=0, fontsize=7)
+
+    # bar plot
+    ax4 = fig.add_subplot(gs02[0, 0])
+    unitDF = pnContrastPlotDF.loc[pnContrastPlotDF['unit'] == unit]
+
+    # spikeCounts in spikes/sec
+    unitDF['stimSpikes'] = unitDF['stimSpikes'] * 1000 / trueStimDurMS
+
+    offset = lambda p: transforms.ScaledTranslation(p / 72., 0, plt.gcf().dpi_scale_trans)
+    trans = plt.gca().transData
+    offsetCount = 0
+
+    colorList = ['b', 'g', 'r', 'c']
+    # plot category by category
+    yMax = 0
+    for pos in [0.35, 0.65]:
+        if pos == 0.35:
+            for count, indx in enumerate(['pref+blank', 'null+blank', 'blank+pref', 'blank+null']):
+                mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+                sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
+                ax4 = plt.scatter(pos, mean, transform=trans + offset(offsetCount),
+                                  label=indx, color=colorList[count])
+                ax4 = plt.errorbar(pos, mean, yerr=sem, fmt='o',
+                                   transform=trans + offset(offsetCount),
+                                   color=colorList[count])
+                offsetCount += 5
+                stimIndex = unitDF.loc[(unitDF['prefNullStr'] == indx), 'stimIndex'].iloc[0]
+
+                # # using EMS generic for L0-L6
+                # fixedVals = fixedValsForEMSGen(stimIndex, stimIndexDict)
+                # if scaledLoc[unitCount] == 0:
+                #     y_pred = emsNormGen1(fixedVals, *unitNormFitEstimate[unitCount])
+                # else:
+                #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount])
+
+                # using gaussian EMS for single stim
+                fixedVals = fixedValsForCurveFit(prefDir, stimIndex, stimIndexDict)
+                if scaledLoc[unitCount] == 1:
+                    y_pred = gaussNormFunc0(fixedVals, *unitGaussFit[unitCount])
+                else:
+                    y_pred = gaussNormFunc1(fixedVals, *unitGaussFit[unitCount])
+                ax4 = plt.scatter(pos, y_pred, transform=trans + offset(offsetCount),
+                                  label=indx, color=lightenColor(colorList[count], 0.5))
+                offsetCount += 5
+                if mean > yMax:
+                    yMax = mean
+        else:
+            offsetCount = 0
+            for count, indx in enumerate(['pref+pref', 'pref+null', 'null+pref', 'null+null']):
+                mean = unitDF.loc[(unitDF['prefNullStr'] == indx)].mean()[3]
+                sem = unitDF.loc[(unitDF['prefNullStr'] == indx)].sem()[3]
+                ax4 = plt.scatter(pos, mean, transform=trans + offset(offsetCount),
+                                  label=indx, color=colorList[count])
+                ax4 = plt.errorbar(pos, mean, yerr=sem, fmt="o",
+                                   transform=trans + offset(offsetCount),
+                                   color=colorList[count])
+                offsetCount += 5
+                stimIndex = unitDF.loc[(unitDF['prefNullStr'] == indx), 'stimIndex'].iloc[0]
+                # fixedVals = fixedValsForEMSGen(stimIndex, stimIndexDict)
+                # if scaledLoc[unitCount] == 0:
+                #     y_pred = emsNormGen1(fixedVals, *unitNormFitEstimate[unitCount])
+                # else:
+                #     y_pred = emsNormGen0(fixedVals, *unitNormFitEstimate[unitCount])
+                fixedVals = fixedValsCurveFitForPairedStim(prefDir,
+                                                           stimIndex,
+                                                           stimIndexDict,
+                                                           unitGaussFit[unitCount])
+                if scaledLoc[unitCount] == 0:
+                    y_pred = EMSGaussNormStepFunc1(fixedVals,
+                                                   *unitPairedNormFit[unitCount])
+                else:
+                    y_pred = EMSGaussNormStepFunc0(fixedVals,
+                                                   *unitPairedNormFit[unitCount])
+                ax4 = plt.scatter(pos, y_pred, transform=trans + offset(offsetCount),
+                                  label=indx, color=lightenColor(colorList[count], 0.5))
+                offsetCount += 5
+                if mean > yMax:
+                    yMax = mean
+    ax4 = plt.axhline(y=meanSpike[unitCount][48] * 1000 / trueStimDurMS, linestyle='--', color='grey')
+    ax4 = plt.ylim([0, yMax * 1.5])
+    ax4 = plt.xticks([0.35, 0.65], ['Singular Stimulus', 'Dual Stimulus'])
+    ax4 = plt.xlim(left=0.2, right=0.8)
+    ax4 = plt.ylabel('Firing Rate spikes/sec')
+    ax4 = plt.legend(loc='upper right', prop={'size': 6}, bbox_to_anchor=(1.25, 1.0))
+
+    # Normalization Fit Parameters for EMS with Gaussian
+    ax5 = fig.add_subplot(gs03[0, 0])
+    ax5.text(0.5, 0.5, f'the scaled location is: {int(scaledLoc[unitCount])}\n\
+    gaussian offset: {unitGaussFit[unitCount][0]:.2f}\n\
+    gaussian amplitude: {unitGaussFit[unitCount][1]:.2f}\n\
+    gaussian mean: {unitGaussFit[unitCount][2]:.2f}\n\
+    gaussian sigma: {unitGaussFit[unitCount][3]:.2f}\n\
+    location scalar: {unitGaussFit[unitCount][4]:.2f}\n\
+    normalization alpha 0: {unitPairedNormFit[unitCount][0]:.2f}\n\
+    normalization alpha 1: {unitPairedNormFit[unitCount][1]:.2f}\n\
+    gauss fit R2: {unitGaussR2[unitCount]:.2f}\n\
+    EMS norm fit R2: {unitPairedNormR2[unitCount]:.2f}', size=10,
+             ha='center', transform=ax5.transAxes)
+    ax5.axis('off')
+    # baseline: {unitNormFitEstimate[unitCount][8]:.2f}\n\
+
+    # norm fit parameters with EMS generic (l1-l6)
+    # ax5 = fig.add_subplot(gs03[0,0])
+    # ax5.text(0.5,0.5, f'the scaled location is: {int(scaledLoc[unitCount])}\n\
+    # L0: {unitNormFitEstimate[unitCount][0]:.2f}\n\
+    # L60: {unitNormFitEstimate[unitCount][1]:.2f}\n\
+    # L120: {unitNormFitEstimate[unitCount][2]:.2f}\n\
+    # L180: {unitNormFitEstimate[unitCount][3]:.2f}\n\
+    # L240: {unitNormFitEstimate[unitCount][4]:.2f}\n\
+    # L300: {unitNormFitEstimate[unitCount][5]:.2f}\n\
+    # Scalar: {unitNormFitEstimate[unitCount][6]:.2f}\n\
+    # alpha 1: {unitNormFitEstimate[unitCount][7]:.2f}\n\
+    # alpha 2: {unitNormFitEstimate[unitCount][8]:.2f}\n\
+    # sigma: {unitNormFitEstimate[unitCount][9]:.2f}\n\
+    # baseline: {unitNormFitEstimate[unitCount][10]:.2f}\n\
+    # fit R2: {unitR2[unitCount]:.2f}', size=10, ha='center', transform=ax5.transAxes)
+    # ax5.axis('off')
+
+    ax8 = fig.add_subplot(gs03[1, 0], polar='True')
+    theta = np.radians(np.arange(0, 420, 60))
+    sponTheta = np.radians(np.arange(0, 360, 360 / 100))
+    sponTheta = np.append(sponTheta, sponTheta[0])
+    # loc 0
+    r0 = (np.append(meanSpike[unitCount][36:42], meanSpike[unitCount][36])) \
+         * 1000 / trueStimDurMS
+    er0 = (np.append(spikeCountSEM[unitCount][36:42], spikeCountSEM[unitCount][36])) \
+          * 1000 / trueStimDurMS
+    ax8.plot(theta, r0, markersize=2, color='green', label='location 0')
+    ax8.errorbar(theta, r0, yerr=er0, fmt='o', ecolor='green',
+                 color='green', markersize=2)
+
+    # loc 1
+    r1 = (np.append(meanSpike[unitCount][42:48], meanSpike[unitCount][42])) \
+         * 1000 / trueStimDurMS
+    er1 = (np.append(spikeCountSEM[unitCount][42:48], spikeCountSEM[unitCount][42])) \
+          * 1000 / trueStimDurMS
+    ax8.plot(theta, r1, markersize=2, color='red', label='location 1')
+    ax8.errorbar(theta, r1, yerr=er1, fmt='x', ecolor='red',
+                 color='red', markersize=2)
+    ax8.set_theta_zero_location('W')
+    ax8.set_title('Direction tuning at both locations')
+    spon = np.array([meanSpike[unitCount][48] * 1000 / trueStimDurMS] * len(sponTheta))
+    ax8.plot(sponTheta, spon, linestyle='--', color='blue',
+             label='spontaneous rate')
+    ax8.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0,
+               prop={'size': 6})
+
+    plt.tight_layout()
+
+    plt.savefig(f'{unit}EMS2PartsuperPlot.pdf')
+    plt.close('all')
+

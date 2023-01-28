@@ -37,7 +37,7 @@ for currTrial in allTrials:
 #### Start Here:
 # Load relevant file here with pyMat reader 
 monkeyName = 'Meetz'
-seshDate = '221208'
+seshDate = '230126'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -180,10 +180,10 @@ for uCount, unit in enumerate(units):
     err = (np.append(spikeCountSEM, spikeCountSEM[0]))*1000/trueStimDurMS
     spon = np.array([sponSpikesMean] * len(sponTheta))
     ax_row1.plot(theta,r, markersize=2)
-    ax_row1.errorbar(theta, r, yerr = err,fmt='o', ecolor = 'black',
+    ax_row1.errorbar(theta, r, yerr=err, fmt='o', ecolor='black',
                      color='black', markersize=2)
-    ax_row1.plot(sponTheta,spon*1000/sponWindowMS, linestyle='--')
-    ax_row1.plot(np.radians(nXFull%360), nYFull*1000/trueStimDurMS)
+    ax_row1.plot(sponTheta, spon*1000/sponWindowMS, linestyle='--')
+    ax_row1.plot(np.radians(nXFull % 360), nYFull*1000/trueStimDurMS)
     ax_row1.set_theta_zero_location("W")
     # ax_row1.set_rmax(120)
     ax_row1.set_title('Direction Tuning Polar Plot', fontsize=8)
@@ -208,21 +208,21 @@ for uCount, unit in enumerate(units):
             gaussSmooth = gaussian_filter1d(spikeHist, 5)
             if max(gaussSmooth) > yMax:
                 yMax = max(gaussSmooth)
-            ax_row2[i,j].plot(gaussSmooth)
+            ax_row2[i, j].plot(gaussSmooth)
             histTitle = titleArr[i][j]
-            ax_row2[i,j].set_title(f"{histTitle}˚", fontsize=7)
-            ax_row2[i,j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,
+            ax_row2[i, j].set_title(f"{histTitle}˚", fontsize=7)
+            ax_row2[i, j].set_xticks([0,histPrePostMS,histPrePostMS+trueStimDurMS,
                                      2*histPrePostMS+trueStimDurMS])
-            ax_row2[i,j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS, 
+            ax_row2[i, j].set_xticklabels([-(histPrePostMS), 0, 0+trueStimDurMS,
                                      trueStimDurMS+histPrePostMS], fontsize=5)
-            ax_row2[i,j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS, 
+            ax_row2[i, j].axvspan(histPrePostMS, histPrePostMS+trueStimDurMS,
                                  color='grey', alpha=0.2)
-            ax_row2[i,j].axhline(y=sponSpikesMean*1000/sponWindowMS, 
+            ax_row2[i, j].axhline(y=sponSpikesMean*1000/sponWindowMS,
                                  linestyle='--', color='grey')
             if i == 1 and j == 0:
-                ax_row2[i,j].set_xlabel('Time (ms)', fontsize=7)
-                ax_row2[i,j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-                ax_row2[i,j].yaxis.set_label_coords(-0.2,0.3)
+                ax_row2[i, j].set_xlabel('Time (ms)', fontsize=7)
+                ax_row2[i, j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+                ax_row2[i, j].yaxis.set_label_coords(-0.2,0.3)
     plt.tight_layout(pad=0.8, w_pad=0.2, h_pad=0.2)
     
     for i in range(2):

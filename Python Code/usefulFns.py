@@ -1,5 +1,6 @@
 import scipy.io as sp
 from scipy.optimize import curve_fit
+import scipy.optimize
 from scipy import ndimage
 from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage.filters import gaussian_filter
@@ -169,13 +170,14 @@ def gauss(x, H, A, x0, sigma):
 
 
 def gaussFit(x, y):
-    '''
+    """
     apply curve_fit from scipy.optimize 
-    '''
+    """
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
-                   bounds=((0,0,0,0),(np.inf,1.50*np.max(y),np.inf,np.inf)))
+                   bounds=((0, 0, 0, 0),
+                           (np.inf, 1.50*np.max(y), np.inf, np.inf)))
     return popt
 
 
@@ -543,7 +545,7 @@ def fixedValsForPairedStimL0L6(stimMatReIndex, stimIndexDict, L0L6Resp):
             np.array(L), np.array(S))
 
 
-def fixedValsForEMSGenCondensed(stimMatReIndex, stimIndexDict, prefDir, nullDir):
+def fixedValsForEMSGenCondensed(stimMatReIndex, stimIndexDict, nullDir, prefDir):
     '''
     function will create the fixed values for running the
     generic EMS normazliation curve_fit
@@ -1178,6 +1180,20 @@ def genericNorm1(fixed, L0, L60, L120, L180, L240, L300, S, al0, al1, c50):
 
     return num / denom
 
+
+def driverFunc(x, fixedVals, resp):
+    """
+    this function will aide in estimating my normalization
+    equation parameters by minimizing the sum of square error
+    """
+
+    # yNew = genericNormNoScalar(fixedVals, *x)
+    yNew = genNormCondensed(fixedVals, *x)
+    yErr = np.sum((yNew - resp) ** 2)
+
+    return yErr
+
+
 def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
                         L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, al0,
                         al1, sig):
@@ -1189,6 +1205,8 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     c0, c1, l0, l1 = fixed
     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
+
+    # generic norm
     # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
     # denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
     #
@@ -1201,40 +1219,29 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     return loc0 + loc1
 
 
-def emsNormGenCondensed0(fixed, LN, LP, S, al0, al1, sig, m):
+def genNormCondensed(fixed, L0_0, L0_180, L1_0, L1_180, al0, al1, sig):
     """
     scaled loc is 1
     loc 0 has stronger response
     """
 
     c0, c1, l0, l1 = fixed
-    L = np.array([LN, LP])
+    L0 = np.array([L0_0, L0_180])
+    L1 = np.array([L1_0, L1_180])
 
-    loc0 = (c0 * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0] * al1) + sig)
+    # generic norm
+    num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
 
-    loc1 = (c1 * S * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0] + sig)
+    return num/denom
 
-    return loc0 + loc1 + m
-
-
-def emsNormGenCondensed1(fixed, LN, LP, S, al0, al1, sig, m):
-    """
-    scaled loc is 1
-    loc 0 has stronger response
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([LN, LP])
-
-    loc0 = (c0 * S * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0] * al1) + sig)
-
-    loc1 = (c1 * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0] + sig)
-
-    return loc0 + loc1 + m
+    # loc0 = (c0 * (l0 * L0)).sum(-1) / (
+    #         c0[:, 0] + (c1[:, 0] * al1) + sig)
+    #
+    # loc1 = (c1 * (l1 * L1)).sum(-1) / (
+    #        (c0[:, 0] * al0) + c1[:, 0] + sig)
+    #
+    # return loc0 + loc1
 
 
 def emsNormFunc0(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):

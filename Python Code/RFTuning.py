@@ -293,10 +293,12 @@ print(time.time()-t0)
 # Plot Overall RF Summary from all sessions
 # figure
 fig = plt.figure()
-fig.set_size_inches(15, 7)
-gs0 = gridspec.GridSpec(1, 2)
-gs00 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[0])
-gs01 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[1])
+fig.set_size_inches(10, 7)
+gs0 = gridspec.GridSpec(2, 2)
+gs00 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[0, 0])
+gs01 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[0, 1])
+gs02 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[1, 0])
+gs03 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[1, 1])
 
 ax = fig.add_subplot(gs00[0, 0])
 x = np.linspace(-15, 30, 10)
@@ -310,7 +312,7 @@ plt.plot(x, y, color='black')
 for i in unitParams:
     if abs(i[3]) < 30 and abs(i[4]) < 30:
         el1SD = Ellipse((i[3], i[4]), i[1], i[2], i[0],
-                        fill=None, edgecolor='blue', alpha=0.4)
+                        fill=None, edgecolor='blue', alpha=0.2)
         el1SD.set(linestyle=':')
         stdMean = ((i[1]*2) + (i[2]*2)) / 2
         if stdMean < 40:
@@ -318,15 +320,23 @@ for i in unitParams:
 ax.set_xlabel('Azimuth (˚)')
 ax.set_ylabel('Elevation (˚)')
 sessionXYMean = np.array(sessionXYMean)
-ax.scatter(sessionXYMean[:, 0], sessionXYMean[:, 1])
+ax.scatter(sessionXYMean[:, 0], sessionXYMean[:, 1], alpha=0.6)
+
+for i in range(len(sessionXYMean)):
+    ax.annotate(i+1, (sessionXYMean[i, 0], sessionXYMean[i, 1]), color='black',
+                fontsize=6)
+
 
 ax2 = fig.add_subplot(gs01[0, 0])
+diamEccRatio = []
 for i in unitParams:
     if abs(i[3]) < 30 and abs(i[4]) < 30:
         unitEcc = np.sqrt((i[3]**2) + (i[4]**2))
-        stdMean = ((i[1]*2*np.sqrt(2)) + (i[2]*2*np.sqrt(2))) / 2
-        if stdMean < 40:
-            ax2.scatter(unitEcc, stdMean, color='grey', alpha=0.8)
+        diam = ((i[1]*2*np.sqrt(2)) + (i[2]*2*np.sqrt(2))) / 2
+        if diam < 40:
+            ax2.scatter(unitEcc, diam, color='grey', alpha=0.8)
+            diamEccRatio.append(diam/unitEcc)
+
 ax2.set_xlim([0, 40])
 ax2.set_ylim([0, 40])
 line = lines.Line2D([0, 1], [0, 1], color='black')
@@ -335,6 +345,16 @@ line.set_transform(transform)
 ax2.add_line(line)
 ax2.set_xlabel('RF Eccentricity (˚)')
 ax2.set_ylabel('RF Diameter (2DGaussSD * 2 * sqrt(2))')
+
+# ax3 = fig.add_subplot(gs02[0, 0])
+
+ax4 = fig.add_subplot(gs03[0, 0])
+ax4.hist(diamEccRatio, bins=20)
+ax4.set_ylabel('Frequency')
+ax4.set_xlabel('unit Diameter/Eccentricity ratio')
+ax4.axvline(np.median(diamEccRatio), color='black')
+ax4.set_title('Diameter/Eccentricity distribution, vertical line=median',
+              fontsize=7)
 
 plt.tight_layout()
 plt.show()

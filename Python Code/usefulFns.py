@@ -1187,7 +1187,18 @@ def driverFunc(x, fixedVals, resp):
     equation parameters by minimizing the sum of square error
     """
 
-    # yNew = genericNormNoScalar(fixedVals, *x)
+    yNew = genericNormNoScalar(fixedVals, *x)
+    yErr = np.sum((yNew - resp) ** 2)
+
+    return yErr
+
+
+def driverFuncCondensend(x, fixedVals, resp):
+    """
+    this function will aide in estimating my normalization
+    equation parameters by minimizing the sum of square error
+    """
+
     yNew = genNormCondensed(fixedVals, *x)
     yErr = np.sum((yNew - resp) ** 2)
 
@@ -1207,27 +1218,27 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
 
     # generic norm
-    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    # denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+
+    return num/denom
+
+    # # ems
+    # loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]) + sig)
+    # loc1 = ((c1 * L1 * l1).sum(-1)) / ((al0 * c0[:, 0]) + c1[:, 0] + sig)
     #
-    # return num/denom
-
-    # ems
-    loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]) + sig)
-    loc1 = ((c1 * L1 * l1).sum(-1)) / ((al0 * c0[:, 0]) + c1[:, 0] + sig)
-
-    return loc0 + loc1
+    # return loc0 + loc1
 
 
-def genNormCondensed(fixed, L0_0, L0_180, L1_0, L1_180, al0, al1, sig):
+def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1, sig):
     """
     scaled loc is 1
     loc 0 has stronger response
     """
 
     c0, c1, l0, l1 = fixed
-    L0 = np.array([L0_0, L0_180])
-    L1 = np.array([L1_0, L1_180])
+    L0 = np.array([L0_0, L0_1])
+    L1 = np.array([L1_0, L1_1])
 
     # generic norm
     num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))

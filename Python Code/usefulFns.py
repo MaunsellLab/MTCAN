@@ -800,105 +800,6 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
             ['channel'], [channelIdentity] * len(spikeTimeMS), 0)
 
 
-def gaussNormFunc0(fixed, BO, A, MU, SIG, S):
-    '''
-    curve fit variables for my direction tuning gauss func and a scalar
-    at the location 1
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: gaussian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    b: baseline
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = c0 * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))
-    loc1 = c1 * S * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2)))
-
-    return (loc0 + loc1).squeeze()
-
-
-def gaussNormFunc1(fixed, BO, A, MU, SIG, S):
-    '''
-    curve fit variables for my direction tuning gauss func and a scalar
-    at the location 0
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: gaussian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    b: baseline
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = c0 * S * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))
-    loc1 = c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2)))
-
-    return (loc0 + loc1).squeeze()
-
-
-def EMSGaussNormStepFunc0(fixed, al0, al1):
-    """
-    curve fit variables for my norm function, when loc0 has stronger response
-    location 1 is scaled
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    """
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-
-    loc0 = (c0 * (BO + A * np.exp(-((l0 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-            c0 + (al1 * c1))
-
-    loc1 = (c1 * S * (BO + A * np.exp(-((l1 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-           (c0 * al0) + c1)
-
-    return (loc0 + loc1).squeeze()
-
-
-def EMSGaussNormStepFunc1(fixed, al0, al1):
-    """
-    curve fit variables for my norm function, when loc1 has stronger response
-    location 0 is scaled
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    """
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-
-    loc0 = (c0 * S * (BO + A * np.exp(-((l0 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-            c0 + (al1 * c1))
-
-    loc1 = (c1 * (BO + A * np.exp(-((l1 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-            (c0 * al0) + c1)
-
-    return (loc0 + loc1).squeeze()
-
-
-def EMSNormNoScalar(fixed, BO, A, MU, SIG, al0, al1):
-    """
-    EMS curve fit for normalization without scalar
-    will let Alpha's decide the scaling
-    """
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = (c0 * (BO + A * np.exp(-((l0 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-           (al0 * c0) + (al1 * c1))
-
-    loc1 = (c1 * (BO + A * np.exp(-((l1 - MU) ** 2) / (2 * (SIG ** 2))))) / (
-           (al0 * c0) + (al1 * c1))
-
-    return (loc0 + loc1).squeeze()
-
-
 def randTuningCurve(numNeurons):
     '''
     Functon will generate random tuning cruves for x number of neurons.
@@ -930,82 +831,6 @@ def randTuningCurve(numNeurons):
             tcDictionary[i+1][tuningMat[0][j]] = dirResp
 
     return tuningMat, tcDictionary
-
-
-def normStepFunc0(fixed, al0, al1, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    '''
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-    num = (c0 * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + (
-                c1 * S * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
-    denom = (al0 * c0) + (al1 * c1) + c50
-    return (num / denom).squeeze()
-
-
-def normStepFunc1(fixed, al0, al1, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has stronger response
-
-    al: alpha for normalization
-    c50: normalization sigma
-    fixed: gaussian fit parameters, independent variables, and location scalar
-    '''
-
-    c0, l0, c1, l1, BO, A, MU, SIG, S = fixed.T
-    num = (c0 * S * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + (
-                c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
-    denom = (al0 * c0) + (al1 * c1) + c50
-    return (num / denom).squeeze()
-
-
-def normFunc0(fixed, BO, A, MU, SIG, S, al, c50):
-    '''
-    curve fit variables for my norm function, when loc0 has a stronger response
-
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al: alpha for normalization
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-    num = (c0 * (BO + A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + \
-          (c1 * (BO + S * A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
-    denom = c0 + (al * c1) + c50
-
-    return (num / denom).squeeze()
-
-
-def normFunc1(fixed, BO, A, MU, SIG, S, al, c50):
-    '''
-    curve fit variables for my norm function, when loc1 has stronger response
-
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al: alpha for normalization
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-    num = (c0 * (BO + S * A * np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) + \
-          (c1 * (BO + A * np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2))))
-    denom = (al * c0) + c1 + c50
-
-    return (num / denom).squeeze()
 
 
 def vonMises(x,x0,conc,I0):
@@ -1049,138 +874,6 @@ def logNormalFit(x,y):
     return popt
 
 
-def emsSingleStim1(fixed, L0, L60, L120, L180, L240, L300, S):
-    """
-    function is the equation for single stimulus linear response
-    at full contrast for L0-L300, scaled location is loc0
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-
-    loc0 = (c0 * S * (l0 * L)).sum(-1)
-    loc1 = (c1 * (l1 * L)).sum(-1)
-
-    return loc0 + loc1
-
-
-def emsSingleStim0(fixed, L0, L60, L120, L180, L240, L300, S):
-    """
-    function is the equation for single stimulus linear response
-    at full contrast for L0-L300, scaled location is loc1
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-
-    loc0 = (c0 * (l0 * L)).sum(-1)
-    loc1 = (c1 * S * (l1 * L)).sum(-1)
-
-    return loc0 + loc1
-
-
-def EMSGenNormPaired1(fixed, al0, al1):
-    """
-    curve fit equation for normalization when loc0 has the scalar
-
-    al0: alpha for normalization at site 0
-    al1: alpha for normalization at site 1
-    fixed: L0-L300 fit responses, independent variable and location 0 scalar
-    """
-
-    c0, c1, l0, l1, L, S = fixed
-
-    loc0 = (c0 * S * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0]) * al1)
-
-    loc1 = (c1 * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0])
-
-    return loc0 + loc1
-
-
-def EMSGenNormPaired0(fixed, al0, al1):
-    """
-    curve fit equation for normalization when loc1 has the scalar
-
-    al0: alpha for normalization at site 0
-    al1: alpha for normalization at site 1
-    fixed: L0-L300 fit responses, independent variable and location 0 scalar
-    """
-
-    c0, c1, l0, l1, L, S = fixed
-
-    loc0 = (c0 * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0]) * al1)
-
-    loc1 = (c1 * S * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0])
-
-    return loc0 + loc1
-
-
-def emsNormGen0(fixed, L0, L60, L120, L180, L240, L300, S, al0, al1):
-    """
-    scaled loc is 1
-    loc 0 has stronger response
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-    loc0 = (c0 * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0] * al1))
-
-    loc1 = (c1 * S * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0])
-
-    return loc0 + loc1
-
-
-def emsNormGen1(fixed, L0, L60, L120, L180, L240, L300, S, al0, al1):
-    '''
-    scaled loc is 0
-    loc 1 has stronger response
-    '''
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-    loc0 = (c0 * S * (l0 * L)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0] * al1))
-
-    loc1 = (c1 * (l1 * L)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0])
-
-    return loc0 + loc1
-
-
-def genericNorm0(fixed, L0, L60, L120, L180, L240, L300, S, al0, al1, c50):
-    """
-    scaled loc is 1
-    loc 0 has stronger response
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-    num = (c0 * (l0 * L)).sum(-1) + (c1 * S * (l1 * L)).sum(-1)
-    denom = (c0[:, 0] * al0) + (c1[:, 0] * al1) + c50
-
-    return num / denom
-
-
-def genericNorm1(fixed, L0, L60, L120, L180, L240, L300, S, al0, al1, c50):
-    """
-    scaled loc is 0
-    loc 1 has stronger response
-    """
-
-    c0, c1, l0, l1 = fixed
-    L = np.array([L0, L60, L120, L180, L240, L300])
-    num = (c0 * S * (l0 * L)).sum(-1) + (c1 * (l1 * L)).sum(-1)
-    denom = (c0[:, 0] * al0) + (c1[:, 0] * al1) + c50
-
-    return num / denom
-
-
 def driverFunc(x, fixedVals, resp):
     """
     this function will aide in estimating my normalization
@@ -1205,9 +898,21 @@ def driverFuncCondensend(x, fixedVals, resp):
     return yErr
 
 
+def driverFuncCondensend1(x, fixedVals, resp):
+    """
+    this function will aide in estimating my normalization
+    equation parameters by minimizing the sum of square error
+    """
+
+    yNew = genNormCondensed1(fixedVals, *x)
+    yErr = np.sum((yNew - resp) ** 2)
+
+    return yErr
+
+
 def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
                         L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, al0,
-                        al1, sig):
+                        al1):
     """
     this function applies the generic normalization equation without a scalar
     at the weaker location. Instead, it gives that location its own L0-L6 value
@@ -1217,23 +922,69 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
 
-    # generic norm
-    num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
-
-    return num/denom
-
-    # # ems
-    # loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]) + sig)
-    # loc1 = ((c1 * L1 * l1).sum(-1)) / ((al0 * c0[:, 0]) + c1[:, 0] + sig)
+    # # generic norm
+    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    # denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
     #
-    # return loc0 + loc1
+    # return num/denom
+
+    # ems
+    loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]))
+    loc1 = ((c1 * L1 * l1).sum(-1)) / ((al0 * c0[:, 0]) + c1[:, 0])
+
+    return loc0 + loc1
 
 
-def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1, sig):
+def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1):
     """
-    scaled loc is 1
-    loc 0 has stronger response
+    generic normalization condensed
+    """
+
+    c0, c1, l0, l1 = fixed
+    L0 = np.array([L0_0, L0_1])
+    L1 = np.array([L1_0, L1_1])
+
+    # # generic norm
+    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    # denom = ((1 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    #
+    # return num / denom
+
+    # ems
+    loc0 = (c0 * (l0 * L0)).sum(-1) / (
+            c0[:, 0] + (c1[:, 0] * al1))
+
+    loc1 = (c1 * (l1 * L1)).sum(-1) / (
+           (c0[:, 0] * al0) + c1[:, 0])
+
+    return loc0 + loc1
+
+
+    # # generic norm
+    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    # denom = (1 + (al1 * c0[:, 0] * c1[:, 0]) + sig)
+    #
+    # return num/denom
+
+    # def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1, sig):
+    #     """
+    #     generic normalization condensed
+    #     """
+    #
+    #     c0, c1, l0, l1 = fixed
+    #     L0 = np.array([L0_0, L0_1])
+    #     L1 = np.array([L1_0, L1_1])
+    #
+    #     # generic norm
+    #     num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    #     denom = ((1 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    #
+    #     return num / denom
+
+
+def genNormCondensed1(fixed, L0_0, L0_1, L1_0, L1_1, al1, sig):
+    """
+    generic normalization condensed
     """
 
     c0, c1, l0, l1 = fixed
@@ -1242,74 +993,9 @@ def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1, sig):
 
     # generic norm
     num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    denom = ((al1 * c0[:, 0]) + (1 * c1[:, 0]) + sig)
 
     return num/denom
-
-    # loc0 = (c0 * (l0 * L0)).sum(-1) / (
-    #         c0[:, 0] + (c1[:, 0] * al1) + sig)
-    #
-    # loc1 = (c1 * (l1 * L1)).sum(-1) / (
-    #        (c0[:, 0] * al0) + c1[:, 0] + sig)
-    #
-    # return loc0 + loc1
-
-
-def emsNormFunc0(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):
-    '''
-    curve fit variables for Ami Ni EMS normalization function, when loc0
-    has a stronger response
-
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al0: alpha for normalization at loc 0
-    al1: alpha for normalization at loc 1
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
-
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = (c0 * (BO + A*np.exp(-(l0-MU) ** 2 / (2 * SIG ** 2)))) / (
-            c0 + (c1 *al1) + c50)
-
-    loc1 = (c1 * (BO + S*A*np.exp(-(l1-MU) ** 2 / (2 * SIG ** 2)))) / (
-           (c0 * al0) + c1 + c50)
-    # s loc 1
-    return (loc0 + loc1 + m).squeeze()
-
-
-def emsNormFunc1(fixed, BO, A, MU, SIG, S, al0, al1, c50, m):
-    '''
-    curve fit variables for Ami Ni EMS normalization function, when loc1
-    has a stronger response
-
-    BO: gaussian tuning curve baseline offset
-    A: gaussian tuning curve amplitude
-    MU: guassian tuning curve mean
-    SIG: gaussian tuning curve std dev
-    S: scalar for other location gauss function
-    al0: alpha for normalization at loc 0
-    al1: alpha for normalization at loc 1
-    c50: normalization sigma
-    M: baseline resp (blank stimulus)
-
-    '''
-
-    c0, l0, c1, l1 = fixed.T
-
-    loc0 = (c0 * (BO + S*A*np.exp(-(l0 - MU) ** 2 / (2 * SIG ** 2)))) / (
-            c0 + (c1 * al1) + c50)
-
-    # s loc 0
-    loc1 = (c1 * (BO + A*np.exp(-(l1 - MU) ** 2 / (2 * SIG ** 2)))) / (
-           (c0 * al0) + c1 + c50)
-
-    return (loc0 + loc1 + m).squeeze()
 
 
 def circularHist(ax, x, bins=16, density=True, offset=0, gaps=True):
@@ -1387,6 +1073,35 @@ def circularHist(ax, x, bins=16, density=True, offset=0, gaps=True):
 
     return n, bins, patches
 
+
+def generateTwoCorrArrays(numSamples, corr):
+    """
+    this function will generate a two arrays of length numSamples
+    that have an inherent correlation
+
+    Inputs: numSamples: the length of the arrays
+            corr: the desired correlation b/w the two arrays
+    Outputs: arr1, arr2: two correlated arrays
+    """
+
+    # Random samples (Uniformly distributed)
+    U1 = np.random.rand(numSamples, 1)
+    U2 = np.random.rand(numSamples, 1)
+
+    # Random samples (normally distributed uncorrelated)
+    S1 = np.sqrt(-2*np.log(U1))*np.cos(2*np.pi*U2)
+    S2 = np.sqrt(-2*np.log(U1))*np.sin(2*np.pi*U2)
+
+    # Correlated random samples
+    mu_x = 0.5
+    mu_y = 0.66
+    sigma_x = 0.85
+    sigma_y = 1.24
+    rho = corr
+    x = mu_x + sigma_x * S1
+    y = mu_y + sigma_y * (rho*S1 + np.sqrt(1-rho**2)*S2)
+
+    return x.flatten(), y.flatten()
 ## END HERE
 
 ''' function fitting working 
@@ -1455,3 +1170,8 @@ for unitCount, unit in enumerate(units):
 # b = np.concatenate((a[3:],a[:4]), axis=0)
 # degList = np.radians(np.arange(-180,240,60) % 360)
 # popt, pcov = curve_fit(vonMises, degList, b)
+
+
+
+
+

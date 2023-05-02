@@ -24,11 +24,9 @@ totFilterR2 = []
 totFilterCombs = []
 unitIdentifier = []
 unitsNormParams = []
-alphaLoc0PrefOnly = []
-alphaLoc1PrefOnly = []
 alphaLoc0Cond = []
 alphaLoc1Cond = []
-popTunCurve = [] 
+popTunCurve = []
 pairSelFromCond = []
 pairNPSuppFromCond = []
 stimIndex12Cond = [0, 3, 18, 21, 7, 10,
@@ -40,21 +38,6 @@ medFRAlpha = []
 medFRParams = []
 lowFRAlpha = []
 lowFRParams = []
-gaborSep = []
-# arrays for nn, pn, np, pp, and basline PSTHs
-ppArr = []
-pnArr = []
-npArr = []
-nnArr = []
-baseArr = []
-# arrays for loc 0, 1 p and n PSTHs
-p0Arr = []
-p1Arr = []
-n0Arr = []
-n1Arr = []
-# arrays for PN, NP z-scored spike counts
-pnZscoSpikeCounts = []
-npZscoSpikeCounts = []
 
 for fileIterator in fileList:
 
@@ -130,22 +113,11 @@ for fileIterator in fileList:
             if stim['stimLoc'] == 0:
                 frameDiff = stim['stimOffFrame'] - stim['stimOnFrame']
                 stimDurFrame.append(frameDiff)
+
     if len(set(stimDurFrame)) != 1:
         print('stimulus frame duration not consistent for mapping stimuli')
     else:
         trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
-
-    # distance between Gabors in the RF
-    stimDesc = allTrials[corrTrials[0]]['stimDesc']['data']
-    for stim in stimDesc:
-        if stim['stimLoc'] == 0:
-            loc0X = stim['azimuthDeg']
-            loc0Y = stim['elevationDeg']
-        if stim['stimLoc'] == 1:
-            loc1X = stim['azimuthDeg']
-            loc1Y = stim['elevationDeg']
-    sep = np.sqrt(((loc0X - loc1X) ** 2) + ((loc0Y - loc1Y) ** 2))
-    gaborSep.append(sep)
 
     # generates a dictionary, numpy array, and Pandas Dataframe of stim Index
     # and corresponding directions/contrasts
@@ -338,69 +310,6 @@ for fileIterator in fileList:
     # combinations of units with wide tuning
     wideCombs = [i for i in combinations(wideUnits, 2)]
 
-    # get p, n, p+n psth for every unit - normalized and aligned
-    # to each unit's pref direction. This will also extract spike counts
-    # for PN, NP condition to create distribution of variance from the mean (z-score)
-    sli = [0, 3, 6]
-    for unitCount, unit in enumerate(units):
-        # find direction tested that is closest to the pref dir
-        # and reindex around this so that it is in the middle of the grid
-        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-        nullDirIndex = np.where(dirArray == nullDir)[0][0]
-        reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
-
-        # fixed (independent) variables - matrix of corresponding stim Indexes
-        stimMat = np.zeros((7, 7))
-        stimMat[:6, :6] = np.arange(36).reshape(6, 6)
-        stimMat[6, :6] = np.arange(36, 42)
-        stimMat[:, 6] = np.arange(42, 49)
-
-        # reshape fixed variables to match dependent variables
-        stimMatReIndex = np.zeros((7, 7))
-        tempMain = stimMat[:6, :6][:, reIndex]
-        tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
-        temp0Blank = stimMat[:6, 6][reIndex]
-        temp1Blank = stimMat[6, :6][reIndex]
-        stimMatReIndex[:6, :6] = tempMain
-        stimMatReIndex[:6, 6] = temp0Blank
-        stimMatReIndex[6, :6] = temp1Blank
-        stimMatReIndex[6, 6] = stimMat[6, 6]
-
-        # condensed matrices for 2 directions only
-        stimMatCond = stimMatReIndex[sli, :]
-        stimMatCond = stimMatCond[:, sli]
-
-        # matrix of each unit's normalized resp to p,n, p+n (9 conditions)
-        unitNormHist = []
-        yMax = 0
-        for count, i in enumerate(stimMatCond.reshape(9)):
-            dirPlot = spikeHists[unitCount, int(i), :] * 1000 / stimIndexCount[int(i)]
-            smoothPlot = gaussian_filter1d(dirPlot, 5)
-            if max(smoothPlot) > yMax:
-                yMax = max(smoothPlot)
-            unitNormHist.append(dirPlot)
-            if count == 1:
-                tempMat = spikeCountMat[unitCount, :blocksDone, int(i)]
-                tempMatZsco = stats.zscore(tempMat)
-                pnZscoSpikeCounts.append(tempMatZsco)
-            if count == 3:
-                tempMat = spikeCountMat[unitCount, :blocksDone, int(i)]
-                tempMatZsco = stats.zscore(tempMat)
-                npZscoSpikeCounts.append(tempMatZsco)
-
-        # normalize response
-        unitNormHist = np.array(unitNormHist)  # / yMax
-
-        nnArr.append(unitNormHist[0])
-        pnArr.append(unitNormHist[1])
-        npArr.append(unitNormHist[3])
-        ppArr.append(unitNormHist[4])
-        p0Arr.append(unitNormHist[7])
-        p1Arr.append(unitNormHist[5])
-        n0Arr.append(unitNormHist[6])
-        n1Arr.append(unitNormHist[2])
-        baseArr.append(unitNormHist[8])
-
     # initialize lists for paired Gabors
     pairPairedCorr = []
     pairDoubleCov = []
@@ -410,7 +319,6 @@ for fileIterator in fileList:
     pairNMIIndex = []
     pairSimpleNMIIndex = []
     pairRawSelectivityIndex = []
-    pairNewSelectivityIndex = []
     # initialize lists for single Gabor presentations
     pairSingleCorr = []
     pairSingleCov = []
@@ -420,7 +328,6 @@ for fileIterator in fileList:
     pairSingleNMI = []
     pairSingleSimpleNMI = []
     pairSingleRawSelectivity = []
-    singleNewSelectivity = []
     # initialize lists for blank Gabor presentations
     pairBlankCorr = []
 
@@ -451,12 +358,13 @@ for fileIterator in fileList:
     #     dir2 = dirArray[sli[1]]
     #     condArr = np.array([dir1, dir2, dir1, dir2])
 
-    # # subsampling the 6x6 matrix of directions into unique 2x2 matrices
+    # subsampling the 6x6 matrix of directions into unique 2x2 matrices
     subsampleMatrix = [i for i in combinations([0, 1, 2, 3, 4, 5], 2)]
     for subpair in subsampleMatrix:
         unitPairedNormFit = []
         unitPairedNormR2 = np.zeros(len(units))
         unitNormFitEstimate = [[] for i in range(len(units))]
+        unitPrefSite = []
         sli = [subpair[0], subpair[1], 6]
         dir1 = dirArray[sli[0]]
         dir2 = dirArray[sli[1]]
@@ -464,9 +372,6 @@ for fileIterator in fileList:
 
         for unitCount, unit in enumerate(units):
             b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
-            prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-            nullDirIndex = np.where(dirArray == nullDir)[0][0]
-            prefDirIndex = np.where(dirArray == prefDir)[0][0]
 
             # fixed (independent) variables - matrix of corresponding stim Indexes
             stimMat = np.zeros((7, 7))
@@ -480,38 +385,46 @@ for fileIterator in fileList:
             stimMatCond = stimMat[sli, :]
             stimMatCond = stimMatCond[:, sli]
 
+            # pref location (higher resp at pref dir)
+            prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+            prefDirIndex = np.where(dirArray == prefDir)[0][0]
+
             # Generic Normalization (L1+L2)/(1+al2+sig) w.o scalar
             guess0 = np.concatenate((bCondensed[2, :-1],
                                      bCondensed[:-1, 2],
-                                     [1, .5]), axis=0)
-            resp = bCondensed.reshape(9)[:-1]
-            fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
+                                     [0, 0.1]), axis=0)
+            resp = bCondensed.reshape(9)
+            fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
                                                     stimIndexDict, dir1, dir2)
 
-            pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-                                    p0=guess0,
-                                    bounds=((0, 0, 0, 0, 0, 0),
-                                            (np.inf, np.inf, np.inf, np.inf,
-                                             6, 6)))
+            # loc 0 pref site
+            if b[6][prefDirIndex] > b[prefDirIndex][6]:
+                pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+                                        p0=guess0,
+                                        bounds=((0, 0, 0, 0, 0, 0),
+                                                (np.inf, np.inf, np.inf, np.inf,
+                                                 5, np.inf)))
+                y_pred = genNormCondensed(fixedVals, *pOpt)
+                unitPrefSite.append(0)
+            else:
+                pOpt, pCov, = curve_fit(genNormCondensed1, fixedVals, resp.squeeze(),
+                                        p0=guess0,
+                                        bounds=((0, 0, 0, 0, 0, 0),
+                                                (np.inf, np.inf, np.inf, np.inf,
+                                                 5, np.inf)))
+                y_pred = genNormCondensed1(fixedVals, *pOpt)
+                unitPrefSite.append(1)
 
-            y_pred = genNormCondensed(fixedVals, *pOpt)
             r2 = r2_score(resp.squeeze(), y_pred)
             print(unit, r2)
 
             # Append fit parameters for condensed matrix
             totR2.append(r2)
-            alphaLoc0Cond.append(pOpt[4])
-            alphaLoc1Cond.append(pOpt[5])
+            # alphaLoc0Cond.append(pOpt[4])
+            # alphaLoc1Cond.append(pOpt[5])
             unitPairedNormR2[unitCount] = r2
             unitPairedNormFit.append(pOpt)
             unitNormFitEstimate[unitCount] = pOpt
-
-            if subpair[0] == nullDirIndex and subpair[1] == prefDirIndex:
-                alphaLoc0PrefOnly.append(pOpt[4])
-                alphaLoc1PrefOnly.append(pOpt[5])
-            if subpair[0] == prefDirIndex and subpair[1] == nullDirIndex:
-                alphaLoc0PrefOnly.append(pOpt[4])
-                alphaLoc1PrefOnly.append(pOpt[5])
             # alphaRankMat[unitCount, :, orthoAxis] = pOpt
 
             # # fit using scipy.optimize.minimize for condensed mat
@@ -811,42 +724,50 @@ for fileIterator in fileList:
                 loc0Resp = unitNormFitEstimate[n1][np.where(condArr == loc0Dir)[0][0]]
                 loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0] + 2]
                 n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                if n1Selectivity >= 0:
-                    n1NonPrefSupp = (unitNormFitEstimate[n1][5]) / (
-                            unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
-                    n1NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
+                if unitPrefSite[n1] == 0:
+                    if n1Selectivity >= 0:
+                        n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
+                                1 + unitNormFitEstimate[n1][4])
+                    else:
+                        n1NonPrefSupp = 1 / (
+                                1 + unitNormFitEstimate[n1][4])
                 else:
-                    n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
-                            unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
-                    n1NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
+                    if n1Selectivity >= 0:
+                        n1NonPrefSupp = 1 / (
+                                1 + unitNormFitEstimate[n1][4])
+                    else:
+                        n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
+                                1 + unitNormFitEstimate[n1][4])
 
                 # n2 selectivity and suppression index
                 loc0Resp = unitNormFitEstimate[n2][np.where(condArr == loc0Dir)[0][0]]
                 loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0] + 2]
                 n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                if n2Selectivity >= 0:
-                    n2NonPrefSupp = (unitNormFitEstimate[n2][5]) / (
-                            unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
-                    n2NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
+                if unitPrefSite[n2] == 0:
+                    if n2Selectivity >= 0:
+                        n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
+                                1 + unitNormFitEstimate[n2][4])
+                    else:
+                        n2NonPrefSupp = 1 / (
+                                1 + unitNormFitEstimate[n2][4])
                 else:
-                    n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
-                            unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
-                    n2NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
+                    if n2Selectivity >= 0:
+                        n2NonPrefSupp = 1 / (
+                                1 + unitNormFitEstimate[n2][4])
+                    else:
+                        n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
+                                1 + unitNormFitEstimate[n2][4])
+
 
                 # # pair selectivity, suppression, and NMI index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                    np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
-                pairNewSelectivity = (np.sign(n1Selectivity) *
-                                      np.sign(n2Selectivity) *
-                                      (abs((n1NewSelectivity - n2NewSelectivity)) /
-                                       (n1NewSelectivity + n2NewSelectivity)))
-                # pairSuppression = (abs(n1NonPrefSupp - n2NonPrefSupp)) / (
-                #                       n1NonPrefSupp + n2NonPrefSupp)
-                pairSuppression = (n1NonPrefSupp +n2NonPrefSupp) / 2
-
+                pairSuppression = (abs(n1NonPrefSupp - n2NonPrefSupp)) / (
+                                      n1NonPrefSupp + n2NonPrefSupp)
+                # pairSuppression = np.sqrt(abs(n1NonPrefSupp) * abs(n2NonPrefSupp))
+                # pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
                 pairNMI = (n1NMI + n2NMI) / 2
-                pairSimpleNMI = abs(n1SimpleNMI - n2SimpleNMI) / (
-                                    n1SimpleNMI + n2SimpleNMI)
+                pairSimpleNMI = np.sqrt(n1SimpleNMI * n2SimpleNMI)
                 pairRawSelectivity = (np.sign(n1RawSelectivity) *
                                       np.sign(n2RawSelectivity) *
                                       np.sqrt(abs(n1RawSelectivity) *
@@ -856,7 +777,6 @@ for fileIterator in fileList:
                 pairDoubleCov.append(pairDCov[0][1])
                 pairDoubleSD.append(pairDSD)
                 pairSelectivityIndex.append(pairSelectivity)
-                pairNewSelectivityIndex.append(pairNewSelectivity)
                 pairNonPrefSuppIndex.append(pairSuppression)
                 pairNMIIndex.append(pairNMI)
                 pairSimpleNMIIndex.append(pairSimpleNMI)
@@ -902,7 +822,6 @@ for fileIterator in fileList:
                 pairSingleSimpleNMI.append(pairSimpleNMI)
                 pairSingleNMI.append(pairNMI)
                 pairSingleRawSelectivity.append(pairRawSelectivity)
-                singleNewSelectivity.append(pairNewSelectivity)
 
                 # loc 1 single Gabor corr
                 stimIndex = np.int_(stimMatCond[:, 2][np.where(condArr == loc1Dir)[0][0]])
@@ -940,7 +859,6 @@ for fileIterator in fileList:
                 pairSingleSimpleNMI.append(pairSimpleNMI)
                 pairSingleNMI.append(pairNMI)
                 pairSingleRawSelectivity.append(pairRawSelectivity)
-                singleNewSelectivity.append(pairNewSelectivity)
 
                 # pair blank corr
                 blankIndex = 48
@@ -1244,7 +1162,6 @@ for fileIterator in fileList:
     pairNMIIndex = np.array(pairNMIIndex)
     pairSimpleNMIIndex = np.array(pairSimpleNMIIndex)
     pairRawSelectivityIndex = np.array(pairRawSelectivityIndex)
-    pairNewSelectivityIndex = np.array(pairNewSelectivityIndex)
 
     pairSingleCov = np.array(pairSingleCov)
     pairSingleSD = np.array(pairSingleSD)
@@ -1254,7 +1171,6 @@ for fileIterator in fileList:
     pairSingleSimpleNMI = np.array(pairSingleSimpleNMI)
     pairSingleNMI = np.array(pairSingleNMI)
     pairSingleRawSelectivity = np.array(pairSingleRawSelectivity)
-    singleNewSelectivity = np.array(singleNewSelectivity)
 
     pairBlankCorr = np.array(pairBlankCorr)
 
@@ -1267,8 +1183,7 @@ for fileIterator in fileList:
                                      pairRawSelectivityIndex,
                                      pairDoubleCov,
                                      pairDoubleSD,
-                                     pairBlankCorr,
-                                     pairNewSelectivityIndex])
+                                     pairBlankCorr])
     gaborSingleCompiledArr = np.array([pairSingleCorr,
                                        pairSingleSelectivityIndex,
                                        pairSingleNonPrefSuppIndex,
@@ -1276,8 +1191,7 @@ for fileIterator in fileList:
                                        pairSingleNMI,
                                        pairSingleRawSelectivity,
                                        pairSingleCov,
-                                       pairSingleSD,
-                                       singleNewSelectivity])
+                                       pairSingleSD])
     np.save(f'../../gaborSingleCorrMaster/pairCorrelationsAndIndices{seshDate}',
             gaborSingleCompiledArr)
     np.save(f'../../gaborPairCorrMaster/pairCorrelationsAndIndices{seshDate}',
@@ -1301,6 +1215,39 @@ for fileIterator in fileList:
     totFilterUnits.append(len(filterUnits))
 
 print(time.time()-t0)
+
+
+# plotting alpha as a function of FR
+highFRAlpha = np.array([item for sublist in highFRAlpha for item in sublist])
+medFRAlpha = np.array([item for sublist in medFRAlpha for item in sublist])
+lowFRAlpha = np.array([item for sublist in lowFRAlpha for item in sublist])
+highFRParams = np.array(highFRParams)
+medFRParams = np.array(medFRParams)
+lowFRParams = np.array(lowFRParams)
+unitIdentifier = np.array(unitIdentifier)
+
+highFRParamsUnitID = np.hstack((highFRParams, unitIdentifier[:, np.newaxis]))
+medFRParamsUnitID = np.hstack((medFRParams, unitIdentifier[:, np.newaxis]))
+lowFRParamsUnitID = np.hstack((lowFRParams, unitIdentifier[:, np.newaxis]))
+
+plt.hist(highFRAlpha)
+plt.xlabel('alpha value')
+plt.ylabel('frequency')
+plt.title(f'High FR median alpha: {np.median(highFRAlpha)}')
+plt.show()
+
+plt.hist(medFRAlpha)
+plt.xlabel('alpha value')
+plt.ylabel('frequency')
+plt.title(f'Med FR median alpha: {np.median(medFRAlpha)}')
+plt.show()
+
+plt.hist(lowFRAlpha)
+plt.xlabel('alpha value')
+plt.ylabel('frequency')
+plt.title(f'Low FR median alpha: {np.median(lowFRAlpha)}')
+plt.show()
+
 
 """
                  STOP HERE
@@ -1376,13 +1323,7 @@ extra code
             loc1Dir = stimIndexDict[i][1]['direction']
 """
 
-# Plotting Code
-
-# distribution of spike counts around PN, NP mean
-pnZscoSpikeCounts = [ele for i in pnZscoSpikeCounts for ele in i]
-npZscoSpikeCounts = [ele for i in npZscoSpikeCounts for ele in i]
-plt.hist(pnZscoSpikeCounts, bins=50); plt.show()
-plt.hist(npZscoSpikeCounts, bins=50); plt.show()
+# Plotting
 
 
 
@@ -1830,37 +1771,6 @@ ax3.set_title('Distribution of Preferred Directions Sampled',
 ax3.grid(alpha=0.4)
 
 plt.tight_layout()
-plt.show()
-
-# plotting alpha as a function of FR
-highFRAlpha = np.array([item for sublist in highFRAlpha for item in sublist])
-medFRAlpha = np.array([item for sublist in medFRAlpha for item in sublist])
-lowFRAlpha = np.array([item for sublist in lowFRAlpha for item in sublist])
-highFRParams = np.array(highFRParams)
-medFRParams = np.array(medFRParams)
-lowFRParams = np.array(lowFRParams)
-unitIdentifier = np.array(unitIdentifier)
-
-highFRParamsUnitID = np.hstack((highFRParams, unitIdentifier[:, np.newaxis]))
-medFRParamsUnitID = np.hstack((medFRParams, unitIdentifier[:, np.newaxis]))
-lowFRParamsUnitID = np.hstack((lowFRParams, unitIdentifier[:, np.newaxis]))
-
-plt.hist(highFRAlpha)
-plt.xlabel('alpha value')
-plt.ylabel('frequency')
-plt.title(f'High FR median alpha: {np.median(highFRAlpha)}')
-plt.show()
-
-plt.hist(medFRAlpha)
-plt.xlabel('alpha value')
-plt.ylabel('frequency')
-plt.title(f'Med FR median alpha: {np.median(medFRAlpha)}')
-plt.show()
-
-plt.hist(lowFRAlpha)
-plt.xlabel('alpha value')
-plt.ylabel('frequency')
-plt.title(f'Low FR median alpha: {np.median(lowFRAlpha)}')
 plt.show()
 
 ## backup

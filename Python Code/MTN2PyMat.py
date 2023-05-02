@@ -425,7 +425,7 @@ for fileIterator in fileList:
         # and reindex around this so that it is in the middle of the grid
         prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
         nullDirIndex = np.where(dirArray == nullDir)[0][0]
-        reIndex = (np.array([0,1,2,3,4,5])+nullDirIndex) % 6
+        reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
 
         tempMain = b[:6, :6][:, reIndex]
         tempMain = tempMain[:6, :6][reIndex, :]

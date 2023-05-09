@@ -40,7 +40,7 @@ medFRAlpha = []
 medFRParams = []
 lowFRAlpha = []
 lowFRParams = []
-gaborSep = []
+gaborSigmaSep = []
 # arrays for nn, pn, np, pp, and basline PSTHs
 ppArr = []
 pnArr = []
@@ -55,6 +55,10 @@ n1Arr = []
 # arrays for PN, NP z-scored spike counts
 pnZscoSpikeCounts = []
 npZscoSpikeCounts = []
+# array for population heatmap 7x7 grid of resp to loc0,loc1 6 dirs
+popRespHeatmap = []
+electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
+
 
 for fileIterator in fileList:
 
@@ -137,6 +141,7 @@ for fileIterator in fileList:
 
     # distance between Gabors in the RF
     stimDesc = allTrials[corrTrials[0]]['stimDesc']['data']
+    sigmaDeg = allTrials[corrTrials[0]]['rfGabor']['data']['sigmaDeg']
     for stim in stimDesc:
         if stim['stimLoc'] == 0:
             loc0X = stim['azimuthDeg']
@@ -145,7 +150,8 @@ for fileIterator in fileList:
             loc1X = stim['azimuthDeg']
             loc1Y = stim['elevationDeg']
     sep = np.sqrt(((loc0X - loc1X) ** 2) + ((loc0Y - loc1Y) ** 2))
-    gaborSep.append(sep)
+    sigmaSep = sep/sigmaDeg
+    gaborSigmaSep.append(sigmaSep)
 
     # generates a dictionary, numpy array, and Pandas Dataframe of stim Index
     # and corresponding directions/contrasts
@@ -233,6 +239,16 @@ for fileIterator in fileList:
                                                   & (unitTimeStamps <= stimOnTimeS))[0]
                             sponSpikeCountLong.append([unit, len(sponSpikes)])
 
+                            # # # # # FAKE DATA PUT FAKE SPIKES FOR NULL (0˚), PREF(180˚)
+                            # # FAKE DATA PN, NP - (0, 180) and (180,0)
+                            # if stimIndex == 21 or stimIndex == 39 or stimIndex == 45:
+                            #     unitTimeStamps = poissonArrivals(stimOnTimeS, 100*1000/250, 250)
+                            # if stimIndex == 0 or stimIndex == 42 or stimIndex == 36:
+                            #     unitTimeStamps = poissonArrivals(stimOnTimeS, 10*1000/250, 250)
+                            # if stimIndex == 3 or stimIndex == 18:
+                            #     unitTimeStamps = poissonArrivals(stimOnTimeS, 55*1000/250, 250)
+                            # # # # # # FAKE DATA ABOVE REMOVE
+
                             # PSTHs
                             stimOnPreSNEV = stimOnTimeS - (histPrePostMS/1000)
                             stimOffPostSNEV = stimOffTimeS + (histPrePostMS/1000)
@@ -281,7 +297,8 @@ for fileIterator in fileList:
         i[:, 48] = meanSpike[count][48]
 
     # Unit's preferred direction based off of
-    # gaussian fit of MTNC stimuli:
+    # gaussian fit of MTNC stimuli
+    # filter units based off of gauss fit > 0.90
     angleMat = np.arange(180, 900, 60)
     unitGaussMean = np.zeros(len(units))
     unitGaussSig = np.zeros(len(units))
@@ -323,6 +340,9 @@ for fileIterator in fileList:
         else:
             lowFRUnits.append(unit)
 
+    totUnits.append(len(units))
+    totFilterUnits.append(len(filterUnits))
+
     # the different combinations of neuron pairs from total units
     combs = [i for i in combinations(units, 2)]
     totCombs.append(len(combs))
@@ -337,17 +357,49 @@ for fileIterator in fileList:
     tightCombs = [i for i in combinations(tightUnits, 2)]
     # combinations of units with wide tuning
     wideCombs = [i for i in combinations(wideUnits, 2)]
+    # combinations of units separated by 200ums
+    distCombs = []
+    for i in combs:
+        n1 = unitsChannel[np.where(units == i[0])[0][0]]
+        n2 = unitsChannel[np.where(units == i[1])[0][0]]
+        n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
+        n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
+        if abs(n1ElectrodePos - n2ElectrodePos) >= 4:
+            distCombs.append(i)
 
     # get p, n, p+n psth for every unit - normalized and aligned
     # to each unit's pref direction. This will also extract spike counts
     # for PN, NP condition to create distribution of variance from the mean (z-score)
     sli = [0, 3, 6]
     for unitCount, unit in enumerate(units):
+
+        # unitCount = np.where(units == unit)[0][0]
         # find direction tested that is closest to the pref dir
         # and reindex around this so that it is in the middle of the grid
         prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+
+        # # FAKE DATA TEST
+        # prefDir = 180
+        # nullDir = 0
+        # # FAKE DATA TEST
+
         nullDirIndex = np.where(dirArray == nullDir)[0][0]
         reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+
+        # raw data reindex to have null in the top left corner
+        b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
+
+        bReIndex = np.zeros((7, 7))
+        tempMain = b[:6, :6][:, reIndex]
+        tempMain = tempMain[:6, :6][reIndex, :]
+        temp0Blank = b[:6, 6][reIndex]
+        temp1Blank = b[6, :6][reIndex]
+        bReIndex[:6, :6] = tempMain
+        bReIndex[:6, 6] = temp0Blank
+        bReIndex[6, :6] = temp1Blank
+        bReIndex[6, 6] = b[6, 6]
+        bReIndexNorm = bReIndex / np.max(bReIndex)
+        popRespHeatmap.append(bReIndexNorm.reshape(49))
 
         # fixed (independent) variables - matrix of corresponding stim Indexes
         stimMat = np.zeros((7, 7))
@@ -388,12 +440,26 @@ for fileIterator in fileList:
                 tempMatZsco = stats.zscore(tempMat)
                 npZscoSpikeCounts.append(tempMatZsco)
 
-        # normalize response
-        unitNormHist = np.array(unitNormHist)  # / yMax
+        # unitNormHist = spikeHists[unitCount, stimMatCond.reshape(9).astype(int), :] *1000
+        # unitNormHist /= stimIndexCount[stimMatCond.reshape(9).astype(int)].reshape(9, 1)
+        # yMax = unitNormHist.max()
+        # unitNormHist /= yMax
+        # assert(unitNormHist.max() == 1)
 
-        nnArr.append(unitNormHist[0])
+        # normalize response
+        unitNormHist = np.array(unitNormHist) / yMax
+
+        # trial shuffle PN, NP condition
+        # if np.random.rand(1) >= 0.5:
+        #     pnArr.append(unitNormHist[1])  # normal condition
+        #     npArr.append(unitNormHist[3])  # normal condition
+        # else:
+        #     pnArr.append(unitNormHist[3])  # shuffling
+        #     npArr.append(unitNormHist[1])  # shuffling
+        # if sigmaSep > 4.300 and sigmaSep < 4.53:  # median split for gabor separation
         pnArr.append(unitNormHist[1])
         npArr.append(unitNormHist[3])
+        nnArr.append(unitNormHist[0])
         ppArr.append(unitNormHist[4])
         p0Arr.append(unitNormHist[7])
         p1Arr.append(unitNormHist[5])
@@ -463,6 +529,8 @@ for fileIterator in fileList:
         condArr = np.array([dir1, dir2, dir1, dir2])
 
         for unitCount, unit in enumerate(units):
+
+            # unitCount = np.where(units == unit)[0][0]
             b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
             prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
             nullDirIndex = np.where(dirArray == nullDir)[0][0]
@@ -483,35 +551,59 @@ for fileIterator in fileList:
             # Generic Normalization (L1+L2)/(1+al2+sig) w.o scalar
             guess0 = np.concatenate((bCondensed[2, :-1],
                                      bCondensed[:-1, 2],
-                                     [1, .5]), axis=0)
+                                     [0.4]), axis=0)
             resp = bCondensed.reshape(9)[:-1]
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
                                                     stimIndexDict, dir1, dir2)
 
+            # # bram implementation
+            # lb = np.sqrt([0.01, 0.01, 0.01, 0.01, 0.1])
+            # ub = np.sqrt([20, 20, 20, 20, 1])
+            # params = []
+            # sse = []
+            # attempts = 0
+            # while attempts < 10:
+            #     startPoint = (ub - lb) * np.random.uniform() + lb
+            #     guess = guess0 + startPoint
+            #     pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+            #                             p0=guess, maxfev=10000000)
+            #     y_pred = genNormCondensed(fixedVals, *pOpt)
+            #     print(r2_score(resp.squeeze(), y_pred))
+            #     attemptSSE = np.sum((y_pred - resp.squeeze()) ** 2)
+            #     params.append(pOpt ** 2)
+            #     sse.append(attemptSSE)
+            #     attempts += 1
+
+            # pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+            #                         p0=guess0,
+            #                         bounds=((0, 0, 0, 0, 0),
+            #                                 (np.inf, np.inf, np.inf, np.inf,
+            #                                  6)))
             pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-                                    p0=guess0,
-                                    bounds=((0, 0, 0, 0, 0, 0),
-                                            (np.inf, np.inf, np.inf, np.inf,
-                                             6, 6)))
+                                    p0=guess0, maxfev=10000000)
 
             y_pred = genNormCondensed(fixedVals, *pOpt)
             r2 = r2_score(resp.squeeze(), y_pred)
             print(unit, r2)
 
+            # bram trick to keep values > 0
+            pOpt = pOpt ** 2
+
             # Append fit parameters for condensed matrix
             totR2.append(r2)
-            alphaLoc0Cond.append(pOpt[4])
-            alphaLoc1Cond.append(pOpt[5])
+            # alphaLoc0Cond.append(pOpt[4])
+            # alphaLoc1Cond.append(pOpt[5])
             unitPairedNormR2[unitCount] = r2
             unitPairedNormFit.append(pOpt)
             unitNormFitEstimate[unitCount] = pOpt
 
-            if subpair[0] == nullDirIndex and subpair[1] == prefDirIndex:
-                alphaLoc0PrefOnly.append(pOpt[4])
-                alphaLoc1PrefOnly.append(pOpt[5])
-            if subpair[0] == prefDirIndex and subpair[1] == nullDirIndex:
-                alphaLoc0PrefOnly.append(pOpt[4])
-                alphaLoc1PrefOnly.append(pOpt[5])
+            # if subpair[0] == nullDirIndex and subpair[1] == prefDirIndex:
+            #     alphaLoc0PrefOnly.append(pOpt[4])
+            #     alphaLoc1PrefOnly.append(pOpt[5])
+            # if subpair[0] == prefDirIndex and subpair[1] == nullDirIndex:
+            #     alphaLoc0PrefOnly.append(pOpt[4])
+            #     alphaLoc1PrefOnly.append(pOpt[5])
+
             # alphaRankMat[unitCount, :, orthoAxis] = pOpt
 
             # # fit using scipy.optimize.minimize for condensed mat
@@ -602,7 +694,7 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        for pairCount, pair in enumerate(combs):
+        for pairCount, pair in enumerate(distCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
@@ -627,8 +719,10 @@ for fileIterator in fileList:
                 for x in n2SkipTrials:
                     skipTrials.append(x)
                 goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                pairStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
-                                              spikeCountMat[n2, goodTrials, i])
+                # pairStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
+                #                               spikeCountMat[n2, goodTrials, i])
+                pairStimCorr = np.corrcoef(spikeCountMat[n1, goodTrials, i],
+                                           spikeCountMat[n2, goodTrials, i])[0][1]
                 pairDCov = np.cov(spikeCountMat[n1, goodTrials, i],
                                        spikeCountMat[n2, goodTrials, i], ddof=1)
                 pairDSD = (np.std(spikeCountMat[n1, goodTrials, i], ddof=1) *
@@ -812,12 +906,16 @@ for fileIterator in fileList:
                 loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0] + 2]
                 n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
                 if n1Selectivity >= 0:
-                    n1NonPrefSupp = (unitNormFitEstimate[n1][5]) / (
-                            unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
+                    # n1NonPrefSupp = (unitNormFitEstimate[n1][5]) / (
+                    #         unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
+                    n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
+                            1 + unitNormFitEstimate[n1][4])
                     n1NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
                 else:
-                    n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
-                            unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
+                    # n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
+                    #         unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
+                    n1NonPrefSupp = 1 / (
+                            1 + unitNormFitEstimate[n1][4])
                     n1NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
 
                 # n2 selectivity and suppression index
@@ -825,24 +923,25 @@ for fileIterator in fileList:
                 loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0] + 2]
                 n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
                 if n2Selectivity >= 0:
-                    n2NonPrefSupp = (unitNormFitEstimate[n2][5]) / (
-                            unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
+                    # n2NonPrefSupp = (unitNormFitEstimate[n2][5]) / (
+                    #         unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
+                    n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
+                            1 + unitNormFitEstimate[n2][4])
                     n2NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
                 else:
-                    n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
-                            unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
+                    # n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
+                    #         unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
+                    n2NonPrefSupp = 1 / (
+                            1 + unitNormFitEstimate[n2][4])
                     n2NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
 
                 # # pair selectivity, suppression, and NMI index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                    np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
-                pairNewSelectivity = (np.sign(n1Selectivity) *
-                                      np.sign(n2Selectivity) *
-                                      (abs((n1NewSelectivity - n2NewSelectivity)) /
-                                       (n1NewSelectivity + n2NewSelectivity)))
+                pairNewSelectivity = np.sqrt(n1NewSelectivity * n2NewSelectivity)
                 # pairSuppression = (abs(n1NonPrefSupp - n2NonPrefSupp)) / (
                 #                       n1NonPrefSupp + n2NonPrefSupp)
-                pairSuppression = (n1NonPrefSupp +n2NonPrefSupp) / 2
+                pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
 
                 pairNMI = (n1NMI + n2NMI) / 2
                 pairSimpleNMI = abs(n1SimpleNMI - n2SimpleNMI) / (
@@ -852,7 +951,7 @@ for fileIterator in fileList:
                                       np.sqrt(abs(n1RawSelectivity) *
                                               abs(n2RawSelectivity)))
 
-                pairPairedCorr.append(pairStimCorr[0])
+                pairPairedCorr.append(pairStimCorr)
                 pairDoubleCov.append(pairDCov[0][1])
                 pairDoubleSD.append(pairDSD)
                 pairSelectivityIndex.append(pairSelectivity)
@@ -887,8 +986,10 @@ for fileIterator in fileList:
                 for x in n2SkipTrials:
                     skipTrials.append(x)
                 goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                singleStimLoc0Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                                                    spikeCountMat[n2, goodTrials, stimIndex])
+                # singleStimLoc0Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
+                #                                     spikeCountMat[n2, goodTrials, stimIndex])
+                singleStimLoc0Corr = np.corrcoef(spikeCountMat[n1, goodTrials, stimIndex],
+                                                 spikeCountMat[n2, goodTrials, stimIndex])[0][1]
                 pairSCov = np.cov(spikeCountMat[n1, goodTrials, stimIndex],
                                   spikeCountMat[n2, goodTrials, stimIndex], ddof=1)
                 pairSSD = (np.std(spikeCountMat[n1, goodTrials, stimIndex], ddof=1) *
@@ -896,7 +997,7 @@ for fileIterator in fileList:
 
                 pairSingleCov.append(pairSCov[0][1])
                 pairSingleSD.append(pairSSD)
-                pairSingleCorr.append(singleStimLoc0Corr[0])
+                pairSingleCorr.append(singleStimLoc0Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)
                 pairSingleNonPrefSuppIndex.append(pairSuppression)
                 pairSingleSimpleNMI.append(pairSimpleNMI)
@@ -925,8 +1026,10 @@ for fileIterator in fileList:
                 for x in n2SkipTrials:
                     skipTrials.append(x)
                 goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                singleStimLoc1Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                                                    spikeCountMat[n2, goodTrials, stimIndex])
+                # singleStimLoc1Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
+                #                                     spikeCountMat[n2, goodTrials, stimIndex])
+                singleStimLoc1Corr = np.corrcoef(spikeCountMat[n1, goodTrials, stimIndex],
+                                                 spikeCountMat[n2, goodTrials, stimIndex])[0][1]
                 pairSCov = np.cov(spikeCountMat[n1, goodTrials, stimIndex],
                                   spikeCountMat[n2, goodTrials, stimIndex], ddof=1)
                 pairSSD = (np.std(spikeCountMat[n1, goodTrials, stimIndex], ddof=1) *
@@ -934,7 +1037,7 @@ for fileIterator in fileList:
 
                 pairSingleCov.append(pairSCov[0][1])
                 pairSingleSD.append(pairSSD)
-                pairSingleCorr.append(singleStimLoc1Corr[0])
+                pairSingleCorr.append(singleStimLoc1Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)
                 pairSingleNonPrefSuppIndex.append(pairSuppression)
                 pairSingleSimpleNMI.append(pairSimpleNMI)
@@ -1296,9 +1399,6 @@ for fileIterator in fileList:
     #     highFRParams.append(sortedParams[i, 2, :].tolist())
     #     medFRParams.append(sortedParams[i, 1, :].tolist())
     #     lowFRParams.append(sortedParams[i, 0, :].tolist())
-
-    totUnits.append(len(units))
-    totFilterUnits.append(len(filterUnits))
 
 print(time.time()-t0)
 

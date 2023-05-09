@@ -5,7 +5,6 @@ to the day's dataset.
 
 to do:
 
-
 Chery March 2022
 Modified to save plots as pngs and incorporated changes to track stimCounts
 - 04/26/22
@@ -17,20 +16,25 @@ Import using pymat reader - 10/11/22
 '''
 
 from usefulFns import *
-import scipy.io as sp
 import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import seaborn as sns
 
-
 fileList = ['221010', '221013', '221108', '221110', '221115', '221117',
             '221124', '221128', '221206', '221208', '221229', '230123',
             '230126']
 unitParams = []
 sessionXYMean = []
+loc0XY = []
+loc1XY = []
+loc0XYDiffFromMean = []
+loc1XYDiffFromMean = []
+loc0DistFromRFCent = []
+loc1DistFromRFCent = []
 t0 = time.time()
+
 for fileIterator in fileList:
     # Load relevant file here with pyMat reader
     monkeyName = 'Meetz'
@@ -50,9 +54,9 @@ for fileIterator in fileList:
         if i == 1:
             stim1Azi = stimDesc['azimuthDeg'][count]
             stim1Ele = stimDesc['elevationDeg'][count]
-    os.chdir('../../Python Code')
 
     # Load the RF location file now
+    os.chdir('../../Python Code')
     allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
     # create folder and change dir to save PDF's and np.array
@@ -176,6 +180,19 @@ for fileIterator in fileList:
         unitParams.append(RFShapeParams)
         unitsXY.append([xMeanConv, yMeanConv])
 
+        # find position of loc 0 and 1 wrt to center of RF
+        # compute shortest distance b/w loc 0 and 1 to RF as well
+        loc0XY.append((stim0Azi, stim0Ele))
+        loc1XY.append((stim1Azi, stim1Ele))
+        loc0XYDiffFromMean.append(((stim0Azi-xMeanConv), (stim0Ele-yMeanConv)))
+        loc1XYDiffFromMean.append(((stim1Azi-xMeanConv), (stim1Ele-yMeanConv)))
+        loc0OffsetFromCenter = np.sqrt(((stim0Azi - xMeanConv) ** 2) +
+                                       ((stim0Ele - yMeanConv) ** 2))
+        loc1OffsetFromCenter = np.sqrt(((stim1Azi - xMeanConv) ** 2) +
+                                       ((stim1Ele - yMeanConv) ** 2))
+        loc0DistFromRFCent.append(loc0OffsetFromCenter)
+        loc1DistFromRFCent.append(loc1OffsetFromCenter)
+
         # # Plot figure
         # fig = plt.figure()
         # fig.set_size_inches(6, 8)
@@ -291,6 +308,10 @@ for fileIterator in fileList:
 print(time.time()-t0)
 
 # Plot Overall RF Summary from all sessions
+loc0XYDiffFromMean = np.array(loc0XYDiffFromMean)
+loc1XYDiffFromMean = np.array(loc1XYDiffFromMean)
+unitParams = np.array(unitParams)
+
 # figure
 fig = plt.figure()
 fig.set_size_inches(10, 7)
@@ -309,18 +330,25 @@ x = np.zeros(len(y))
 plt.plot(x, y, color='black')
 
 # overlay 1SD
-for i in unitParams:
-    if abs(i[3]) < 30 and abs(i[4]) < 30:
+badUnits = []
+goodUnits = []
+for count, i in enumerate(unitParams):
+    if -5 < i[3] < 30 and 3 > i[4] > -20:
         el1SD = Ellipse((i[3], i[4]), i[1], i[2], i[0],
                         fill=None, edgecolor='blue', alpha=0.2)
         el1SD.set(linestyle=':')
         stdMean = ((i[1]*2) + (i[2]*2)) / 2
         if stdMean < 40:
+            goodUnits.append(count)
             ax.add_artist(el1SD)
+            ax.scatter(loc0XY[count][0], loc0XY[count][1], color='red')
+            ax.scatter(loc1XY[count][0], loc1XY[count][1], color='blue')
+    else:
+        badUnits.append(count)
 ax.set_xlabel('Azimuth (˚)')
 ax.set_ylabel('Elevation (˚)')
 sessionXYMean = np.array(sessionXYMean)
-ax.scatter(sessionXYMean[:, 0], sessionXYMean[:, 1], alpha=0.6)
+ax.scatter(sessionXYMean[:, 0], sessionXYMean[:, 1], alpha=0.6, color='green')
 
 for i in range(len(sessionXYMean)):
     ax.annotate(i+1, (sessionXYMean[i, 0], sessionXYMean[i, 1]), color='black',
@@ -358,6 +386,31 @@ ax4.set_title('Diameter/Eccentricity distribution, vertical line=median',
 
 plt.tight_layout()
 plt.show()
+
+# plot average RF ellipse with average loc 0 and 1 stim placement
+loc0XAvgOffset = np.median(loc0XYDiffFromMean[goodUnits, :], 0)[0]
+loc0YAvgOffset = np.median(loc0XYDiffFromMean[goodUnits, :], 0)[1]
+loc1XAvgOffset = np.median(loc1XYDiffFromMean[goodUnits, :], 0)[0]
+loc1YAvgOffset = np.median(loc1XYDiffFromMean[goodUnits, :], 0)[1]
+avgEllipseXStd = np.median(unitParams[goodUnits, 1], 0)
+avgEllipseYStd = np.median(unitParams[goodUnits, 2], 0)
+
+fig, ax = plt.subplots()
+x = np.linspace(-5, 5, 11)
+y = np.zeros(len(x))
+plt.plot(x, y, color='white', alpha=0)
+y = np.linspace(5, -5, 21)
+x = np.zeros(len(y))
+plt.plot(x, y, color='white', alpha=0)
+el1SD = Ellipse((0, 0), avgEllipseXStd, avgEllipseYStd,
+                fill=None, edgecolor='blue', alpha=0.2)
+ax.add_artist(el1SD)
+ax.scatter(0, 0, marker='X')
+ax.scatter(loc0XAvgOffset, loc0YAvgOffset, color='red', label='loc 0')
+ax.scatter(loc1XAvgOffset, loc1YAvgOffset, color='blue', label='loc 1')
+ax.legend()
+plt.show()
+
 
 
 ################################## STOP HERE ###########################################

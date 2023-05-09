@@ -10,6 +10,7 @@ from sklearn.metrics import explained_variance_score
 from itertools import combinations
 import itertools
 import numpy as np
+import random
 import numpy.ma as ma
 from numpy.linalg import inv
 import matplotlib.pyplot as plt
@@ -28,6 +29,7 @@ import matplotlib.ticker as ticker
 import time
 from astropy.modeling import models, fitting
 from pymatreader import read_mat
+from binsreg import *
 import glob
 
 
@@ -232,7 +234,7 @@ def bhattCoef(m1, m2, v1, v2):
     return BC
 
 
-def bhattCoef2D(m1,m2,cov1,cov2):
+def bhattCoef2D(m1, m2, cov1, cov2):
     '''
     This function will compute the Bhattacharyya Coefficient for two
     2D-Gaussian distriutions. This is used to measure how much overlap there
@@ -284,7 +286,7 @@ def upperTriMasking(matrix):
     return matrix[mask]
 
 
-def rejectOutliers(data, m = 2.):
+def rejectOutliers(data, m=2.):
     d = np.abs(data - np.median(data))
     mdev = np.median(d)
     s = d/mdev if mdev else 0.
@@ -366,12 +368,12 @@ def eyePosDurTrial(currTrial):
 
 
 def activeUnits(unitData, allTrials):
-    '''
+    """
     function returns the active units across trials for a session as a list
 
     Inputs: unitData (str): Are we using fakeData or spikeData
     Outputs: units (list): active units for a sessioon
-    '''
+    """
     units = []
     for currTrial in allTrials:
         if unitData in currTrial:
@@ -714,9 +716,8 @@ def lightenColor(color, amount=0.5):
 
 
 def unitsInfo(units, corrTrials, allTrials):
-    '''
-    function will return the channel the unit was found and whether
-    the unit is a multi-unit or single unit.
+    """
+    function will return the channel the unit was found
 
     Input: 
         units (list): list of active units
@@ -724,7 +725,7 @@ def unitsInfo(units, corrTrials, allTrials):
         allTrials (dict): all trials in the dataset
     Outputs: 
         unitChannel (list):  list of which channel the unit was found
-    '''
+    """
 
     unitChannels = []
     for unit in units:
@@ -757,7 +758,6 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
     spikes_4rows = np.tile(spikes, (4,1))
     '''
 
-
     numNeurons = len(units)
 
     C0 = stimIndexDict[index][0]['contrast']
@@ -769,21 +769,18 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
     stimDur = 493
     popMean = expectedNormSpikeRate/(1000/stimDur)
 
-    spikes = popMean + np.random.rand(1,numNeurons)           
-    R = np.zeros((numNeurons,numNeurons))
+    spikes = popMean + np.random.rand(1, numNeurons)
+    R = np.zeros((numNeurons, numNeurons))
     for neuronI in range(numNeurons):
         for neuronJ in range(numNeurons):
             if neuronI == neuronJ:
-                R[neuronI,neuronJ] = 1
+                R[neuronI, neuronJ] = 1
             else:
                 R[neuronI, neuronJ] = 0.1
 
     L = np.linalg.cholesky(R)
-    spikes = np.matmul(spikes,L)   
+    spikes = np.matmul(spikes, L)
     spikes = np.around(spikes) 
-
-    # print(spikes)
-
 
     for count, i in enumerate(spikes[0]):
         if i != 0:
@@ -791,13 +788,30 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
             channelIdentity = int(unit[0:unit.find('_')])
             channel = np.array([channelIdentity] * stimDur)
             spikeTimeMS = (np.sort(np.random.choice(np.arange(stimDur), int(i),
-            replace = False)))/1000
+                           replace=False)))/1000
             currTrial['spikeData']['timeStamp'] = np.append(currTrial['spikeData'] \
             ['timeStamp'], stimOnTimeSNEV + spikeTimeMS, 0)
             currTrial['spikeData']['unit'] = np.append(currTrial['spikeData'] \
             ['unit'], [unit] * len(spikeTimeMS), 0)
             currTrial['spikeData']['channel'] = np.append(currTrial['spikeData'] \
             ['channel'], [channelIdentity] * len(spikeTimeMS), 0)
+
+
+def poissonArrivals(stimOnTimeS,lam, duration, doDecay=False, doRamp=False):
+
+    # Decay lambda over the duration of the spike generation period
+    a = -lam / (2 * duration**2)
+    if doRamp:
+        a *= -1
+    t = 0
+    spikeTimes = []
+    while t < duration:
+        dec_lam = (a * t**2 + lam) if doDecay else lam
+        t += int(random.expovariate(dec_lam) * 1000)
+        if t < duration:
+            spikeTimes.append(t)
+
+    return stimOnTimeS + (np.array(spikeTimes)/1000)
 
 
 def randTuningCurve(numNeurons):
@@ -856,9 +870,9 @@ def vonMisesFit(x,y):
 
 
 def logNormal(x,H,A,x0,sigma):
-    '''
+    """
     equation for log-normal fot
-    '''
+    """
     return H + A * np.exp(-(x-x0)**2 / (2*sigma**2))
 
 
@@ -911,7 +925,7 @@ def driverFuncCondensend1(x, fixedVals, resp):
 
 
 def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
-                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, al0,
+                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300,
                         al1):
     """
     this function applies the generic normalization equation without a scalar
@@ -922,20 +936,20 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
 
-    # # generic norm
-    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    # denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    # generic norm
+    num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
+    denom = ((1 * c0[:, 0]) + (al1 * c1[:, 0]))
+
+    return num/denom
+
+    # # ems
+    # loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]))
+    # loc1 = ((c1 * L1 * l1).sum(-1)) / ((1 * c0[:, 0]) + c1[:, 0])
     #
-    # return num/denom
-
-    # ems
-    loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]))
-    loc1 = ((c1 * L1 * l1).sum(-1)) / ((al0 * c0[:, 0]) + c1[:, 0])
-
-    return loc0 + loc1
+    # return loc0 + loc1
 
 
-def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1):
+def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1):
     """
     generic normalization condensed
     """
@@ -944,21 +958,20 @@ def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al0, al1):
     L0 = np.array([L0_0, L0_1])
     L1 = np.array([L1_0, L1_1])
 
-    # # generic norm
-    # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    # denom = ((1 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
+    # generic norm
+    num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
+    denom = ((1 * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
+
+    return num / denom
+
+    # # ems
+    # loc0 = (c0 * (l0 * L0)).sum(-1) / (
+    #         c0[:, 0] + (c1[:, 0] * al1))
     #
-    # return num / denom
-
-    # ems
-    loc0 = (c0 * (l0 * L0)).sum(-1) / (
-            c0[:, 0] + (c1[:, 0] * al1))
-
-    loc1 = (c1 * (l1 * L1)).sum(-1) / (
-           (c0[:, 0] * al0) + c1[:, 0])
-
-    return loc0 + loc1
-
+    # loc1 = (c1 * (l1 * L1)).sum(-1) / (
+    #        (c0[:, 0] * al0) + c1[:, 0])
+    #
+    # return loc0 + loc1
 
     # # generic norm
     # num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))

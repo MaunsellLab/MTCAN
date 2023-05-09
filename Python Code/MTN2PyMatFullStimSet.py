@@ -31,6 +31,8 @@ pairNPSupp12FromFull = []
 stimIndex12Cond1 = [0, 3, 18, 21]
 stimIndex12Cond2 = [7, 10, 25, 28]
 stimIndex12Cond3 = [14, 17, 32, 35]
+loc0to1RespRatio = []
+electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
 
 for fileIterator in fileList:
 
@@ -155,8 +157,8 @@ for fileIterator in fileList:
     spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
     spikeCountLong = []
     sponSpikeCountLong = []
-    onLatency = 25/1000  # time in MS for counting window latency after stim on
-    offLatency = 50/1000  # time in MS for counting window latency after stim off
+    onLatency = 50/1000  # time in MS for counting window latency after stim on
+    offLatency = 150/1000  # time in MS for counting window latency after stim off
     histPrePostMS = 100  # 100ms window pre/post stimulus on/off
     sponWindowMS = 50  # 50ms window before stimulus onset
     spikeHists = np.zeros((len(units), 49, trueStimDurMS + (2*histPrePostMS+1)))
@@ -285,14 +287,14 @@ for fileIterator in fileList:
         # Generic Normalization (L1+L2)/(al1+al2+sig) w.o scalar
         # fits L0-L6 for both locations separately loc0 and loc1 will
         # have different L0-L6 values
-        guess0 = np.concatenate((b[6, :6], b[:6, 6], [0.1, 0.1]), axis=0)
+        guess0 = np.concatenate((b[6, :6], b[:6, 6], [0.4]), axis=0)
         resp = b.reshape(49)[:-1]
         fixedVals = fixedValsForGenericNorm(stimMat.reshape(49)[:-1], stimIndexDict)
         pOpt, pCov = curve_fit(genericNormNoScalar, fixedVals, resp.squeeze(), p0=guess0,
-                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                                        (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
                                         np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
-                                        5, 5)))
+                                        6)))
 
         y_pred = genericNormNoScalar(fixedVals, *pOpt)
         r2 = r2_score(resp.squeeze(), y_pred)
@@ -348,6 +350,7 @@ for fileIterator in fileList:
                                          [np.array(baselineNormalized)]),
                                         axis=0).tolist()
         popTunCurve.append(respNormalized)
+        loc0to1RespRatio.append(loc0ReIndex[3]/loc1ReIndex[3])
 
     # the different pairs of neurons from total units
     combs = [i for i in combinations(units, 2)]
@@ -356,6 +359,16 @@ for fileIterator in fileList:
     # filtered pairs for pairs of units having R2 > 0.75
     filterCombs = [i for i in combinations(filterUnits, 2)]
     totFilterCombs.append(len(filterCombs))
+
+    # combinations of units separated by 200ums
+    distCombs = []
+    for i in combs:
+        n1 = unitsChannel[np.where(units == i[0])[0][0]]
+        n2 = unitsChannel[np.where(units == i[1])[0][0]]
+        n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
+        n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
+        if abs(n1ElectrodePos - n2ElectrodePos) >= 4:
+            distCombs.append(i)
 
     # generate paired stimulus correlation, selectivity index,
     # suppression, and NMI index for each gabor pair for each pair
@@ -384,7 +397,7 @@ for fileIterator in fileList:
     stimIndexMat = np.arange(36).reshape(6, 6)
     upperTriangle = upperTriMasking(stimIndexMat)
 
-    for pairCount, pair in enumerate(combs):
+    for pairCount, pair in enumerate(distCombs):
         n1 = np.where(units == pair[0])[0][0]
         n2 = np.where(units == pair[1])[0][0]
 
@@ -422,29 +435,37 @@ for fileIterator in fileList:
             loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0] + 6]
             n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
             if n1Selectivity >= 0:
-                n1NonPrefSupp = (unitNormFitEstimate[n1][13]) / (
-                        unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][5])
-            else:
                 n1NonPrefSupp = (unitNormFitEstimate[n1][12]) / (
-                        unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][5])
+                        1 + unitNormFitEstimate[n1][12])
+                # n1NonPrefSupp = (unitNormFitEstimate[n1][13]) / (
+                #         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+            else:
+                n1NonPrefSupp = 1 / (
+                        1 + unitNormFitEstimate[n1][12])
+                # n1NonPrefSupp = (unitNormFitEstimate[n1][12]) / (
+                #         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
 
             # n2 selectivity and suppression index
             loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
             loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0] + 6]
             n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
             if n2Selectivity >= 0:
-                n2NonPrefSupp = (unitNormFitEstimate[n2][13]) / (
-                        unitNormFitEstimate[n2][12] + unitNormFitEstimate[n2][13])
-            else:
                 n2NonPrefSupp = (unitNormFitEstimate[n2][12]) / (
-                        unitNormFitEstimate[n2][12] + unitNormFitEstimate[n2][13])
+                        1 + unitNormFitEstimate[n2][12])
+                # n2NonPrefSupp = (unitNormFitEstimate[n2][13]) / (
+                #         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+            else:
+                n2NonPrefSupp = 1 / (
+                        1 + unitNormFitEstimate[n2][12])
+                # n2NonPrefSupp = (unitNormFitEstimate[n2][12]) / (
+                #         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
 
             # pair selectivity, suppression, and NMI index
             pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
-            # pairSuppression = np.sqrt(abs(n1NonPrefSupp) * abs(n2NonPrefSupp))
-            pairSuppression = abs(n1NonPrefSupp - n2NonPrefSupp) / (
-                                 (n1NonPrefSupp + n2NonPrefSupp))
+            pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+            # pairSuppression = abs(n1NonPrefSupp - n2NonPrefSupp) / (
+            #                      (n1NonPrefSupp + n2NonPrefSupp))
             pairNMI = 1
             pairSimpleNMI = 1
 

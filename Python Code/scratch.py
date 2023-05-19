@@ -159,8 +159,9 @@ ax3.set_ylim([0, 1])
 fig.suptitle('gabor sigma sep > 25th percentile and < 50th gabor sigma sep', fontsize=20)
 plt.show()
 
-
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # plot PSTH session by session
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 seshMeanA0 = []
 seshMeanA1 = []
 start = 0
@@ -317,7 +318,9 @@ for count, i in enumerate(totUnits):
     fig.suptitle(f'Session {count+1} average PSTH', fontsize=20)
     plt.savefig(f'../Analysis Screenshots/session{count+1}average.pdf')
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # plt scatter of session mean alphas
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 fig, ax = plt.subplots()
 ax.scatter(seshMeanA0, seshMeanA1)
 ax.set_ylabel('session mean Alpha 1')
@@ -328,14 +331,16 @@ ax.set_ylim(bottom=0, top=3.5)
 ax.set_aspect('equal', adjustable='box')
 plt.show()
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # population normalized heatmap
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 tickLabels = np.array(['-180', '-120', '-60', '0', '60', '120', 'blank'])
 
 fig, ax = plt.subplots()
 meanPopResp = np.mean(popRespHeatmap, 0)
 meanPopResp = meanPopResp.reshape(7, 7)
 ax = sns.heatmap(meanPopResp, square=True, linewidths=0.2, vmin=0,
-                 vmax=np.max(meanPopResp), annot=True, annot_kws={'fontsize': 7})
+                 vmax=np.max(meanPopResp), annot=True, annot_kws={'fontsize': 13})
 
 ax.set_xticks(np.arange(7) + 0.5)
 ax.set_title(f'Population Normalized Response: Aligned to Preferred',
@@ -349,29 +354,66 @@ ax.set_yticks(np.arange(7) + 0.5)
 ax.set_yticklabels(tickLabels, rotation=0, fontsize=15)
 plt.show()
 
-# # # binned plot of gabor distance from center of RF and mean alpha at that loc
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# binned plot of gabor distance from center of RF and mean alpha at that loc
+# also can plot pref resp (normalized to max resp of that neuron)
+# as a fn of distance from RF center
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 loc0DistFromRFCent = np.array(loc0DistFromRFCent)
 loc1DistFromRFCent = np.array(loc1DistFromRFCent)
+loc0PrefNormalized = np.array(loc0PrefNormalized)
+loc1PrefNormalized = np.array(loc1PrefNormalized)
 alphaLoc0 = np.array(alphaLoc0)
 alphaLoc1 = np.array(alphaLoc1)
+loc0NullNMI = np.array(loc0NullNMI)
+loc1NullNMI = np.array(loc1NullNMI)
 combDistFromRFCent = np.array([loc0DistFromRFCent, loc1DistFromRFCent]).flatten()
 combAlpha = np.array([alphaLoc0, alphaLoc1]).flatten()
+combPrefNormalized = np.array([loc0PrefNormalized, loc1PrefNormalized]).flatten()
+combNMI = np.array([loc0NullNMI, loc1NullNMI]).flatten()
 
 # exclude elements that are > 10 deg from the mean
 filt = np.where(combDistFromRFCent < 5)[0]
 filtDistFromRFCent = combDistFromRFCent[filt]
 filtAlpha = combAlpha[filt]
+filtPref = combPrefNormalized[filt]
+filtNMI = combNMI[filt]
 
 # exclude alphas > 4
 filt = np.where(filtAlpha < 4)[0]
 filtDistFromRFCent = filtDistFromRFCent[filt]
 filtAlpha = filtAlpha[filt]
+filtPref = filtPref[filt]
+filtNMI = filtNMI[filt]
 
-# manual binning
 sortIndex = np.argsort(filtDistFromRFCent)
 sortedDist = filtDistFromRFCent[sortIndex]
 sortedAlpha = filtAlpha[sortIndex]
+sortedPrefResp = filtPref[sortIndex]
+sortedNMI = filtNMI[sortIndex]
 
+# manual bins - equally populated bins
+n = 10
+equalBinsDist = [sortedDist[i:i + n] for i in range(0, len(sortedDist), n)]
+equalBinsAlpha = [sortedAlpha[i:i + n] for i in range(0, len(sortedAlpha), n)]
+binMeanDist = np.array([np.mean(i) for i in equalBinsDist])
+binMeanAlpha = np.array([np.mean(i) for i in equalBinsAlpha])
+
+# polynomial fit
+a, b = np.polyfit(binMeanDist, binMeanAlpha, 1)
+
+# figure
+fig, ax = plt.subplots()
+ax.scatter(binMeanDist, binMeanAlpha)
+ax.plot(binMeanDist, (a*binMeanDist+b))
+ax.set_xlabel('Gabor distance from RF center')
+ax.set_ylabel('Normalization Alpha')
+ax.set_xlim([0, 5])
+ax.set_ylim(bottom=0)
+ax.set_title(f'Equal sized bins ({n}) of gabor distance from RF center vs alpha')
+plt.show()
+
+# manual binning option 2 (defined by number of bins)
 binSize = 10
 binMedian, binEdges, binNum = stats.binned_statistic(sortedDist, sortedAlpha,
                                                      statistic='median', bins=binSize)
@@ -402,7 +444,54 @@ plt.show()
 # plot use bin reg
 est = binsreg(filtAlpha, filtDistFromRFCent, line=(5, 5), cb=(5, 5), nbins=5)
 
-# # # plot resp pref/null ratio vs alpha1/alpha0 ratio
+# figure for pref resp normalized as fn of distance from RF center
+# manual bins - equally populated bins
+n = 10
+equalBinsDist = [sortedDist[i:i + n] for i in range(0, len(sortedDist), n)]
+equalBinsPref = [sortedPrefResp[i:i + n] for i in range(0, len(sortedPrefResp), n)]
+binMeanDist = np.array([np.mean(i) for i in equalBinsDist])
+binMeanPref = np.array([np.mean(i) for i in equalBinsPref])
+
+# polynomial fit
+a, b = np.polyfit(binMeanDist, binMeanPref, 1)
+
+# figure
+fig, ax = plt.subplots()
+ax.scatter(binMeanDist, binMeanPref)
+ax.plot(binMeanDist, (a*binMeanDist+b))
+ax.set_xlabel('Gabor distance from RF center')
+ax.set_ylabel('Pref resp normalized to stim with strongest resp')
+ax.set_xlim([0, 5])
+ax.set_ylim([0, 1])
+ax.set_title(f'Equal sized bins ({n}) of gabor distance from RF center vs pref resp normalized')
+plt.show()
+
+# figure for NMI as a function of distance from RF center
+# manual bins - equally populated bins
+n = 20
+equalBinsDist = [sortedDist[i:i + n] for i in range(0, len(sortedDist), n)]
+equalBinsNMI = [sortedNMI[i:i + n] for i in range(0, len(sortedNMI), n)]
+binMeanDist = np.array([np.mean(i) for i in equalBinsDist])
+binMeanNMI = np.array([np.mean(i) for i in equalBinsNMI])
+
+# polynomial fit
+a, b = np.polyfit(binMeanDist, binMeanNMI, 1)
+
+# figure
+fig, ax = plt.subplots()
+ax.scatter(binMeanDist, binMeanNMI)
+ax.plot(binMeanDist, (a*binMeanDist+b))
+ax.set_xlabel('Gabor distance from RF center')
+ax.set_ylabel('NMI')
+ax.set_xlim([0, 5])
+ax.set_ylim(bottom=0)
+ax.set_title(f'Equal sized bins ({n}) of gabor distance from RF center vs NMI')
+plt.show()
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# plot resp pref/null ratio vs alpha1/alpha0 ratio
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 alphaLoc0 = np.array(alphaLoc0)
 alphaLoc1 = np.array(alphaLoc1)
 loc0to1RespRatio = np.array(loc0to1RespRatio)
@@ -416,8 +505,3 @@ fig, ax = plt.subplots()
 ax.scatter(filteredRespRatio, filteredAlphaRatio)
 ax.set_ylim([0, 5])
 plt.show()
-
-
-
-
-

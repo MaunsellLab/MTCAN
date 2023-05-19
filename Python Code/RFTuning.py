@@ -33,6 +33,7 @@ loc0XYDiffFromMean = []
 loc1XYDiffFromMean = []
 loc0DistFromRFCent = []
 loc1DistFromRFCent = []
+sessionRFGaborSigma = []
 t0 = time.time()
 
 for fileIterator in fileList:
@@ -41,11 +42,14 @@ for fileIterator in fileList:
     seshDate = fileIterator
     fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
-    # ascertain the position of the gabor stimuli for MTNC
+    # ascertain the position of the gabor stimuli for
+    # and get the sigma (size) of the Gabor used for MTNC
     fileNameMTNC = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
     allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileNameMTNC)
     corrTrials = correctTrialsMTX(allTrials)
     currTrial = allTrials[corrTrials[0]]
+    rfGaborSigma = currTrial['rfGabor']['data']['sigmaDeg']
+    sessionRFGaborSigma.append(rfGaborSigma)
     stimDesc = currTrial['stimDesc']['data']
     for count, i in enumerate(stimDesc['stimLoc']):
         if i == 0:
@@ -410,6 +414,20 @@ ax.scatter(loc0XAvgOffset, loc0YAvgOffset, color='red', label='loc 0')
 ax.scatter(loc1XAvgOffset, loc1YAvgOffset, color='blue', label='loc 1')
 ax.legend()
 plt.show()
+
+# plot RF Gabor sigma as a function of eccentricity
+sessionXYMean = np.array(sessionXYMean)
+sessionRFGaborSigma = np.array(sessionRFGaborSigma)
+
+sessionEccentricity = np.sqrt((sessionXYMean[:, 0] ** 2) +
+                              (sessionXYMean[:, 1] ** 2))
+
+fig, ax = plt.subplots()
+ax.scatter(sessionEccentricity, sessionRFGaborSigma)
+ax.set_xlabel('Session Eccentricity', fontsize=15)
+ax.set_ylabel('Session RF Gabor Sigma', fontsize=15)
+plt.show()
+
 
 
 

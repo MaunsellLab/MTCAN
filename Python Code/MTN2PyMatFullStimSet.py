@@ -22,8 +22,6 @@ totCombs = []
 totFilterUnits = []
 totFilterR2 = []
 totFilterCombs = []
-alphaLoc0 = []
-alphaLoc1 = []
 unitIdentifier = []
 popTunCurve = []
 pairSel12FromFull = []
@@ -32,6 +30,12 @@ stimIndex12Cond1 = [0, 3, 18, 21]
 stimIndex12Cond2 = [7, 10, 25, 28]
 stimIndex12Cond3 = [14, 17, 32, 35]
 loc0to1RespRatio = []
+alphaLoc0 = []
+alphaLoc1 = []
+loc0PrefNormalized = []
+loc1PrefNormalized = []
+loc0NullNMI = []
+loc1NullNMI = []
 electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
 
 for fileIterator in fileList:
@@ -287,15 +291,16 @@ for fileIterator in fileList:
         # Generic Normalization (L1+L2)/(al1+al2+sig) w.o scalar
         # fits L0-L6 for both locations separately loc0 and loc1 will
         # have different L0-L6 values
-        guess0 = np.concatenate((b[6, :6], b[:6, 6], [0.4]), axis=0)
+        guess0 = np.concatenate((b[6, :6], b[:6, 6], [1, 0.4]), axis=0)
         resp = b.reshape(49)[:-1]
         fixedVals = fixedValsForGenericNorm(stimMat.reshape(49)[:-1], stimIndexDict)
+        # pOpt, pCov = curve_fit(genericNormNoScalar, fixedVals, resp.squeeze(), p0=guess0,
+        #                        bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #                                (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+        #                                 np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+        #                                 6)))
         pOpt, pCov = curve_fit(genericNormNoScalar, fixedVals, resp.squeeze(), p0=guess0,
-                               bounds=((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                                       (np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
-                                        np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
-                                        6)))
-
+                               maxfev=10000000)
         y_pred = genericNormNoScalar(fixedVals, *pOpt)
         r2 = r2_score(resp.squeeze(), y_pred)
         print(unit, r2)
@@ -320,8 +325,11 @@ for fileIterator in fileList:
         # Append fit parameters for full matrix
         totR2.append(r2)
 
-        # alphaLoc0.append(pOpt[12])
-        # alphaLoc1.append(pOpt[13])
+        # bram trick to keep things non negative
+        pOpt = pOpt ** 2
+
+        alphaLoc0.append(pOpt[12])
+        alphaLoc1.append(pOpt[13])
         # alphaLoc0.append(res.x[12])
         # alphaLoc1.append(res.x[13])
         unitPairedNormR2[unitCount] = r2
@@ -339,8 +347,10 @@ for fileIterator in fileList:
         prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
         nullDirIndex = np.where(dirArray == nullDir)[0][0]
         reIndex = (np.array([0, 1, 2, 3, 4, 5])+nullDirIndex) % 6
-        loc1ReIndex = b[:6, 6][reIndex]
         loc0ReIndex = b[6, :6][reIndex]
+        loc1ReIndex = b[:6, 6][reIndex]
+        loc0PrefNormalized.append(loc0ReIndex[3] / np.max(b))
+        loc1PrefNormalized.append(loc1ReIndex[3] / np.max(b))
         respAvg = ((loc1ReIndex + loc0ReIndex) / 2)
         baselineNormalized = b[6, 6] / np.max(respAvg)
         respNormalized = respAvg / np.max(respAvg)
@@ -352,6 +362,21 @@ for fileIterator in fileList:
         popTunCurve.append(respNormalized)
         loc0to1RespRatio.append(loc0ReIndex[3]/loc1ReIndex[3])
 
+        # raw data reindex to have null in the top left corner
+        bReIndex = np.zeros((7, 7))
+        tempMain = b[:6, :6][:, reIndex]
+        tempMain = tempMain[:6, :6][reIndex, :]
+        temp0Blank = b[:6, 6][reIndex]
+        temp1Blank = b[6, :6][reIndex]
+        bReIndex[:6, :6] = tempMain
+        bReIndex[:6, 6] = temp0Blank
+        bReIndex[6, :6] = temp1Blank
+        bReIndex[6, 6] = b[6, 6]
+        loc0NMI = (bReIndex[3, 3] + bReIndex[0, 0]) / bReIndex[3, 0]
+        loc1NMI = (bReIndex[3, 3] + bReIndex[0, 0]) / bReIndex[0, 3]
+        loc0NullNMI.append(loc0NMI)
+        loc1NullNMI.append(loc1NMI)
+
     # the different pairs of neurons from total units
     combs = [i for i in combinations(units, 2)]
     totCombs.append(len(combs))
@@ -360,14 +385,14 @@ for fileIterator in fileList:
     filterCombs = [i for i in combinations(filterUnits, 2)]
     totFilterCombs.append(len(filterCombs))
 
-    # combinations of units separated by 200ums
+    # combinations of units separated by more than 250ums
     distCombs = []
     for i in combs:
         n1 = unitsChannel[np.where(units == i[0])[0][0]]
         n2 = unitsChannel[np.where(units == i[1])[0][0]]
         n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
         n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
-        if abs(n1ElectrodePos - n2ElectrodePos) >= 4:
+        if abs(n1ElectrodePos - n2ElectrodePos) >= 5:
             distCombs.append(i)
 
     # generate paired stimulus correlation, selectivity index,
@@ -435,30 +460,30 @@ for fileIterator in fileList:
             loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0] + 6]
             n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
             if n1Selectivity >= 0:
-                n1NonPrefSupp = (unitNormFitEstimate[n1][12]) / (
-                        1 + unitNormFitEstimate[n1][12])
-                # n1NonPrefSupp = (unitNormFitEstimate[n1][13]) / (
-                #         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
-            else:
-                n1NonPrefSupp = 1 / (
-                        1 + unitNormFitEstimate[n1][12])
                 # n1NonPrefSupp = (unitNormFitEstimate[n1][12]) / (
-                #         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+                #         1 + unitNormFitEstimate[n1][12])
+                n1NonPrefSupp = (unitNormFitEstimate[n1][13]) / (
+                        unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+            else:
+                # n1NonPrefSupp = 1 / (
+                #         1 + unitNormFitEstimate[n1][12])
+                n1NonPrefSupp = (unitNormFitEstimate[n1][12]) / (
+                        unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
 
             # n2 selectivity and suppression index
             loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
             loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0] + 6]
             n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
             if n2Selectivity >= 0:
-                n2NonPrefSupp = (unitNormFitEstimate[n2][12]) / (
-                        1 + unitNormFitEstimate[n2][12])
-                # n2NonPrefSupp = (unitNormFitEstimate[n2][13]) / (
-                #         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
-            else:
-                n2NonPrefSupp = 1 / (
-                        1 + unitNormFitEstimate[n2][12])
                 # n2NonPrefSupp = (unitNormFitEstimate[n2][12]) / (
-                #         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+                #         1 + unitNormFitEstimate[n2][12])
+                n2NonPrefSupp = (unitNormFitEstimate[n2][13]) / (
+                        unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+            else:
+                # n2NonPrefSupp = 1 / (
+                #         1 + unitNormFitEstimate[n2][12])
+                n2NonPrefSupp = (unitNormFitEstimate[n2][12]) / (
+                        unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
 
             # pair selectivity, suppression, and NMI index
             pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *

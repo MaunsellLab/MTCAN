@@ -58,7 +58,7 @@ npZscoSpikeCounts = []
 # array for population heatmap 7x7 grid of resp to loc0,loc1 6 dirs
 popRespHeatmap = []
 electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
-
+pairDistance = []
 
 for fileIterator in fileList:
 
@@ -88,8 +88,9 @@ for fileIterator in fileList:
     for corrTrial in corrTrials:
         currTrial = allTrials[corrTrial]
         nStim = len(currTrial['stimDesc']['data']['listType'])
-        currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()}
-                                        for i in range(nStim)]
+        currTrial['stimDesc']['data'] = [{k: v[i] for k, v in
+                                          currTrial['stimDesc']['data'].items()}
+                                         for i in range(nStim)]
 
     # assert: stim sequence list is frozen
     seqList = []
@@ -142,6 +143,7 @@ for fileIterator in fileList:
     # distance between Gabors in the RF
     stimDesc = allTrials[corrTrials[0]]['stimDesc']['data']
     sigmaDeg = allTrials[corrTrials[0]]['rfGabor']['data']['sigmaDeg']
+    loc0X, loc0Y, loc1X, loc1Y = 1, 1, 1, 1
     for stim in stimDesc:
         if stim['stimLoc'] == 0:
             loc0X = stim['azimuthDeg']
@@ -195,11 +197,9 @@ for fileIterator in fileList:
     angleMat = np.arange(180, 900, 60)
     spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
     spikeCountLong = []
-    sponSpikeCountLong = []
     onLatency = 50/1000  # time in MS for counting window latency after stim on
     offLatency = 100/1000  # time in MS for counting window latency after stim off
     histPrePostMS = 100  # 100ms window pre/post stimulus on/off
-    sponWindowMS = 50  # 50ms window before stimulus onset
     spikeHists = np.zeros((len(units), 49, trueStimDurMS + (2*histPrePostMS+1)))
     stimIndexCount = np.zeros(49)
     filterUnits = []
@@ -214,7 +214,7 @@ for fileIterator in fileList:
             for stim in stimDesc:
                 if stim['stimLoc'] == 0 and stim['listType'] == 1:
                     stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
-                                    / 1000) + stim1TimeS
+                                   / 1000) + stim1TimeS
                     stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
                                     / 1000) + stim1TimeS
                     stimIndex = np.int32(stim['stimIndex'])
@@ -223,21 +223,15 @@ for fileIterator in fileList:
                     for unitCount, unit in enumerate(units):
                         if unit in currTrial['spikeData']['unit']:
                             unitIndex = np.where(currTrial['spikeData']['unit'] == unit)[0]
-                            # added 50ms onset latency for spike counts (100 for offset)
                             unitTimeStamps = currTrial['spikeData']['timeStamp'][unitIndex]
                             stimSpikes = np.where((unitTimeStamps >= (stimOnTimeS + onLatency)) &
-                                         (unitTimeStamps <= (stimOffTimeS + offLatency)))[0]
+                                                  (unitTimeStamps <= (stimOffTimeS + offLatency)))[0]
                             spikeCountMat[unitCount][stCount][stimIndex] \
                                 = len(stimSpikes)
                             spikeCountLong.append([unit,
                                                    stimIndex,
                                                    stimIndexCount[stimIndex],
                                                    len(stimSpikes)])
-
-                            # Spontaneous Spikes
-                            sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS-(sponWindowMS/1000)))
-                                                  & (unitTimeStamps <= stimOnTimeS))[0]
-                            sponSpikeCountLong.append([unit, len(sponSpikes)])
 
                             # # # # # FAKE DATA PUT FAKE SPIKES FOR NULL (0˚), PREF(180˚)
                             # # FAKE DATA PN, NP - (0, 180) and (180,0)
@@ -256,19 +250,12 @@ for fileIterator in fileList:
                                                             & (unitTimeStamps <= stimOffPostSNEV)
                                                              )] - stimOnPreSNEV
                             histStimSpikes = np.int32(histStimSpikes*1000)
-                            # spikeHists[unitCount, stimIndex, histStimSpikes] += 1
                             spikeHists[unitCount][stimIndex][histStimSpikes] += 1
 
     # mean, SEM, and reshaping of spikeCount matrices
     # create pandas dataframe of spikeCount with corresponding unit, stimIndex
     spikeCountDF = pd.DataFrame(spikeCountLong, columns=['unit', 'stimIndex',
                                                          'stimCount', 'stimSpikes'])
-    sponSpikeCountDF = pd.DataFrame(sponSpikeCountLong, columns=['unit', 'sponSpikes'])
-    sponSpikesMean = np.zeros(len(units))  # spikes in 50ms window
-    sponSpikesSEM = np.zeros(len(units))
-    for unitCount, unit in enumerate(units):
-        sponSpikesMean[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].mean()[1]
-        sponSpikesSEM[unitCount] = sponSpikeCountDF.loc[sponSpikeCountDF['unit'] == unit].sem()[1]
     meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
     spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
     spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
@@ -296,8 +283,7 @@ for fileIterator in fileList:
         i[:, 42:48] = meanSpike[count][36:42]
         i[:, 48] = meanSpike[count][48]
 
-    # Unit's preferred direction based off of
-    # gaussian fit of MTNC stimuli
+    # Unit's preferred direction based off of gaussian fit of MTNC stimuli
     # filter units based off of gauss fit > 0.90
     angleMat = np.arange(180, 900, 60)
     unitGaussMean = np.zeros(len(units))
@@ -357,14 +343,16 @@ for fileIterator in fileList:
     tightCombs = [i for i in combinations(tightUnits, 2)]
     # combinations of units with wide tuning
     wideCombs = [i for i in combinations(wideUnits, 2)]
-    # combinations of units separated by 200ums
+    # combinations of units separated by more than 250ums
     distCombs = []
     for i in combs:
         n1 = unitsChannel[np.where(units == i[0])[0][0]]
         n2 = unitsChannel[np.where(units == i[1])[0][0]]
         n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
         n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
-        if abs(n1ElectrodePos - n2ElectrodePos) >= 4:
+        pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
+        pairDistance.append(pairDistOnElectrode * 50)
+        if pairDistOnElectrode >= 5:
             distCombs.append(i)
 
     # get p, n, p+n psth for every unit - normalized and aligned
@@ -388,35 +376,12 @@ for fileIterator in fileList:
 
         # raw data reindex to have null in the top left corner
         b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
-
-        bReIndex = np.zeros((7, 7))
-        tempMain = b[:6, :6][:, reIndex]
-        tempMain = tempMain[:6, :6][reIndex, :]
-        temp0Blank = b[:6, 6][reIndex]
-        temp1Blank = b[6, :6][reIndex]
-        bReIndex[:6, :6] = tempMain
-        bReIndex[:6, 6] = temp0Blank
-        bReIndex[6, :6] = temp1Blank
-        bReIndex[6, 6] = b[6, 6]
+        bReIndex = reIndexedRespMat(b, reIndex)
         bReIndexNorm = bReIndex / np.max(bReIndex)
         popRespHeatmap.append(bReIndexNorm.reshape(49))
 
-        # fixed (independent) variables - matrix of corresponding stim Indexes
-        stimMat = np.zeros((7, 7))
-        stimMat[:6, :6] = np.arange(36).reshape(6, 6)
-        stimMat[6, :6] = np.arange(36, 42)
-        stimMat[:, 6] = np.arange(42, 49)
-
-        # reshape fixed variables to match dependent variables
-        stimMatReIndex = np.zeros((7, 7))
-        tempMain = stimMat[:6, :6][:, reIndex]
-        tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
-        temp0Blank = stimMat[:6, 6][reIndex]
-        temp1Blank = stimMat[6, :6][reIndex]
-        stimMatReIndex[:6, :6] = tempMain
-        stimMatReIndex[:6, 6] = temp0Blank
-        stimMatReIndex[6, :6] = temp1Blank
-        stimMatReIndex[6, 6] = stimMat[6, 6]
+        # matrix of indices for b and bReIndexed
+        stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
 
         # condensed matrices for 2 directions only
         stimMatCond = stimMatReIndex[sli, :]
@@ -531,16 +496,16 @@ for fileIterator in fileList:
         for unitCount, unit in enumerate(units):
 
             # unitCount = np.where(units == unit)[0][0]
-            b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
             prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
             nullDirIndex = np.where(dirArray == nullDir)[0][0]
             prefDirIndex = np.where(dirArray == prefDir)[0][0]
+            reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+
+            # responses (dependent variables) - matrix of responses
+            b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000/trueStimDurMS
 
             # fixed (independent) variables - matrix of corresponding stim Indexes
-            stimMat = np.zeros((7, 7))
-            stimMat[:6, :6] = np.arange(36).reshape(6, 6)
-            stimMat[6, :6] = np.arange(36, 42)
-            stimMat[:, 6] = np.arange(42, 49)
+            stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
 
             # condensed matrices for 2 directions only
             bCondensed = b[sli, :]
@@ -551,7 +516,7 @@ for fileIterator in fileList:
             # Generic Normalization (L1+L2)/(1+al2+sig) w.o scalar
             guess0 = np.concatenate((bCondensed[2, :-1],
                                      bCondensed[:-1, 2],
-                                     [0.4]), axis=0)
+                                     [0.2]), axis=0)
             resp = bCondensed.reshape(9)[:-1]
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
                                                     stimIndexDict, dir1, dir2)
@@ -707,152 +672,13 @@ for fileIterator in fileList:
 
                 # correlation for that Gabor pair b/w 2 units excluding trials where
                 # spike counts exceeded 3 SD from mean
-                skipTrials = []
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
-                n1Zscore = stats.zscore(n1SpikeMat)
-                n2Zscore = stats.zscore(n2SpikeMat)
-                n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                for x in n1SkipTrials:
-                    skipTrials.append(x)
-                for x in n2SkipTrials:
-                    skipTrials.append(x)
-                goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                # pairStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
-                #                               spikeCountMat[n2, goodTrials, i])
-                pairStimCorr = np.corrcoef(spikeCountMat[n1, goodTrials, i],
-                                           spikeCountMat[n2, goodTrials, i])[0][1]
-                pairDCov = np.cov(spikeCountMat[n1, goodTrials, i],
-                                       spikeCountMat[n2, goodTrials, i], ddof=1)
-                pairDSD = (np.std(spikeCountMat[n1, goodTrials, i], ddof=1) *
-                           np.std(spikeCountMat[n2, goodTrials, i], ddof=1))
-
+                pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
 
                 # extract directions of the gabor pair
                 loc0Dir = stimIndexDict[i][0]['direction']
                 loc1Dir = stimIndexDict[i][1]['direction']
-
-                # # n1 selectivity and suppression index based of Normalization params
-                # loc0Resp = unitNormFitEstimate[n1][np.where(condArr == loc0Dir)[0][0]]
-                # loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0] + 2]
-                # if loc0Resp > loc1Resp:
-                #     n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                #     n1NonPrefSupp = unitNormFitEstimate[n1][5] / (
-                #                     unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
-                #     n1PrefResp = 0
-                # else:
-                #     n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-                #     n1NonPrefSupp = unitNormFitEstimate[n1][4] / (
-                #                     unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
-                #     n1PrefResp = 1
-                #
-                # # n2 selectivity and suppression index
-                # loc0Resp = unitNormFitEstimate[n2][np.where(condArr == loc0Dir)[0][0]]
-                # loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0] + 2]
-                # if loc0Resp > loc1Resp:
-                #     n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                #     n2NonPrefSupp = unitNormFitEstimate[n2][5] / (
-                #                     unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
-                #     n2PrefResp = 0
-                # else:
-                #     n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-                #     n2NonPrefSupp = unitNormFitEstimate[n2][4] / (
-                #                     unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
-                #     n2PrefResp = 1
-                #
-                # # n1 NMI
-                # b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
-                # bCondensed = b[sli, :]
-                # bCondensed = bCondensed[:, sli]
-                # pairedMat = bCondensed[:2, :2].reshape(4)
-                # loc0Single = bCondensed[2, :2]
-                # loc1Single = bCondensed[:2, 2]
-                # loc0SingleResp = loc0Single[np.where(condArr == loc0Dir)[0][0]]
-                # loc1SingleResp = loc1Single[np.where(condArr == loc1Dir)[0][0]]
-                # n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
-                #       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
-                # n1SimpleNMI = pairedMat[count] / (loc0SingleResp + loc1SingleResp)
-                #
-                # # n2 NMI
-                # b = meanSpikeReshaped[n2].reshape(7, 7) * 1000/trueStimDurMS
-                # bCondensed = b[sli, :]
-                # bCondensed = bCondensed[:, sli]
-                # pairedMat = bCondensed[:2, :2].reshape(4)
-                # loc0Single = bCondensed[2, :2]
-                # loc1Single = bCondensed[:2, 2]
-                # loc0SingleResp = loc0Single[np.where(condArr == loc0Dir)[0][0]]
-                # loc1SingleResp = loc1Single[np.where(condArr == loc1Dir)[0][0]]
-                # n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
-                #       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
-                # n2simpleNMI = pairedMat[count] / (loc0SingleResp + loc1SingleResp)
-                #
-                # # pair selectivity, suppression, and NMI index
-                # pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
-                # pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
-                # if n1PrefResp != n2PrefResp:
-                #     pairSelectivity = -pairSelectivity
-                # pairNMI = (n1NMI + n2NMI) / 2
-                # pairSimpleNMI = np.sqrt(n1SimpleNMI * n2simpleNMI)
-                #
-                # pairPairedCorr.append(pairStimCorr[0])
-                # pairSelectivityIndex.append(pairSelectivity)
-                # pairNonPrefSuppIndex.append(pairSuppression)
-                # pairNMIIndex.append(pairNMI)
-                # pairSimpleNMIIndex.append(pairSimpleNMI)
-                #
-                # if i in stimIndex12Cond:
-                #     pairSelFromCond.append(pairSelectivity)
-                #     pairNPSuppFromCond.append(pairSuppression)
-                #
-                # # indices and correlations for single Gabor stimuli
-                # singleStimIndex = np.int_(np.concatenate((stimMatCond[2, :2],
-                #                                           stimMatCond[:2, 2]),
-                #                                          axis=0))
-                #
-                # # loc 0 single Gabor corr
-                # stimIndex = np.int_(stimMatCond[2, :][np.where(condArr == loc0Dir)[0][0]])
-                # # correlation for that Gabor pair b/w 2 units excluding trials where
-                # # spike counts exceeded 3 SD from mean
-                # skipTrials = []
-                # n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
-                # n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                # n1Zscore = stats.zscore(n1SpikeMat)
-                # n2Zscore = stats.zscore(n2SpikeMat)
-                # n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                # n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                # for x in n1SkipTrials:
-                #     skipTrials.append(x)
-                # for x in n2SkipTrials:
-                #     skipTrials.append(x)
-                # goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                # singleStimLoc0Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                #                                     spikeCountMat[n2, goodTrials, stimIndex])
-                # pairSingleCorr.append(singleStimLoc0Corr[0])
-                # pairSingleSelectivityIndex.append(pairSelectivity)
-                # pairSingleNonPrefSuppIndex.append(pairSuppression)
-                #
-                # # loc 1 single Gabor corr
-                # stimIndex = np.int_(stimMatCond[:, 2][np.where(condArr == loc1Dir)[0][0]])
-                # # correlation for that Gabor pair b/w 2 units excluding trials where
-                # # spike counts exceeded 3 SD from mean
-                # skipTrials = []
-                # n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
-                # n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                # n1Zscore = stats.zscore(n1SpikeMat)
-                # n2Zscore = stats.zscore(n2SpikeMat)
-                # n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                # n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                # for x in n1SkipTrials:
-                #     skipTrials.append(x)
-                # for x in n2SkipTrials:
-                #     skipTrials.append(x)
-                # goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                # singleStimLoc1Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                #                                     spikeCountMat[n2, goodTrials, stimIndex])
-                # pairSingleCorr.append(singleStimLoc1Corr[0])
-                # pairSingleSelectivityIndex.append(pairSelectivity)
-                # pairSingleNonPrefSuppIndex.append(pairSuppression)
 
                 # n1 NMI and selectivity (raw spike counts)
                 b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
@@ -965,35 +791,16 @@ for fileIterator in fileList:
                     pairSelFromCond.append(pairSelectivity)
                     pairNPSuppFromCond.append(pairSuppression)
 
-                # loc 0 single Gabor corr
+                # loc 0 single Gabor corr, excluding trials where spike counts > 3 SD
                 stimIndex = np.int_(stimMatCond[2, :][np.where(condArr == loc0Dir)[0][0]])
-                # correlation for that Gabor pair b/w 2 units excluding trials where
-                # spike counts exceeded 3 SD from mean
 
                 # # INSERT FAKE DATA FOR LOC 0 SINGLE GABOR
                 # spikeCountMat[n1, :blocksDone, stimIndex], spikeCountMat[n2, :blocksDone, stimIndex] = generateTwoCorrArrays(blocksDone, 0.03)
                 # # FAKE DATA ABOVE REMOVE DURING REAL ANALYSIS
 
-                skipTrials = []
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                n1Zscore = stats.zscore(n1SpikeMat)
-                n2Zscore = stats.zscore(n2SpikeMat)
-                n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                for x in n1SkipTrials:
-                    skipTrials.append(x)
-                for x in n2SkipTrials:
-                    skipTrials.append(x)
-                goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                # singleStimLoc0Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                #                                     spikeCountMat[n2, goodTrials, stimIndex])
-                singleStimLoc0Corr = np.corrcoef(spikeCountMat[n1, goodTrials, stimIndex],
-                                                 spikeCountMat[n2, goodTrials, stimIndex])[0][1]
-                pairSCov = np.cov(spikeCountMat[n1, goodTrials, stimIndex],
-                                  spikeCountMat[n2, goodTrials, stimIndex], ddof=1)
-                pairSSD = (np.std(spikeCountMat[n1, goodTrials, stimIndex], ddof=1) *
-                           np.std(spikeCountMat[n2, goodTrials, stimIndex], ddof=1))
+                singleStimLoc0Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
 
                 pairSingleCov.append(pairSCov[0][1])
                 pairSingleSD.append(pairSSD)
@@ -1005,35 +812,16 @@ for fileIterator in fileList:
                 pairSingleRawSelectivity.append(pairRawSelectivity)
                 singleNewSelectivity.append(pairNewSelectivity)
 
-                # loc 1 single Gabor corr
+                # loc 1 single Gabor corr, excluding trials where spike counts > 3 SD
                 stimIndex = np.int_(stimMatCond[:, 2][np.where(condArr == loc1Dir)[0][0]])
-                # correlation for that Gabor pair b/w 2 units excluding trials where
-                # spike counts exceeded 3 SD from mean
 
                 # # INSERT FAKE DATA FOR LOC 1 SINGLE GABOR
                 # spikeCountMat[n1, :blocksDone, stimIndex], spikeCountMat[n2, :blocksDone, stimIndex] = generateTwoCorrArrays(blocksDone, 0.03)
                 # # FAKE DATA ABOVE REMOVE DURING REAL ANALYSIS
 
-                skipTrials = []
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                n1Zscore = stats.zscore(n1SpikeMat)
-                n2Zscore = stats.zscore(n2SpikeMat)
-                n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                for x in n1SkipTrials:
-                    skipTrials.append(x)
-                for x in n2SkipTrials:
-                    skipTrials.append(x)
-                goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                # singleStimLoc1Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
-                #                                     spikeCountMat[n2, goodTrials, stimIndex])
-                singleStimLoc1Corr = np.corrcoef(spikeCountMat[n1, goodTrials, stimIndex],
-                                                 spikeCountMat[n2, goodTrials, stimIndex])[0][1]
-                pairSCov = np.cov(spikeCountMat[n1, goodTrials, stimIndex],
-                                  spikeCountMat[n2, goodTrials, stimIndex], ddof=1)
-                pairSSD = (np.std(spikeCountMat[n1, goodTrials, stimIndex], ddof=1) *
-                           np.std(spikeCountMat[n2, goodTrials, stimIndex], ddof=1))
+                singleStimLoc1Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
 
                 pairSingleCov.append(pairSCov[0][1])
                 pairSingleSD.append(pairSSD)
@@ -1050,295 +838,10 @@ for fileIterator in fileList:
                 skipTrials = []
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, blankIndex]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, blankIndex]
-                n1Zscore = stats.zscore(n1SpikeMat)
-                n2Zscore = stats.zscore(n2SpikeMat)
-                n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-                n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-                for x in n1SkipTrials:
-                    skipTrials.append(x)
-                for x in n2SkipTrials:
-                    skipTrials.append(x)
-                goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-                blankCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, blankIndex],
-                                           spikeCountMat[n2, goodTrials, blankIndex])
+                blankCorr, blankCov, blankSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
 
-                pairBlankCorr.append(blankCorr[0])
+                pairBlankCorr.append(blankCorr)
 
-            # # indices and correlations for single Gabor stimuli
-            # singleStimIndex = np.int_(np.concatenate((stimMatCond[2, :2],
-            #                                           stimMatCond[:2, 2]),
-            #                                          axis=0))
-            # for count, i in enumerate(singleStimIndex):
-            #     # correlation for the single Gabor b/w 2 units excluding trials where
-            #     # spike counts exceeded 3 SD from mean
-            #     skipTrials = []
-            #     n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
-            #     n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
-            #     n1Zscore = stats.zscore(n1SpikeMat)
-            #     n2Zscore = stats.zscore(n2SpikeMat)
-            #     n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-            #     n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-            #     for x in n1SkipTrials:
-            #         skipTrials.append(x)
-            #     for x in n2SkipTrials:
-            #         skipTrials.append(x)
-            #     # print(skipTrials)
-            #     goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-            #     singleStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
-            #                                   spikeCountMat[n2, goodTrials, i])
-            #
-            #     # extract direction and contrast of the gabor
-            #     loc0Dir = stimIndexDict[i][0]['direction']
-            #     loc1Dir = stimIndexDict[i][1]['direction']
-            #     loc0Con = stimIndexDict[i][0]['contrast']
-            #     loc1Con = stimIndexDict[i][1]['contrast']
-            #
-            #     # n1 selectivity and suppression index based of Norm params
-            #     loc0Dir0Resp = unitNormFitEstimate[n1][0]
-            #     loc0Dir1Resp = unitPairedNormFit[n1][1]
-            #     loc1Dir0Resp = unitNormFitEstimate[n1][2]
-            #     loc1Dir1Resp = unitNormFitEstimate[n1][3]
-            #     minRespN1 = np.where(unitNormFitEstimate[n1][:4] ==
-            #                          min(unitNormFitEstimate[n1][:4]))[0]
-            #     maxRespN1 = np.where(unitNormFitEstimate[n1][:4] ==
-            #                          max(unitNormFitEstimate[n1][:4]))[0]
-            #     if maxRespN1 < 2:
-            #         n1PrefResp = 0
-            #     else:
-            #         n1PrefResp = 1
-            #     if minRespN1 < 2:
-            #         n1NonPrefSupp = unitNormFitEstimate[n1][4] / (
-            #             unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
-            #     else:
-            #         n1NonPrefSupp = unitNormFitEstimate[n1][5] / (
-            #             unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
-            #     if loc0Con == 1:
-            #         if loc0Dir0Resp > loc0Dir1Resp:
-            #             n1Selectivity = (loc0Dir0Resp - loc0Dir1Resp) / (
-            #                              loc0Dir0Resp + loc0Dir1Resp)
-            #         else:
-            #             n1Selectivity = (loc0Dir1Resp - loc0Dir0Resp) / (
-            #                              loc0Dir0Resp + loc0Dir1Resp)
-            #     else:
-            #         if loc1Dir0Resp > loc1Dir1Resp:
-            #             n1Selectivity = (loc1Dir0Resp - loc1Dir1Resp) / (
-            #                              loc1Dir0Resp + loc1Dir1Resp)
-            #         else:
-            #             n1Selectivity = (loc1Dir1Resp - loc1Dir0Resp) / (
-            #                              loc1Dir0Resp + loc1Dir1Resp)
-            #
-            #     # n2 selectivity and suppression index based of Norm params
-            #     loc0Dir0Resp = unitNormFitEstimate[n2][0]
-            #     loc0Dir1Resp = unitPairedNormFit[n2][1]
-            #     loc1Dir0Resp = unitNormFitEstimate[n2][2]
-            #     loc1Dir1Resp = unitNormFitEstimate[n2][3]
-            #     minRespN2 = np.where(unitNormFitEstimate[n2][:4] ==
-            #                          min(unitNormFitEstimate[n2][:4]))[0]
-            #     maxRespN2 = np.where(unitNormFitEstimate[n2][:4] ==
-            #                          max(unitNormFitEstimate[n2][:4]))[0]
-            #     if maxRespN2 < 2:
-            #         n2PrefResp = 0
-            #     else:
-            #         n2PrefResp = 1
-            #     if minRespN2 < 2:
-            #         n2NonPrefSupp = unitNormFitEstimate[n2][4] / (
-            #                 unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
-            #     else:
-            #         n2NonPrefSupp = unitNormFitEstimate[n2][5] / (
-            #                 unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
-            #     if loc0Con == 1:
-            #         if loc0Dir0Resp > loc0Dir1Resp:
-            #             n2Selectivity = (loc0Dir0Resp - loc0Dir1Resp) / (
-            #                     loc0Dir0Resp + loc0Dir1Resp)
-            #         else:
-            #             n2Selectivity = (loc0Dir1Resp - loc0Dir0Resp) / (
-            #                     loc0Dir0Resp + loc0Dir1Resp)
-            #     else:
-            #         if loc1Dir0Resp > loc1Dir1Resp:
-            #             n2Selectivity = (loc1Dir0Resp - loc1Dir1Resp) / (
-            #                     loc1Dir0Resp + loc1Dir1Resp)
-            #         else:
-            #             n2Selectivity = (loc1Dir1Resp - loc1Dir0Resp) / (
-            #                     loc1Dir0Resp + loc1Dir1Resp)
-            #
-            #     # pair selectivity, suppression index for single gabors
-            #     pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
-            #     pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
-            #     if n1PrefResp != n2PrefResp:
-            #         pairSelectivity = -pairSelectivity
-            #
-            #     pairSingleCorr.append(singleStimCorr[0])
-            #     pairSingleSelectivityIndex.append(pairSelectivity)
-            #     pairSingleNonPrefSuppIndex.append(pairSuppression)
-
-            # # indices and correlations for paired Gabor stimuli
-            # for i in range(36):
-            #
-            #     # correlation for that Gabor pair b/w 2 units excluding trials where
-            #     # spike counts exceeded 3 SD from mean
-            #     skipTrials = []
-            #     n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
-            #     n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
-            #     n1Zscore = stats.zscore(n1SpikeMat)
-            #     n2Zscore = stats.zscore(n2SpikeMat)
-            #     n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-            #     n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-            #     for x in n1SkipTrials:
-            #         skipTrials.append(x)
-            #     for x in n2SkipTrials:
-            #         skipTrials.append(x)
-            #     # print(skipTrials)
-            #     goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
-            #     pairStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
-            #                                   spikeCountMat[n2, goodTrials, i])
-            #     # print(pairStimCorr)
-            #     #
-            #     # pairStimCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, i],
-            #     #                               spikeCountMat[n2, :blocksDone, i])
-            #     # print(pairStimCorr)
-            #
-            #     # extract directions of the gabor pair
-            #     loc0Dir = stimIndexDict[i][0]['direction']
-            #     loc1Dir = stimIndexDict[i][1]['direction']
-            #
-            #     # # n1 selectivity and suppression based off of average spike counts
-            #     # b = meanSpikeReshaped[n1][0] * 1000/trueStimDurMS
-            #     # pairedMat = b[:36]
-            #     # loc0Resp = b[loc0IndexArray[np.where(dirArray == loc0Dir)[0][0]]]
-            #     # loc1Resp = b[loc1IndexArray[np.where(dirArray == loc1Dir)[0][0]]]
-            #     # if loc0Resp > loc1Resp:
-            #     #     # n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-            #     #     n1Selectivity = (loc0Resp - loc1Resp) / loc0Resp
-            #     #     n1NonPrefSupp = abs(loc0Resp - pairedMat[i]) / (loc0Resp + pairedMat[i])
-            #     #     n1PrefResp = 0
-            #     # else:
-            #     #     # n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-            #     #     n1Selectivity = (loc1Resp - loc0Resp) / loc1Resp
-            #     #     n1NonPrefSupp = abs(loc1Resp - pairedMat[i]) / (loc1Resp + pairedMat[i])
-            #     #     n1PrefResp = 1
-            #     #
-            #     # # n2 selectivity and suppression bvased off of average spike counts
-            #     # b = meanSpikeReshaped[n2][0] * 1000/trueStimDurMS
-            #     # pairedMat = b[:36]
-            #     # loc0Resp = b[loc0IndexArray[np.where(dirArray == loc0Dir)[0][0]]]
-            #     # loc1Resp = b[loc1IndexArray[np.where(dirArray == loc1Dir)[0][0]]]
-            #     # if loc0Resp > loc1Resp:
-            #     #     # n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-            #     #     n2Selectivity = (loc0Resp - loc1Resp) / loc0Resp
-            #     #     n2NonPrefSupp = abs(loc0Resp - pairedMat[i]) / (loc0Resp + pairedMat[i])
-            #     #     n2PrefResp = 0
-            #     # else:
-            #     #     # n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-            #     #     n2Selectivity = (loc1Resp - loc0Resp) / loc1Resp
-            #     #     n2NonPrefSupp = abs(loc1Resp - pairedMat[i]) / (loc1Resp + pairedMat[i])
-            #     #     n2PrefResp = 1
-            #
-            #     # n1 selectivity and suppression index based of Normalization params
-            #     loc0Resp = unitNormFitEstimate[n1][np.where(dirArray == loc0Dir)[0][0]]
-            #     loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0] + 6]
-            #     if loc0Resp > loc1Resp:
-            #         n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-            #         n1NonPrefSupp = unitNormFitEstimate[n1][13] / (
-            #                         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
-            #         n1PrefResp = 0
-            #         if abs(loc0Resp - n1PrefDir) > 180:
-            #             n1Diff = 360 - abs(loc0Resp - n1PrefDir)
-            #         else:
-            #             n1Diff = abs(loc0Resp - n1PrefDir)
-            #     else:
-            #         n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-            #         n1NonPrefSupp = unitNormFitEstimate[n1][12] / (
-            #                         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
-            #         n1PrefResp = 1
-            #         if abs(loc1Resp - n1PrefDir) > 180:
-            #             n1Diff = 360 - abs(loc1Resp - n1PrefDir)
-            #         else:
-            #             n1Diff = abs(loc1Resp - n1PrefDir)
-            #
-            #     # n2 selectivity and suppression index
-            #     loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
-            #     loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0] + 6]
-            #     if loc0Resp > loc1Resp:
-            #         n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-            #         n2NonPrefSupp = unitNormFitEstimate[n2][13] / (
-            #                         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
-            #         n2PrefResp = 0
-            #         if abs(loc0Resp - n2PrefDir) > 180:
-            #             n2Diff = 360 - abs(loc0Resp - n2PrefDir)
-            #         else:
-            #             n2Diff = abs(loc0Resp - n2PrefDir)
-            #     else:
-            #         n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
-            #         n2NonPrefSupp = unitNormFitEstimate[n2][12] / (
-            #                         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
-            #         n2PrefResp = 1
-            #         if abs(loc1Resp - n2PrefDir) > 180:
-            #             n2Diff = 360 - abs(loc1Resp - n2PrefDir)
-            #         else:
-            #             n2Diff = abs(loc1Resp - n2PrefDir)
-            #
-            #     # n1 NMI
-            #     b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
-            #     pairedMat = b[:6, :6].reshape(36)
-            #     loc0Single = b[6, :6]
-            #     loc1Single = b[:6, 6]
-            #     loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
-            #     loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
-            #     n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
-            #           (loc0SingleResp + loc1SingleResp) + pairedMat[i])
-            #     n1SimpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
-            #
-            #     # n2 NMI
-            #     b = meanSpikeReshaped[n2].reshape(7, 7) * 1000/trueStimDurMS
-            #     pairedMat = b[:6, :6].reshape(36)
-            #     loc0Single = b[6, :6]
-            #     loc1Single = b[:6, 6]
-            #     loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
-            #     loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
-            #     n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
-            #           (loc0SingleResp + loc1SingleResp) + pairedMat[i])
-            #     n2simpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
-            #
-            #     # pair selectivity, suppression, and NMI index
-            #     pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
-            #     pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
-            #     if n1PrefResp != n2PrefResp:
-            #         pairSelectivity = -pairSelectivity
-            #     pairNMI = (n1NMI + n2NMI) / 2
-            #     pairSimpleNMI = np.sqrt(n1SimpleNMI * n2simpleNMI)
-            #
-            #     pairPairedCorr.append(pairStimCorr[0])
-            #     pairSelectivityIndex.append(pairSelectivity)
-            #     pairNonPrefSuppIndex.append(pairSuppression)
-            #     pairNMIIndex.append(pairNMI)
-            #     pairSimpleNMIIndex.append(pairSimpleNMI)
-            #
-            #     # appending pair Selectivity and pair NMI to get average
-            #     # for the single Gabor figure
-            #     neuronPairAvgSelectivity.append(pairSelectivity)
-            #     if i in upperTriangle:
-            #         neuronPairAvgNMIloc0.append(pairNMI)
-            #     else:
-            #         neuronPairAvgNMIloc1.append(pairNMI)
-
-            # # indices and correlations for single Gabor b/w pair of neuron
-            # for j in range(36, 48):
-            #     pairSingCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, j],
-            #                                   spikeCountMat[n2, :blocksDone, j])
-            #
-            #     # extract location and direction of tested gabor
-            #     loc0Dir = stimIndexDict[j][0]['direction']
-            #     loc0Con = stimIndexDict[j][0]['contrast']
-            #     loc1Dir = stimIndexDict[j][1]['direction']
-            #     loc1Con = stimIndexDict[j][1]['contrast']
-            #     if loc0Con == 1:
-            #         avgNMI = np.mean(neuronPairAvgNMIloc1)
-            #     else:
-            #         avgNMI = np.mean(neuronPairAvgNMIloc0)
-            #
-            #     pairSingleGaborNMI.append(avgNMI)
-            #     pairSingleGaborSelectivity.append(np.mean(neuronPairAvgSelectivity))
-            #     pairSingleCorr.append(pairSingCorr[0])
     pairDoubleCov = np.array(pairDoubleCov)
     pairDoubleSd = np.array(pairDoubleSD)
     pairPairedCorr = np.array(pairPairedCorr)
@@ -1985,3 +1488,400 @@ if n2Selectivity >= 0:
     n2NonPrefSupp = 0.5 * (-n2NonPrefSupp + 1)
 else:
     n2NonPrefSupp = 0.5 * (n2NonPrefSupp + 1)
+
+# # indices and correlations for single Gabor stimuli
+# singleStimIndex = np.int_(np.concatenate((stimMatCond[2, :2],
+#                                           stimMatCond[:2, 2]),
+#                                          axis=0))
+# for count, i in enumerate(singleStimIndex):
+#     # correlation for the single Gabor b/w 2 units excluding trials where
+#     # spike counts exceeded 3 SD from mean
+#     skipTrials = []
+#     n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
+#     n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
+#     n1Zscore = stats.zscore(n1SpikeMat)
+#     n2Zscore = stats.zscore(n2SpikeMat)
+#     n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
+#     n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
+#     for x in n1SkipTrials:
+#         skipTrials.append(x)
+#     for x in n2SkipTrials:
+#         skipTrials.append(x)
+#     # print(skipTrials)
+#     goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
+#     singleStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
+#                                   spikeCountMat[n2, goodTrials, i])
+#
+#     # extract direction and contrast of the gabor
+#     loc0Dir = stimIndexDict[i][0]['direction']
+#     loc1Dir = stimIndexDict[i][1]['direction']
+#     loc0Con = stimIndexDict[i][0]['contrast']
+#     loc1Con = stimIndexDict[i][1]['contrast']
+#
+#     # n1 selectivity and suppression index based of Norm params
+#     loc0Dir0Resp = unitNormFitEstimate[n1][0]
+#     loc0Dir1Resp = unitPairedNormFit[n1][1]
+#     loc1Dir0Resp = unitNormFitEstimate[n1][2]
+#     loc1Dir1Resp = unitNormFitEstimate[n1][3]
+#     minRespN1 = np.where(unitNormFitEstimate[n1][:4] ==
+#                          min(unitNormFitEstimate[n1][:4]))[0]
+#     maxRespN1 = np.where(unitNormFitEstimate[n1][:4] ==
+#                          max(unitNormFitEstimate[n1][:4]))[0]
+#     if maxRespN1 < 2:
+#         n1PrefResp = 0
+#     else:
+#         n1PrefResp = 1
+#     if minRespN1 < 2:
+#         n1NonPrefSupp = unitNormFitEstimate[n1][4] / (
+#             unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
+#     else:
+#         n1NonPrefSupp = unitNormFitEstimate[n1][5] / (
+#             unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
+#     if loc0Con == 1:
+#         if loc0Dir0Resp > loc0Dir1Resp:
+#             n1Selectivity = (loc0Dir0Resp - loc0Dir1Resp) / (
+#                              loc0Dir0Resp + loc0Dir1Resp)
+#         else:
+#             n1Selectivity = (loc0Dir1Resp - loc0Dir0Resp) / (
+#                              loc0Dir0Resp + loc0Dir1Resp)
+#     else:
+#         if loc1Dir0Resp > loc1Dir1Resp:
+#             n1Selectivity = (loc1Dir0Resp - loc1Dir1Resp) / (
+#                              loc1Dir0Resp + loc1Dir1Resp)
+#         else:
+#             n1Selectivity = (loc1Dir1Resp - loc1Dir0Resp) / (
+#                              loc1Dir0Resp + loc1Dir1Resp)
+#
+#     # n2 selectivity and suppression index based of Norm params
+#     loc0Dir0Resp = unitNormFitEstimate[n2][0]
+#     loc0Dir1Resp = unitPairedNormFit[n2][1]
+#     loc1Dir0Resp = unitNormFitEstimate[n2][2]
+#     loc1Dir1Resp = unitNormFitEstimate[n2][3]
+#     minRespN2 = np.where(unitNormFitEstimate[n2][:4] ==
+#                          min(unitNormFitEstimate[n2][:4]))[0]
+#     maxRespN2 = np.where(unitNormFitEstimate[n2][:4] ==
+#                          max(unitNormFitEstimate[n2][:4]))[0]
+#     if maxRespN2 < 2:
+#         n2PrefResp = 0
+#     else:
+#         n2PrefResp = 1
+#     if minRespN2 < 2:
+#         n2NonPrefSupp = unitNormFitEstimate[n2][4] / (
+#                 unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
+#     else:
+#         n2NonPrefSupp = unitNormFitEstimate[n2][5] / (
+#                 unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
+#     if loc0Con == 1:
+#         if loc0Dir0Resp > loc0Dir1Resp:
+#             n2Selectivity = (loc0Dir0Resp - loc0Dir1Resp) / (
+#                     loc0Dir0Resp + loc0Dir1Resp)
+#         else:
+#             n2Selectivity = (loc0Dir1Resp - loc0Dir0Resp) / (
+#                     loc0Dir0Resp + loc0Dir1Resp)
+#     else:
+#         if loc1Dir0Resp > loc1Dir1Resp:
+#             n2Selectivity = (loc1Dir0Resp - loc1Dir1Resp) / (
+#                     loc1Dir0Resp + loc1Dir1Resp)
+#         else:
+#             n2Selectivity = (loc1Dir1Resp - loc1Dir0Resp) / (
+#                     loc1Dir0Resp + loc1Dir1Resp)
+#
+#     # pair selectivity, suppression index for single gabors
+#     pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
+#     pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+#     if n1PrefResp != n2PrefResp:
+#         pairSelectivity = -pairSelectivity
+#
+#     pairSingleCorr.append(singleStimCorr[0])
+#     pairSingleSelectivityIndex.append(pairSelectivity)
+#     pairSingleNonPrefSuppIndex.append(pairSuppression)
+
+# # indices and correlations for paired Gabor stimuli
+# for i in range(36):
+#
+#     # correlation for that Gabor pair b/w 2 units excluding trials where
+#     # spike counts exceeded 3 SD from mean
+#     skipTrials = []
+#     n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
+#     n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
+#     n1Zscore = stats.zscore(n1SpikeMat)
+#     n2Zscore = stats.zscore(n2SpikeMat)
+#     n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
+#     n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
+#     for x in n1SkipTrials:
+#         skipTrials.append(x)
+#     for x in n2SkipTrials:
+#         skipTrials.append(x)
+#     # print(skipTrials)
+#     goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
+#     pairStimCorr = stats.pearsonr(spikeCountMat[n1, goodTrials, i],
+#                                   spikeCountMat[n2, goodTrials, i])
+#     # print(pairStimCorr)
+#     #
+#     # pairStimCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, i],
+#     #                               spikeCountMat[n2, :blocksDone, i])
+#     # print(pairStimCorr)
+#
+#     # extract directions of the gabor pair
+#     loc0Dir = stimIndexDict[i][0]['direction']
+#     loc1Dir = stimIndexDict[i][1]['direction']
+#
+#     # # n1 selectivity and suppression based off of average spike counts
+#     # b = meanSpikeReshaped[n1][0] * 1000/trueStimDurMS
+#     # pairedMat = b[:36]
+#     # loc0Resp = b[loc0IndexArray[np.where(dirArray == loc0Dir)[0][0]]]
+#     # loc1Resp = b[loc1IndexArray[np.where(dirArray == loc1Dir)[0][0]]]
+#     # if loc0Resp > loc1Resp:
+#     #     # n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#     #     n1Selectivity = (loc0Resp - loc1Resp) / loc0Resp
+#     #     n1NonPrefSupp = abs(loc0Resp - pairedMat[i]) / (loc0Resp + pairedMat[i])
+#     #     n1PrefResp = 0
+#     # else:
+#     #     # n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#     #     n1Selectivity = (loc1Resp - loc0Resp) / loc1Resp
+#     #     n1NonPrefSupp = abs(loc1Resp - pairedMat[i]) / (loc1Resp + pairedMat[i])
+#     #     n1PrefResp = 1
+#     #
+#     # # n2 selectivity and suppression bvased off of average spike counts
+#     # b = meanSpikeReshaped[n2][0] * 1000/trueStimDurMS
+#     # pairedMat = b[:36]
+#     # loc0Resp = b[loc0IndexArray[np.where(dirArray == loc0Dir)[0][0]]]
+#     # loc1Resp = b[loc1IndexArray[np.where(dirArray == loc1Dir)[0][0]]]
+#     # if loc0Resp > loc1Resp:
+#     #     # n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#     #     n2Selectivity = (loc0Resp - loc1Resp) / loc0Resp
+#     #     n2NonPrefSupp = abs(loc0Resp - pairedMat[i]) / (loc0Resp + pairedMat[i])
+#     #     n2PrefResp = 0
+#     # else:
+#     #     # n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#     #     n2Selectivity = (loc1Resp - loc0Resp) / loc1Resp
+#     #     n2NonPrefSupp = abs(loc1Resp - pairedMat[i]) / (loc1Resp + pairedMat[i])
+#     #     n2PrefResp = 1
+#
+#     # n1 selectivity and suppression index based of Normalization params
+#     loc0Resp = unitNormFitEstimate[n1][np.where(dirArray == loc0Dir)[0][0]]
+#     loc1Resp = unitNormFitEstimate[n1][np.where(dirArray == loc1Dir)[0][0] + 6]
+#     if loc0Resp > loc1Resp:
+#         n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#         n1NonPrefSupp = unitNormFitEstimate[n1][13] / (
+#                         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+#         n1PrefResp = 0
+#         if abs(loc0Resp - n1PrefDir) > 180:
+#             n1Diff = 360 - abs(loc0Resp - n1PrefDir)
+#         else:
+#             n1Diff = abs(loc0Resp - n1PrefDir)
+#     else:
+#         n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#         n1NonPrefSupp = unitNormFitEstimate[n1][12] / (
+#                         unitNormFitEstimate[n1][13] + unitNormFitEstimate[n1][12])
+#         n1PrefResp = 1
+#         if abs(loc1Resp - n1PrefDir) > 180:
+#             n1Diff = 360 - abs(loc1Resp - n1PrefDir)
+#         else:
+#             n1Diff = abs(loc1Resp - n1PrefDir)
+#
+#     # n2 selectivity and suppression index
+#     loc0Resp = unitNormFitEstimate[n2][np.where(dirArray == loc0Dir)[0][0]]
+#     loc1Resp = unitNormFitEstimate[n2][np.where(dirArray == loc1Dir)[0][0] + 6]
+#     if loc0Resp > loc1Resp:
+#         n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#         n2NonPrefSupp = unitNormFitEstimate[n2][13] / (
+#                         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+#         n2PrefResp = 0
+#         if abs(loc0Resp - n2PrefDir) > 180:
+#             n2Diff = 360 - abs(loc0Resp - n2PrefDir)
+#         else:
+#             n2Diff = abs(loc0Resp - n2PrefDir)
+#     else:
+#         n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#         n2NonPrefSupp = unitNormFitEstimate[n2][12] / (
+#                         unitNormFitEstimate[n2][13] + unitNormFitEstimate[n2][12])
+#         n2PrefResp = 1
+#         if abs(loc1Resp - n2PrefDir) > 180:
+#             n2Diff = 360 - abs(loc1Resp - n2PrefDir)
+#         else:
+#             n2Diff = abs(loc1Resp - n2PrefDir)
+#
+#     # n1 NMI
+#     b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
+#     pairedMat = b[:6, :6].reshape(36)
+#     loc0Single = b[6, :6]
+#     loc1Single = b[:6, 6]
+#     loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
+#     loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
+#     n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
+#           (loc0SingleResp + loc1SingleResp) + pairedMat[i])
+#     n1SimpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
+#
+#     # n2 NMI
+#     b = meanSpikeReshaped[n2].reshape(7, 7) * 1000/trueStimDurMS
+#     pairedMat = b[:6, :6].reshape(36)
+#     loc0Single = b[6, :6]
+#     loc1Single = b[:6, 6]
+#     loc0SingleResp = loc0Single[np.where(dirArray == loc0Dir)[0]][0]
+#     loc1SingleResp = loc1Single[np.where(dirArray == loc1Dir)[0]][0]
+#     n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[i]) / (
+#           (loc0SingleResp + loc1SingleResp) + pairedMat[i])
+#     n2simpleNMI = pairedMat[i] / (loc0SingleResp + loc1SingleResp)
+#
+#     # pair selectivity, suppression, and NMI index
+#     pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
+#     pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+#     if n1PrefResp != n2PrefResp:
+#         pairSelectivity = -pairSelectivity
+#     pairNMI = (n1NMI + n2NMI) / 2
+#     pairSimpleNMI = np.sqrt(n1SimpleNMI * n2simpleNMI)
+#
+#     pairPairedCorr.append(pairStimCorr[0])
+#     pairSelectivityIndex.append(pairSelectivity)
+#     pairNonPrefSuppIndex.append(pairSuppression)
+#     pairNMIIndex.append(pairNMI)
+#     pairSimpleNMIIndex.append(pairSimpleNMI)
+#
+#     # appending pair Selectivity and pair NMI to get average
+#     # for the single Gabor figure
+#     neuronPairAvgSelectivity.append(pairSelectivity)
+#     if i in upperTriangle:
+#         neuronPairAvgNMIloc0.append(pairNMI)
+#     else:
+#         neuronPairAvgNMIloc1.append(pairNMI)
+
+# # indices and correlations for single Gabor b/w pair of neuron
+# for j in range(36, 48):
+#     pairSingCorr = stats.pearsonr(spikeCountMat[n1, :blocksDone, j],
+#                                   spikeCountMat[n2, :blocksDone, j])
+#
+#     # extract location and direction of tested gabor
+#     loc0Dir = stimIndexDict[j][0]['direction']
+#     loc0Con = stimIndexDict[j][0]['contrast']
+#     loc1Dir = stimIndexDict[j][1]['direction']
+#     loc1Con = stimIndexDict[j][1]['contrast']
+#     if loc0Con == 1:
+#         avgNMI = np.mean(neuronPairAvgNMIloc1)
+#     else:
+#         avgNMI = np.mean(neuronPairAvgNMIloc0)
+#
+#     pairSingleGaborNMI.append(avgNMI)
+#     pairSingleGaborSelectivity.append(np.mean(neuronPairAvgSelectivity))
+#     pairSingleCorr.append(pairSingCorr[0])
+
+# # n1 selectivity and suppression index based of Normalization params
+# loc0Resp = unitNormFitEstimate[n1][np.where(condArr == loc0Dir)[0][0]]
+# loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0] + 2]
+# if loc0Resp > loc1Resp:
+#     n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#     n1NonPrefSupp = unitNormFitEstimate[n1][5] / (
+#                     unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
+#     n1PrefResp = 0
+# else:
+#     n1Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#     n1NonPrefSupp = unitNormFitEstimate[n1][4] / (
+#                     unitNormFitEstimate[n1][4] + unitNormFitEstimate[n1][5])
+#     n1PrefResp = 1
+#
+# # n2 selectivity and suppression index
+# loc0Resp = unitNormFitEstimate[n2][np.where(condArr == loc0Dir)[0][0]]
+# loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0] + 2]
+# if loc0Resp > loc1Resp:
+#     n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+#     n2NonPrefSupp = unitNormFitEstimate[n2][5] / (
+#                     unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
+#     n2PrefResp = 0
+# else:
+#     n2Selectivity = (loc1Resp - loc0Resp) / (loc0Resp + loc1Resp)
+#     n2NonPrefSupp = unitNormFitEstimate[n2][4] / (
+#                     unitNormFitEstimate[n2][4] + unitNormFitEstimate[n2][5])
+#     n2PrefResp = 1
+#
+# # n1 NMI
+# b = meanSpikeReshaped[n1].reshape(7, 7) * 1000/trueStimDurMS
+# bCondensed = b[sli, :]
+# bCondensed = bCondensed[:, sli]
+# pairedMat = bCondensed[:2, :2].reshape(4)
+# loc0Single = bCondensed[2, :2]
+# loc1Single = bCondensed[:2, 2]
+# loc0SingleResp = loc0Single[np.where(condArr == loc0Dir)[0][0]]
+# loc1SingleResp = loc1Single[np.where(condArr == loc1Dir)[0][0]]
+# n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
+#       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
+# n1SimpleNMI = pairedMat[count] / (loc0SingleResp + loc1SingleResp)
+#
+# # n2 NMI
+# b = meanSpikeReshaped[n2].reshape(7, 7) * 1000/trueStimDurMS
+# bCondensed = b[sli, :]
+# bCondensed = bCondensed[:, sli]
+# pairedMat = bCondensed[:2, :2].reshape(4)
+# loc0Single = bCondensed[2, :2]
+# loc1Single = bCondensed[:2, 2]
+# loc0SingleResp = loc0Single[np.where(condArr == loc0Dir)[0][0]]
+# loc1SingleResp = loc1Single[np.where(condArr == loc1Dir)[0][0]]
+# n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
+#       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
+# n2simpleNMI = pairedMat[count] / (loc0SingleResp + loc1SingleResp)
+#
+# # pair selectivity, suppression, and NMI index
+# pairSelectivity = np.sqrt(n1Selectivity * n2Selectivity)
+# pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+# if n1PrefResp != n2PrefResp:
+#     pairSelectivity = -pairSelectivity
+# pairNMI = (n1NMI + n2NMI) / 2
+# pairSimpleNMI = np.sqrt(n1SimpleNMI * n2simpleNMI)
+#
+# pairPairedCorr.append(pairStimCorr[0])
+# pairSelectivityIndex.append(pairSelectivity)
+# pairNonPrefSuppIndex.append(pairSuppression)
+# pairNMIIndex.append(pairNMI)
+# pairSimpleNMIIndex.append(pairSimpleNMI)
+#
+# if i in stimIndex12Cond:
+#     pairSelFromCond.append(pairSelectivity)
+#     pairNPSuppFromCond.append(pairSuppression)
+#
+# # indices and correlations for single Gabor stimuli
+# singleStimIndex = np.int_(np.concatenate((stimMatCond[2, :2],
+#                                           stimMatCond[:2, 2]),
+#                                          axis=0))
+#
+# # loc 0 single Gabor corr
+# stimIndex = np.int_(stimMatCond[2, :][np.where(condArr == loc0Dir)[0][0]])
+# # correlation for that Gabor pair b/w 2 units excluding trials where
+# # spike counts exceeded 3 SD from mean
+# skipTrials = []
+# n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
+# n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
+# n1Zscore = stats.zscore(n1SpikeMat)
+# n2Zscore = stats.zscore(n2SpikeMat)
+# n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
+# n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
+# for x in n1SkipTrials:
+#     skipTrials.append(x)
+# for x in n2SkipTrials:
+#     skipTrials.append(x)
+# goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
+# singleStimLoc0Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
+#                                     spikeCountMat[n2, goodTrials, stimIndex])
+# pairSingleCorr.append(singleStimLoc0Corr[0])
+# pairSingleSelectivityIndex.append(pairSelectivity)
+# pairSingleNonPrefSuppIndex.append(pairSuppression)
+#
+# # loc 1 single Gabor corr
+# stimIndex = np.int_(stimMatCond[:, 2][np.where(condArr == loc1Dir)[0][0]])
+# # correlation for that Gabor pair b/w 2 units excluding trials where
+# # spike counts exceeded 3 SD from mean
+# skipTrials = []
+# n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
+# n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
+# n1Zscore = stats.zscore(n1SpikeMat)
+# n2Zscore = stats.zscore(n2SpikeMat)
+# n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
+# n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
+# for x in n1SkipTrials:
+#     skipTrials.append(x)
+# for x in n2SkipTrials:
+#     skipTrials.append(x)
+# goodTrials = [x for x in range(blocksDone) if x not in skipTrials]
+# singleStimLoc1Corr = stats.pearsonr(spikeCountMat[n1, goodTrials, stimIndex],
+#                                     spikeCountMat[n2, goodTrials, stimIndex])
+# pairSingleCorr.append(singleStimLoc1Corr[0])
+# pairSingleSelectivityIndex.append(pairSelectivity)
+# pairSingleNonPrefSuppIndex.append(pairSuppression)

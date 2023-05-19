@@ -34,14 +34,15 @@ import glob
 
 
 def loadMatFile73(NHP, date, fileName):
-    '''
+    """
     Loads the given matfile and assigns variables to access trial data
 
     Inputs: matfile name, (str)
     Outputs: variables, (nd.array)
-    '''
+    """
+
     os.chdir(f'../{NHP}/{date}/')
-    allTrials = mat73.loadmat(f'{fileName}', use_attrdict = True)
+    allTrials = mat73.loadmat(f'{fileName}', use_attrdict=True)
     allTrialsData = allTrials.trials
     header = allTrials.header
 
@@ -49,12 +50,13 @@ def loadMatFile73(NHP, date, fileName):
 
 
 def loadMatFilePyMat(NHP, date, fileName):
-    '''
+    """
     Loads the given matfile and assigns variables to access trial data
 
     Inputs: NHP (monkey Name), date of data collection (str), fileName (str)
     Outputs: variables, (dict)
-    '''
+    """
+
     os.chdir(f'../{NHP}/{date}/')
     allTrials = read_mat(f'{fileName}')
     allTrialsData = allTrials['trials']
@@ -64,14 +66,14 @@ def loadMatFilePyMat(NHP, date, fileName):
 
 
 def loadMatFile(fileName):
-    '''
+    """
     Loads the given matfile and assigns variables to access trial data
 
     Inputs: matfile name, (str)
     Outputs: variables, (nd.array)
-    '''
+    """
     
-    allTrials = sp.loadmat(f'../Matlab Data/{fileName}', squeeze_me = True)
+    allTrials = sp.loadmat(f'../Matlab Data/{fileName}', squeeze_me=True)
     allTrialsData = allTrials['trials']
     header = allTrials['header']
 
@@ -79,12 +81,13 @@ def loadMatFile(fileName):
 
 
 def correctTrialsGRF(allTrials):
-    '''
+    """
     fn that will filter for correct non-instruct trials (valid) in GRF
 
     inputs: allTrials (list of trials)
     outputs: correctTrials (list): index of valid trials from allTrials
-    '''
+    """
+
     correctTrials = []
     for trialCount, currTrial in enumerate(allTrials):
         trial = currTrial['trial']['data']
@@ -96,14 +99,15 @@ def correctTrialsGRF(allTrials):
 
 
 def correctTrialsMTX(allTrials):
-    '''
+    """
     Function will filter through allTrials and return a list of 
     correct non-instruct trials in MTN/MTC. This function checks
     for valid trialCertify trials (!=0)
 
     Inputs: allTrials (list of trials (nd.array))
     Outputs: correctTrials(list): index of valid trials from allTrials
-    '''
+    """
+
     correctTrials = []
     for trialCount, currTrial in enumerate(allTrials):
         trial = currTrial['trial']['data']
@@ -116,7 +120,7 @@ def correctTrialsMTX(allTrials):
 
 
 def unitPrefNullDir(bSmooth):
-    '''
+    """
     function will return the units preferred and null direction based
     off of the maximum response at either location when there is only one 
     stimulus.
@@ -126,22 +130,23 @@ def unitPrefNullDir(bSmooth):
         meanSpikeReshaped: array of meanSpike counts for each stimulusIndex
     Outputs:
         prefDirection, nullDirection: the preferred and null direction for the neuron
-    '''
-    dirArray = np.array([0,60,120,180,240,300])
+    """
 
-    maxLoc0 = max(bSmooth[6,:6])
-    maxLoc1 = max(bSmooth[:6,6])
+    dirArray = np.array([0, 60, 120, 180, 240, 300])
+
+    maxLoc0 = max(bSmooth[6, :6])
+    maxLoc1 = max(bSmooth[:6, 6])
     if maxLoc0 > maxLoc1:
-        prefDirection = dirArray[np.where(bSmooth[6,:]==maxLoc0)[0][0]]
+        prefDirection = dirArray[np.where(bSmooth[6, :] == maxLoc0)[0][0]]
     else:
-        prefDirection = dirArray[np.where(bSmooth[:,6]==maxLoc1)[0][0]]
-    nullDirection = (prefDirection + 180)%360
+        prefDirection = dirArray[np.where(bSmooth[:, 6] == maxLoc1)[0][0]]
+    nullDirection = (prefDirection + 180) % 360
 
     return prefDirection, nullDirection 
 
 
-def histSpikes(stimOnTimeS,stimOffTimeS,histPrePostMS,unitTimeStamps):
-    '''
+def histSpikes(stimOnTimeS, stimOffTimeS, histPrePostMS, unitTimeStamps):
+    """
     Function will extract the time a unit spikes within the histogram window
     during a stimulus presentation. 
 
@@ -153,21 +158,22 @@ def histSpikes(stimOnTimeS,stimOffTimeS,histPrePostMS,unitTimeStamps):
     
     Outputs:
         histStimSpikes: index values for when the unit fired within the hist window 
-    '''
+    """
 
     stimOnPreSNEV = stimOnTimeS - histPrePostMS/1000
     stimOffPostSNEV = stimOffTimeS + histPrePostMS/1000
     histStimSpikes = unitTimeStamps[((unitTimeStamps >= stimOnPreSNEV) &
-                     (unitTimeStamps < stimOffPostSNEV))] - stimOnPreSNEV
+                                    (unitTimeStamps < stimOffPostSNEV))] - stimOnPreSNEV
     histStimSpikes = np.int32(histStimSpikes*1000)
 
     return histStimSpikes
 
 
 def gauss(x, H, A, x0, sigma):
-    '''
+    """
     equation for gaussian fit
-    '''
+    """
+
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 
@@ -178,43 +184,43 @@ def gaussFit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
-                   bounds=((0, 0, 0, 0),
-                           (np.inf, 1.50*np.max(y), np.inf, np.inf)))
+                           bounds=((0, 0, 0, 0),
+                                   (np.inf, 1.50*np.max(y), np.inf, np.inf)))
     return popt
 
 
 def gauss2dParams(neuronTuningMat):
-    '''
+    """
     function will return the parameters to fit a 2D gaussian
     onto the neuron RF location heatmap
     returns mean vector (meanVec) and covariance matrix (covMat)
     http://prob140.org/sp18/textbook/notebooks-md/24_01_Bivariate_Normal_Distribution.html
-    '''
+    """
 
     com = ndimage.center_of_mass(neuronTuningMat)
     p_init = models.Gaussian2D(amplitude=1, x_mean=com[1], y_mean=com[0], x_stddev=None, 
-                            y_stddev=None, theta=None, cov_matrix=None)
+                               y_stddev=None, theta=None, cov_matrix=None)
     yi, xi = np.indices(neuronTuningMat.shape)
     fit_p = fitting.LevMarLSQFitter()
-    p = fit_p(p_init,xi,yi,neuronTuningMat)
+    p = fit_p(p_init, xi, yi, neuronTuningMat)
 
     theta = p.theta[0] * 180/np.pi
     xStdDev = p.x_stddev[0]
     yStdDev = p.y_stddev[0]
     xMean = p.x_mean[0]
     yMean = p.y_mean[0]
-    amp = p.amplitude[0]
+    # amp = p.amplitude[0]
 
     rho = np.cos(theta)
-    covMat = np.array([[xStdDev**2,rho*xStdDev*yStdDev],
-                    [rho*xStdDev*yStdDev,yStdDev**2]])
-    meanVec = np.array([[xMean],[yMean]])
+    covMat = np.array([[xStdDev**2, rho*xStdDev*yStdDev],
+                      [rho*xStdDev*yStdDev, yStdDev**2]])
+    meanVec = np.array([[xMean], [yMean]])
 
     return meanVec, covMat, p
 
 
 def bhattCoef(m1, m2, v1, v2):
-    '''
+    """
     This function will compute the Bhattacharyya Coefficient of two 
     tuning curves. The BC measures how similar two normal distributions are. 
 
@@ -225,7 +231,7 @@ def bhattCoef(m1, m2, v1, v2):
         v2 (float) - variance of the second tuning curve
     Outputs: 
         BC (float) - a value b/w 0 and 1 that defines how similar the curves are.
-    '''
+    """
 
     BD = (1/4*np.log(1/4*((v1/v2) + (v2/v1) + 2))) + \
          (1/4*(((m1-m2)**2)/(v1+v2)))
@@ -235,7 +241,7 @@ def bhattCoef(m1, m2, v1, v2):
 
 
 def bhattCoef2D(m1, m2, cov1, cov2):
-    '''
+    """
     This function will compute the Bhattacharyya Coefficient for two
     2D-Gaussian distriutions. This is used to measure how much overlap there
     is between two receptive fields.
@@ -247,7 +253,7 @@ def bhattCoef2D(m1, m2, cov1, cov2):
         cov2 (np.array) - covariance matrix of the second 2D Gaussian
     Outputs:
         BC (float) - a value b/w 0 and 1 that defines how similar the curves are
-    '''
+    """
 
     meanDiff = m1 - m2
     sigma = (cov1 + cov2)/2
@@ -255,7 +261,7 @@ def bhattCoef2D(m1, m2, cov1, cov2):
     detCov1 = np.linalg.det(cov1)
     detCov2 = np.linalg.det(cov2)
 
-    X = 1/8 * np.dot(np.dot(np.transpose(meanDiff),inv(sigma)), meanDiff)
+    X = 1/8 * np.dot(np.dot(np.transpose(meanDiff), inv(sigma)), meanDiff)
     Y = 1/2 * np.log(detSigma/np.sqrt(detCov1 * detCov2))
     BD = X + Y
     BC = np.exp(-BD)
@@ -264,9 +270,9 @@ def bhattCoef2D(m1, m2, cov1, cov2):
     
 
 def smooth(y, box_pts):
-    '''
+    """
     moving point average
-    '''
+    """
     box = np.ones(box_pts)/box_pts
     y_smooth = np.convolve(y, box, mode='valid')
     return y_smooth
@@ -290,27 +296,28 @@ def rejectOutliers(data, m=2.):
     d = np.abs(data - np.median(data))
     mdev = np.median(d)
     s = d/mdev if mdev else 0.
-    return data[s<m]
+    return data[s < m]
 
 
-def spikeHistIndex(loc0Dir,loc0Con, loc1Dir, loc1Con):
-    '''
+def spikeHistIndex(loc0Dir, loc0Con, loc1Dir, loc1Con):
+    """
     function will return the index for the each stimulus type PSTH
-    '''
+    """
+
     histIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == nullDir) & 
     (stimIndexDF['loc0 Contrast'] == lowC) & (stimIndexDF['loc1 Direction'] == nullDir)
     & (stimIndexDF['loc1 Contrast'] == lowC)][0]
     return histIndex
 
 
-def fieldInTrial(fieldList, trial = None):
-    '''
+def fieldInTrial(fieldList, trial=None):
+    """
     Function will check whether all fields in a list are in the trial
     
     Inputs: trial (data struct from MATLAB)
             list of fields (list)
     Outputs: bool
-    '''
+    """
     if trial == None:
         trial = currTrial
 
@@ -322,13 +329,13 @@ def fieldInTrial(fieldList, trial = None):
 
 
 def targetOnsetIndexStimDesc(stimDesc):
-    '''
+    """
     fn will identify the index of the target onset stimulus
     fn will put out ListTypes subdictionary within stimDesc 
     
     Inputs: stimDesc (variable)
     Outputs: the index of the target onset stim (int)
-    '''
+    """
 
     for count, d in enumerate(stimDesc['listTypes']):
                 if 2 in d:
@@ -339,12 +346,13 @@ def targetOnsetIndexStimDesc(stimDesc):
 
 
 def eyePosDurTrial(currTrial):
-    '''
+    """
     fn will return a defaultdict with the converted x,y deg for each eye
 
     Inputs: trial (nd.array)
     Outputs: defaultdict
-    '''
+    """
+
     eyesXYDeg = defaultdict(list)
     eyeLX = currTrial['eyeLXData']['data']
     eyeLY = currTrial['eyeLYData']['data']
@@ -386,14 +394,14 @@ def activeUnits(unitData, allTrials):
 
 
 def dirClosestToPref(unitPrefDir):
-    '''
+    """
     function will take the unit's pref direction (based off gaussian fit)
     and return the directed tested that is closest to the preferred direction
 
     Inputs: unitPrefDir (unit's preferred direction)
     Outputs: prefDir, nullDir (unit's preferred and null direction from
             directions tested)
-    '''
+    """
 
     extDirArray = np.array([0,60,120,180,240,300,360])
     tempArr = abs(extDirArray-unitPrefDir)
@@ -452,10 +460,10 @@ def fixedValsForGenericNorm(stimMatReIndex, stimIndexDict):
 
 
 def fixedValsForEMSGen(stimMatReIndex, stimIndexDict):
-    '''
+    """
     function will create the fixed values for running the
     generic EMS normazliation curve_fit
-    '''
+    """
 
     c0s, c1s, l0s, l1s = [], [], [], []
     direction_set = np.arange(0, 360, 60)
@@ -548,10 +556,10 @@ def fixedValsForPairedStimL0L6(stimMatReIndex, stimIndexDict, L0L6Resp):
 
 
 def fixedValsForEMSGenCondensed(stimMatReIndex, stimIndexDict, nullDir, prefDir):
-    '''
+    """
     function will create the fixed values for running the
     generic EMS normazliation curve_fit
-    '''
+    """
 
     c0s, c1s, l0s, l1s = [], [], [], []
     directionSet = np.array([nullDir, prefDir])
@@ -646,14 +654,14 @@ def fixedValsCurveFitForPairedStim(prefDir, stimMatReIndex, stimIndexDict, gPara
 
 
 def fixedValsForCurveFit(prefDir, stimMatReIndex, stimIndexDict):
-    '''
+    """
     function will take in the sequence of stimulus indexes to be fit
     and return the fixed values for that position:
     loc 0: contrast
     loc 0: direction
     loc 1: contrast
     loc 1: direction
-    '''
+    """
 
     fixedVals = []
     if type(stimMatReIndex) == int:
@@ -745,7 +753,7 @@ def unitsInfo(units, corrTrials, allTrials):
 
 
 def insertStimSpikeData(units, index, stimOnTimeSNEV):
-    '''
+    """
     this function will generate a poisson spike train and return the normalized
     response for the RF for a given stimulus configuration
     Inputs:
@@ -756,7 +764,7 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
         RFSpikes: normalized response 
 
     spikes_4rows = np.tile(spikes, (4,1))
-    '''
+    """
 
     numNeurons = len(units)
 
@@ -797,7 +805,7 @@ def insertStimSpikeData(units, index, stimOnTimeSNEV):
             ['channel'], [channelIdentity] * len(spikeTimeMS), 0)
 
 
-def poissonArrivals(stimOnTimeS,lam, duration, doDecay=False, doRamp=False):
+def poissonArrivals(stimOnTimeS, lam, duration, doDecay=False, doRamp=False):
 
     # Decay lambda over the duration of the spike generation period
     a = -lam / (2 * duration**2)
@@ -815,7 +823,7 @@ def poissonArrivals(stimOnTimeS,lam, duration, doDecay=False, doRamp=False):
 
 
 def randTuningCurve(numNeurons):
-    '''
+    """
     Functon will generate random tuning cruves for x number of neurons.
     Function will also iterate through tuning curves to create dictionary of
     responses to each direction for each neuron
@@ -827,19 +835,20 @@ def randTuningCurve(numNeurons):
                               neuron
         tcDictionary (dictionary): maps each neurons response for a direction onto
                                    a dictionary
-    '''
+    """
+
     tuningMat = np.zeros((numNeurons + 1, 6))
-    tuningMat[0] = np.arange(360,720,60)
+    tuningMat[0] = np.arange(360, 720, 60)
     tcDictionary = {}
 
     for i in range(1, tuningMat.shape[0]):
         np.random.seed(i)
-        amp = np.random.randint(15,30)
-        y_translate = np.random.randint(30,50)
-        x_translate = np.random.randint(60,120)
-        tuningMat[i,:] = (amp * np.sin((tuningMat[0,:] * (np.pi / 180)) + x_translate)) + y_translate
+        amp = np.random.randint(15, 30)
+        y_translate = np.random.randint(30, 50)
+        x_translate = np.random.randint(60, 120)
+        tuningMat[i, :] = (amp * np.sin((tuningMat[0, :] * (np.pi / 180)) + x_translate)) + y_translate
 
-    for i, neuron in enumerate(tuningMat[1:,:]):
+    for i, neuron in enumerate(tuningMat[1:, :]):
         tcDictionary[i+1] = {}
         for j, dirResp in enumerate(neuron):
             tcDictionary[i+1][tuningMat[0][j]] = dirResp
@@ -847,44 +856,46 @@ def randTuningCurve(numNeurons):
     return tuningMat, tcDictionary
 
 
-def vonMises(x,x0,conc,I0):
-    '''
+def vonMises(x, x0, conc, I0):
+    """
     equation for a Von Mises fit
-    '''
+    """
+
     return (np.exp(conc * np.cos(x - x0))) / (2*np.pi*I0*conc)
 
 
-def vonMisesMatt(x,phase, kappa):
+def vonMisesMatt(x, phase, kappa):
     # Von mises distribution
     z = np.exp(kappa * phase) / np.exp(kappa)
     return z / np.mean(z)
 
 
-def vonMisesFit(x,y):
-    '''
+def vonMisesFit(x, y):
+    """
     apply curve_fit from scipy.optimize
-    '''
+    """
 
-    popt, pcov = curve_fit(vonMises, x,y)
+    popt, pcov = curve_fit(vonMises, x, y)
     return popt
 
 
-def logNormal(x,H,A,x0,sigma):
+def logNormal(x, H, A, x0, sigma):
     """
     equation for log-normal fot
     """
     return H + A * np.exp(-(x-x0)**2 / (2*sigma**2))
 
 
-def logNormalFit(x,y):
-    '''
+def logNormalFit(x, y):
+    """
     apply curve_fit from scipy.optimize to fit a lognormal
     curve to speed tuning data
-    '''
+    """
+
     x = np.log2(x)
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
-    popt,pcov = curve_fit(gauss,x,y, p0=[min(y), max(y), mean, sigma])
+    popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
 
@@ -925,7 +936,7 @@ def driverFuncCondensend1(x, fixedVals, resp):
 
 
 def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
-                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300,
+                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, al0,
                         al1):
     """
     this function applies the generic normalization equation without a scalar
@@ -936,17 +947,17 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
 
-    # generic norm
-    num = ((c0 * L0 * l0).sum(-1) + (c1 * L1 * l1).sum(-1))
-    denom = ((1 * c0[:, 0]) + (al1 * c1[:, 0]))
-
-    return num/denom
-
-    # # ems
-    # loc0 = ((c0 * L0 * l0).sum(-1)) / (c0[:, 0] + (al1 * c1[:, 0]))
-    # loc1 = ((c1 * L1 * l1).sum(-1)) / ((1 * c0[:, 0]) + c1[:, 0])
+    # # generic norm
+    # num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
+    # denom = (((al0 ** 2) * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
     #
-    # return loc0 + loc1
+    # return num/denom
+
+    # ems
+    loc0 = ((c0 * (L0 ** 2) * l0).sum(-1)) / (c0[:, 0] + ((al1 ** 2) * c1[:, 0]))
+    loc1 = ((c1 * (L1 ** 2) * l1).sum(-1)) / (((al0 ** 2) * c0[:, 0]) + c1[:, 0])
+
+    return loc0 + loc1
 
 
 def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1):
@@ -965,11 +976,11 @@ def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1):
     return num / denom
 
     # # ems
-    # loc0 = (c0 * (l0 * L0)).sum(-1) / (
-    #         c0[:, 0] + (c1[:, 0] * al1))
+    # loc0 = (c0 * (l0 * (L0 ** 2))).sum(-1) / (
+    #         c0[:, 0] + (c1[:, 0] * (al1 ** 2)))
     #
-    # loc1 = (c1 * (l1 * L1)).sum(-1) / (
-    #        (c0[:, 0] * al0) + c1[:, 0])
+    # loc1 = (c1 * (l1 * (L1 ** 2))).sum(-1) / (
+    #        (c0[:, 0] * 1) + c1[:, 0])
     #
     # return loc0 + loc1
 
@@ -1115,7 +1126,96 @@ def generateTwoCorrArrays(numSamples, corr):
     y = mu_y + sigma_y * (rho*S1 + np.sqrt(1-rho**2)*S2)
 
     return x.flatten(), y.flatten()
-## END HERE
+
+
+def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat):
+    """
+    this function will return the pearson's correlation coefficient
+    between a pair of neuron's spike counts to a stimulus condition.
+    will also return the covariance and SD (numerator/denominator of the
+    correlation equation). This function will z-score the spike counts
+    for each neuron and exclude trials that are larger than abs(3).
+
+    Inputs: n1SpikeMat/n2SpikeMat: the spike counts for each neuron (array)
+    Outputs: pairCorr: pearson's correlation coeff (int)
+             pairCov: covariance
+
+    """
+
+    skipTrials = []
+    n1Zscore = stats.zscore(n1SpikeMat)
+    n2Zscore = stats.zscore(n2SpikeMat)
+    n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
+    n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
+    for x in n1SkipTrials:
+        skipTrials.append(x)
+    for x in n2SkipTrials:
+        skipTrials.append(x)
+    goodTrials = [x for x in range(len(n1SpikeMat)) if x not in skipTrials]
+    pairStimCorr = stats.pearsonr(n1SpikeMat[goodTrials],
+                                  n2SpikeMat[goodTrials])[0]
+    pairDCov = np.cov(n1SpikeMat[goodTrials],
+                      n2SpikeMat[goodTrials], ddof=1)
+    pairDSD = (np.std(n1SpikeMat[goodTrials], ddof=1) *
+               np.std(n2SpikeMat[goodTrials], ddof=1))
+
+    return pairStimCorr, pairDCov, pairDSD
+
+
+def reIndexedRespMat(b, reIndex):
+    """
+    this function will take the 6x6 (nxn) stimMat matrix for each neuron
+    and reIndex it so that the null direction for that neuron is in the top
+    left corner
+    Inputs: b (2D np.array) - the stimMat matrix for that neuron
+            reIndex (np.array) - array that gives reindex operation
+    Outputs: bReIndex (2D np.array) - reIndexed stimMat matrix
+    """
+
+    bReIndex = np.zeros((7, 7))
+    tempMain = b[:6, :6][:, reIndex]
+    tempMain = tempMain[:6, :6][reIndex, :]
+    temp0Blank = b[:6, 6][reIndex]
+    temp1Blank = b[6, :6][reIndex]
+    bReIndex[:6, :6] = tempMain
+    bReIndex[:6, 6] = temp0Blank
+    bReIndex[6, :6] = temp1Blank
+    bReIndex[6, 6] = b[6, 6]
+
+    return bReIndex
+
+
+def reIndexedStimMat(reIndex):
+    """
+    this function will return the 6x6 grid of stimMat indices as well
+    as the reIndexed version of the stimMat indices.
+    Inputs: reIndex (np.array) - array that gives reindex operation
+    Outputs: stimMat (2D np.array) - indices of stimMat 6x6
+             stimMatReIndex (2D np.array) - indices of stimMat reIndex 6x6
+    """
+
+    # fixed (independent) variables - matrix of corresponding stim Indexes
+    stimMat = np.zeros((7, 7))
+    stimMat[:6, :6] = np.arange(36).reshape(6, 6)
+    stimMat[6, :6] = np.arange(36, 42)
+    stimMat[:, 6] = np.arange(42, 49)
+
+    # reshape fixed variables to match dependent variables (reIndexed)
+    stimMatReIndex = np.zeros((7, 7))
+    tempMain = stimMat[:6, :6][:, reIndex]
+    tempMain = np.squeeze(tempMain[:6, :6][reIndex, :])
+    temp0Blank = stimMat[:6, 6][reIndex]
+    temp1Blank = stimMat[6, :6][reIndex]
+    stimMatReIndex[:6, :6] = tempMain
+    stimMatReIndex[:6, 6] = temp0Blank
+    stimMatReIndex[6, :6] = temp1Blank
+    stimMatReIndex[6, 6] = stimMat[6, 6]
+
+    return stimMat, stimMatReIndex
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# END HERE
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 ''' function fitting working 
 

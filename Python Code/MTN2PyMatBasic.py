@@ -41,7 +41,7 @@ medFRParams = []
 lowFRAlpha = []
 lowFRParams = []
 gaborSigmaSep = []
-# arrays for nn, pn, np, pp, and basline PSTHs
+# arrays for nn, pn, np, pp, and baseline PSTHs
 ppArr = []
 pnArr = []
 npArr = []
@@ -59,6 +59,11 @@ npZscoSpikeCounts = []
 popRespHeatmap = []
 electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
 pairDistance = []
+# ruff and cohen 2016 analysis arr
+allNMIAvg = []
+alln1n2CorrAvg = []
+n1n2NMISimIndx = []
+n1n2ElectrodeDiff = []
 
 for fileIterator in fileList:
 
@@ -454,6 +459,9 @@ for fileIterator in fileList:
     singleNewSelectivity = []
     # initialize lists for blank Gabor presentations
     pairBlankCorr = []
+    # initialize lists for ruff and cohen 2016 (NMI vs corr - zscored)
+    dayNMI = []
+    dayCorr = []
 
     # temp mats for ranking each unit's alpha based off FR for each axis
     # alphaRankMat = np.zeros((len(units), 6, 3))
@@ -659,13 +667,18 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        for pairCount, pair in enumerate(distCombs):
+        for pairCount, pair in enumerate(combs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
             # unit's preferred directions
             n1PrefDir = unitGaussMean[n1]
             n2PrefDir = unitGaussMean[n2]
+
+            # ruff and cohen 2016 nmi vs corr reproduction
+            n1NMIArr = []
+            n2NMIArr = []
+            n1n2Corr = []
 
             # indices and correlations for paired Gabor stimuli
             for count, i in enumerate(np.int_(stimMatCond[:2, :2].reshape(4))):
@@ -730,41 +743,21 @@ for fileIterator in fileList:
                 # n1 selectivity and suppression index
                 loc0Resp = unitNormFitEstimate[n1][np.where(condArr == loc0Dir)[0][0]]
                 loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0] + 2]
-                n1Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                if n1Selectivity >= 0:
-                    # n1NonPrefSupp = (unitNormFitEstimate[n1][5]) / (
-                    #         unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
-                    n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
-                            1 + unitNormFitEstimate[n1][4])
-                    n1NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
-                else:
-                    # n1NonPrefSupp = (unitNormFitEstimate[n1][4]) / (
-                    #         unitNormFitEstimate[n1][5] + unitNormFitEstimate[n1][4])
-                    n1NonPrefSupp = 1 / (
-                            1 + unitNormFitEstimate[n1][4])
-                    n1NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
+                al0 = 1
+                al1 = unitNormFitEstimate[n1][4]
+                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, al0, al1)
 
                 # n2 selectivity and suppression index
                 loc0Resp = unitNormFitEstimate[n2][np.where(condArr == loc0Dir)[0][0]]
                 loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0] + 2]
-                n2Selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
-                if n2Selectivity >= 0:
-                    # n2NonPrefSupp = (unitNormFitEstimate[n2][5]) / (
-                    #         unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
-                    n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
-                            1 + unitNormFitEstimate[n2][4])
-                    n2NewSelectivity = loc0Resp / (loc0Resp + loc1Resp)
-                else:
-                    # n2NonPrefSupp = (unitNormFitEstimate[n2][4]) / (
-                    #         unitNormFitEstimate[n2][5] + unitNormFitEstimate[n2][4])
-                    n2NonPrefSupp = 1 / (
-                            1 + unitNormFitEstimate[n2][4])
-                    n2NewSelectivity = loc1Resp / (loc0Resp + loc1Resp)
+                al0 = 1
+                al1 = unitNormFitEstimate[n2][4]
+                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, al0, al1)
 
                 # # pair selectivity, suppression, and NMI index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                    np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
-                pairNewSelectivity = np.sqrt(n1NewSelectivity * n2NewSelectivity)
+                pairNewSelectivity = 1
                 # pairSuppression = (abs(n1NonPrefSupp - n2NonPrefSupp)) / (
                 #                       n1NonPrefSupp + n2NonPrefSupp)
                 pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
@@ -786,6 +779,11 @@ for fileIterator in fileList:
                 pairNMIIndex.append(pairNMI)
                 pairSimpleNMIIndex.append(pairSimpleNMI)
                 pairRawSelectivityIndex.append(pairRawSelectivity)
+
+                # ruff and cohen 2016
+                n1n2Corr.append(pairStimCorr)
+                n1NMIArr.append(n1SimpleNMI)
+                n2NMIArr.append(n2SimpleNMI)
 
                 if i in stimIndex12Cond:
                     pairSelFromCond.append(pairSelectivity)
@@ -841,6 +839,31 @@ for fileIterator in fileList:
                 blankCorr, blankCov, blankSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
 
                 pairBlankCorr.append(blankCorr)
+
+            n1n2NMIAvg = np.mean(np.array([n1NMIArr, n2NMIArr]).flatten())
+            n1n2CorrAvg = np.nanmean(n1n2Corr)
+
+            # n1NMI n2NMI similarity index (n1-n2/n1+n2)
+            n1n2NMISim = abs(np.mean(n1NMIArr) - np.mean(n2NMIArr)) / (
+                             np.mean(n1NMIArr) + np.mean(n2NMIArr))
+
+            n1Chan = unitsChannel[n1]
+            n2Chan = unitsChannel[n2]
+            n1ElectrodePos = np.where(electrodeArr == n1Chan)[0][0]
+            n2ElectrodePos = np.where(electrodeArr == n2Chan)[0][0]
+            pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
+
+            n1n2NMISimIndx.append(n1n2NMISim)
+            n1n2ElectrodeDiff.append(pairDistOnElectrode * 50)
+            dayNMI.append(n1n2NMIAvg)
+            dayCorr.append(n1n2CorrAvg)
+
+    # ruff and cohen 2016
+    dayNMIZscore = stats.zscore(dayNMI)
+    dayCorrZscore = stats.zscore(dayCorr)
+    for i in range(len(dayNMIZscore)):
+        allNMIAvg.append(dayNMIZscore[i])
+        alln1n2CorrAvg.append(dayCorrZscore[i])
 
     pairDoubleCov = np.array(pairDoubleCov)
     pairDoubleSd = np.array(pairDoubleSD)
@@ -986,7 +1009,6 @@ pnZscoSpikeCounts = [ele for i in pnZscoSpikeCounts for ele in i]
 npZscoSpikeCounts = [ele for i in npZscoSpikeCounts for ele in i]
 plt.hist(pnZscoSpikeCounts, bins=50); plt.show()
 plt.hist(npZscoSpikeCounts, bins=50); plt.show()
-
 
 
 # SUPERPLOT OF PSTH, Normalization (pref+null+blank) heatmap, and bar plot

@@ -81,7 +81,8 @@ ax.fill_between(x, smoothPlotNP - semSmoothNP, smoothPlotNP + semSmoothNP,
 ax.plot(smoothPlotNN, linestyle='solid', color='grey', label='NN')
 ax.fill_between(x, smoothPlotNN - semSmoothNN,
                 smoothPlotNN + semSmoothNN, alpha=0.1, color='grey')
-ax.plot(smoothBase, linestyle='solid', color='black', label='Baseline', linewidth=0.5)
+ax.plot(smoothBase, linestyle='solid', color='black', label='Baseline',
+        linewidth=0.5)
 ax.fill_between(x, smoothBase - semSmoothBase,
                 smoothBase + semSmoothBase, alpha=0.1, color='black')
 ax.set_xticks([0,
@@ -110,7 +111,8 @@ ax2.fill_between(x, smoothPlotPN - semSmoothPN, smoothPlotPN + semSmoothPN,
 ax2.plot(smoothPlotN1, linestyle='solid', color='grey', label='N1')
 ax2.fill_between(x, smoothPlotN1 - semSmoothN1,
                  smoothPlotN1 + semSmoothN1, alpha=0.1, color='grey')
-ax2.plot(smoothBase, linestyle='solid', color='black', label='Baseline', linewidth=0.5)
+ax2.plot(smoothBase, linestyle='solid', color='black', label='Baseline',
+         linewidth=0.5)
 ax2.fill_between(x, smoothBase - semSmoothBase,
                  smoothBase + semSmoothBase, alpha=0.1, color='black')
 ax2.set_xticks([0,
@@ -138,7 +140,8 @@ ax3.fill_between(x, smoothPlotNP - semSmoothNP, smoothPlotNP + semSmoothNP,
 ax3.plot(smoothPlotN0, linestyle='solid', color='grey', label='N0')
 ax3.fill_between(x, smoothPlotN0 - semSmoothN0,
                  smoothPlotN0 + semSmoothN0, alpha=0.1, color='grey')
-ax3.plot(smoothBase, linestyle='solid', color='black', label='Baseline', linewidth=0.5)
+ax3.plot(smoothBase, linestyle='solid', color='black', label='Baseline',
+         linewidth=0.5)
 ax3.fill_between(x, smoothBase - semSmoothBase,
                  smoothBase + semSmoothBase, alpha=0.1, color='black')
 ax3.set_xticks([0,
@@ -156,7 +159,8 @@ ax3.set_xticklabels([-histPrePostMS, 0, 50, 0 + trueStimDurMS,
 ax3.legend()
 ax3.set_ylim([0, 1])
 
-fig.suptitle('gabor sigma sep > 25th percentile and < 50th gabor sigma sep', fontsize=20)
+fig.suptitle('gabor sigma sep > 25th percentile and < 50th gabor sigma sep',
+             fontsize=20)
 plt.show()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -488,6 +492,115 @@ ax.set_ylim(bottom=0)
 ax.set_title(f'Equal sized bins ({n}) of gabor distance from RF center vs NMI')
 plt.show()
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# ruff and cohen 2016, norm vs correlation plot and norm vs pair distance plot
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+allNMIAvg = np.array(allNMIAvg)
+alln1n2CorrAvg = np.array(alln1n2CorrAvg)
+n1n2NMISimIndx = np.array(n1n2NMISimIndx)
+n1n2ElectrodeDiff = np.array(n1n2ElectrodeDiff)
+
+# exclude elements that are > 3 NMI
+filt = np.where(allNMIAvg <= 3)[0]
+filtNMI = allNMIAvg[filt]
+filtCorr = alln1n2CorrAvg[filt]
+
+sortIndex = np.argsort(filtNMI)
+sortedNMI = filtNMI[sortIndex]
+sortedCorr = filtCorr[sortIndex]
+
+# manual bins - equally populated bins
+n = 2500
+equalBinsNMI = [sortedNMI[i:i + n] for i in range(0, len(sortedNMI), n)]
+equalBinsCorr = [sortedCorr[i:i + n] for i in range(0, len(sortedCorr), n)]
+binMeanNMI = np.array([np.mean(i) for i in equalBinsNMI])
+binMeanCorr = np.array([np.mean(i) for i in equalBinsCorr])
+
+# polynomial fit
+a, b = np.polyfit(binMeanNMI, binMeanCorr, 1)
+
+# figure
+fig, ax = plt.subplots()
+ax.plot(binMeanNMI, binMeanCorr)
+ax.scatter(binMeanNMI, binMeanCorr)
+# ax.plot(binMeanNMI, (a*binMeanNMI+b))
+ax.set_xlabel('NMI')
+ax.set_ylabel('Spike Count Correlation')
+# ax.set_xlim([-3, 3])
+# ax.set_ylim(bottom=0)
+ax.set_title(f'Equal sized bins ({n}) of pair NMI vs Rsc')
+plt.show()
+
+# manual binning option 2 (defined by number of bins)
+binSize = 8
+binMedian, binEdges, binNum = stats.binned_statistic(sortedNMI, sortedCorr,
+                                                     statistic='median', bins=binSize)
+binCount, binEdges, binNum = stats.binned_statistic(sortedNMI, sortedCorr,
+                                                    statistic='count', bins=binSize)
+binSD, binEdges, binNum = stats.binned_statistic(sortedNMI, sortedCorr,
+                                                 statistic='std', bins=binSize)
+binSEM = binSD/binCount
+binWidth = (binEdges[1] - binEdges[0])
+binCenters = binEdges[1:] - binWidth/2
+
+# figure
+fig, ax = plt.subplots()
+ax.scatter(binCenters, binMedian)
+ax.fill_between(binCenters, binMedian - binSEM, binMedian + binSEM,
+                 alpha=0.1, color='black')
+ax.set_xlabel('Z-Scored NMI')
+ax.set_ylabel('Z-Scored Spike Count Correlations')
+ax.set_title('Binned plot of gabor distance from RF center vs alpha')
+plt.show()
+
+# # Norm vs Distance Plot
+sortIndex = np.argsort(n1n2ElectrodeDiff)
+sortedNMIDiff = n1n2NMISimIndx[sortIndex]
+sortedDist = n1n2ElectrodeDiff[sortIndex]
+
+# manual bins - equally populated bins
+n = 750
+equalBinsDist = [sortedDist[i:i + n] for i in range(0, len(sortedDist), n)]
+equalBinsNMIDiff = [sortedNMIDiff[i:i + n] for i in range(0, len(sortedNMIDiff), n)]
+binMeanNMIDiff = np.array([np.mean(i) for i in equalBinsNMIDiff])
+binMeanDist = np.array([np.mean(i) for i in equalBinsDist])
+
+# polynomial fit
+a, b = np.polyfit(binMeanDist, binMeanNMIDiff, 1)
+
+# figure
+fig, ax = plt.subplots()
+ax.plot(binMeanDist, binMeanNMIDiff)
+ax.scatter(binMeanDist, binMeanNMIDiff)
+# ax.plot(binMeanNMI, (a*binMeanNMI+b))
+ax.set_xlabel('Pair Separation (um)')
+ax.set_ylabel('NMI Diff Index (similarity)')
+# ax.set_xlim([-3, 3])
+ax.set_ylim(bottom=0)
+ax.set_title(f'Equal sized bins ({n}) of pair separation vs NMI Similarity')
+plt.show()
+
+# manual binning option 2 (defined by number of bins)
+binSize = 10
+binMedian, binEdges, binNum = stats.binned_statistic(sortedDist, sortedNMIDiff,
+                                                     statistic='median', bins=binSize)
+binCount, binEdges, binNum = stats.binned_statistic(sortedDist, sortedNMIDiff,
+                                                    statistic='count', bins=binSize)
+binSD, binEdges, binNum = stats.binned_statistic(sortedDist, sortedNMIDiff,
+                                                 statistic='std', bins=binSize)
+binSEM = binSD/binCount
+binWidth = (binEdges[1] - binEdges[0])
+binCenters = binEdges[1:] - binWidth/2
+
+# figure
+fig, ax = plt.subplots()
+ax.scatter(binCenters, binMedian)
+ax.fill_between(binCenters, binMedian - binSEM, binMedian + binSEM,
+                 alpha=0.1, color='black')
+ax.set_xlabel('Pair Separation (um)')
+ax.set_ylabel('NMI Diff Index (similarity)')
+ax.set_title('Binned plot of pair separation vs NMI Similarity')
+plt.show()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # plot resp pref/null ratio vs alpha1/alpha0 ratio

@@ -936,7 +936,7 @@ def driverFuncCondensend1(x, fixedVals, resp):
 
 
 def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
-                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, al0,
+                        L1_0, L1_60, L1_120, L1_180, L1_240, L1_300,
                         al1):
     """
     this function applies the generic normalization equation without a scalar
@@ -947,17 +947,17 @@ def genericNormNoScalar(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
 
-    # # generic norm
-    # num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
-    # denom = (((al0 ** 2) * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
+    # generic norm
+    num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
+    denom = (((1 ** 2) * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
+
+    return num/denom
+
+    # # ems
+    # loc0 = ((c0 * (L0 ** 2) * l0).sum(-1)) / (c0[:, 0] + ((al1 ** 2) * c1[:, 0]))
+    # loc1 = ((c1 * (L1 ** 2) * l1).sum(-1)) / (((1 ** 2) * c0[:, 0]) + c1[:, 0])
     #
-    # return num/denom
-
-    # ems
-    loc0 = ((c0 * (L0 ** 2) * l0).sum(-1)) / (c0[:, 0] + ((al1 ** 2) * c1[:, 0]))
-    loc1 = ((c1 * (L1 ** 2) * l1).sum(-1)) / (((al0 ** 2) * c0[:, 0]) + c1[:, 0])
-
-    return loc0 + loc1
+    # return loc0 + loc1
 
 
 def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1):
@@ -1062,7 +1062,7 @@ def circularHist(ax, x, bins=16, density=True, offset=0, gaps=True):
         or list of such containers if there are multiple input datasets.
     """
     # Wrap angles to [-pi, pi)
-    x = (x+np.pi) % (2*np.pi) - np.pi
+    x = (x + np.pi) % (2*np.pi) - np.pi
 
     # Force bins to partition entire circle
     if not gaps:
@@ -1212,6 +1212,29 @@ def reIndexedStimMat(reIndex):
     stimMatReIndex[6, 6] = stimMat[6, 6]
 
     return stimMat, stimMatReIndex
+
+
+def getSelAndSuppIndx(loc0Resp, loc1Resp, al0, al1):
+    """
+    this function will compute the selectivity and suppression index
+    for the neuron of interest to different pairings of stimuli
+    Inputs: loc0Resp (int): the response to loc0 stimuli from normalization fit
+            loc1Resp (int): the response to loc1 stimuli from normalization fit
+            al0 (int): the suppression at loc0 (alpha 0 from norm fit)
+                            this is usually 1
+            al1 (int): the suppression at loc1 (alpha 1 from norm fit)
+    Outputs: n1Selectivity (int): selectivity index for neuron
+             n1NonPrefSupp (int): suppression index for neuron
+    """
+
+    selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+    if selectivity >= 0:
+        nonPrefSupp = al1 / (al0 + al1)
+    else:
+        nonPrefSupp = al0 / (al0 + al1)
+
+    return selectivity, nonPrefSupp
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # END HERE

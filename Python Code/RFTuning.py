@@ -25,6 +25,8 @@ import seaborn as sns
 fileList = ['221010', '221013', '221108', '221110', '221115', '221117',
             '221124', '221128', '221206', '221208', '221229', '230123',
             '230126']
+
+fileList = ['230606']
 unitParams = []
 sessionXYMean = []
 loc0XY = []
@@ -77,8 +79,8 @@ for fileIterator in fileList:
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
         nStim = len(currTrial['stimDesc']['data']['stimType'])
-        currTrial['stimDesc']['data'] = [{k:v[i] for k,v in currTrial['stimDesc']['data'].items()}
-                                        for i in range(nStim)]
+        currTrial['stimDesc']['data'] = [{k:v[i] for k, v in currTrial['stimDesc']['data'].items()}
+                                         for i in range(nStim)]
 
     frameRateHz = header['displayCalibration']['data']['frameRateHz']
     numAzi = header['map0Settings']['data']['azimuthDeg']['n']
@@ -95,6 +97,7 @@ for fileIterator in fileList:
 
     # assert frame consistency for frame duration
     stimDurFrame = []
+    trueStimDurMS = 0
     for corrTrial in correctTrials:
         currTrial = allTrials[corrTrial]
         stimDesc = currTrial['stimDesc']['data']
@@ -111,8 +114,8 @@ for fileIterator in fileList:
         trueStimDurMS = np.int32(np.around(1000/frameRateHz * stimDurFrame[0]))
 
     for uCount, unit in enumerate(units):
-        stimCount = np.zeros((numEle,numAzi))
-        spikeCountMat = np.zeros((25,numEle, numAzi))
+        stimCount = np.zeros((numEle, numAzi))
+        spikeCountMat = np.zeros((25, numEle, numAzi))
         spikeCountMat[:, :, :] = np.nan
         spikeHists = np.zeros((trueStimDurMS + 2*histPrePostMS+12, numEle, numAzi))
         sponSpikesArr = []
@@ -135,7 +138,7 @@ for fileIterator in fileList:
                         stimOnTimeS = ((1000/frameRateHz * stim['stimOnFrame'])
                                        / 1000) + stim1TimeS
                         stimOffTimeS = ((1000/frameRateHz * stim['stimOffFrame'])
-                                       / 1000) + stim1TimeS
+                                        / 1000) + stim1TimeS
                         stimCount[eleIndex][aziIndex] += 1
                         map0Count += 1
                         if unit in spikeData['unit']:

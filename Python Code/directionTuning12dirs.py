@@ -1,10 +1,10 @@
-'''
+"""
 directionTuning generates a polar plot and histograms for each unit.
 The script will save the plots for each unit as a PDF in a folder specific
 to the day's dataset. This is the version for 12 directions tested
 
 Chery June - 2023
-'''
+"""
 
 from usefulFns import *
 import numpy as np
@@ -14,7 +14,7 @@ import matplotlib.patheffects as path_effects
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Meetz'
-seshDate = '230606'
+seshDate = '230607'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -41,6 +41,7 @@ interstimDurMS = header['mapInterstimDurationMS']['data']
 histPrePostMS = 100
 sponWindowMS = 100
 allTuningMat = np.zeros((len(units), numDir))
+allSEMMat = np.zeros((len(units), numDir))
 # numBlocks = header['mappingBlockStatus']['data']['blockLimit']
 numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
 
@@ -113,6 +114,7 @@ for uCount, unit in enumerate(units):
     sponSpikesMean = np.mean(sponSpikesArr)
     sponSpikesSEM = np.std(sponSpikesArr) / np.sqrt(len(sponSpikesArr))
     allTuningMat[uCount] = spikeCountMean * 1000 / trueStimDurMS
+    allSEMMat[uCount] = spikeCountSEM * 1000 / trueStimDurMS
 
     # Gaussian Fit
     angleMat = np.arange(180, 900, 30)
@@ -212,3 +214,4 @@ for uCount, unit in enumerate(units):
 
 plt.close('all')
 np.save('unitsDirTuningMat', allTuningMat)
+np.save('unitsDirTuningSEM', allSEMMat)

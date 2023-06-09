@@ -13,12 +13,21 @@ from usefulFns import *
 # Load relevant file here with pyMat reader
 monkeyName = 'Meetz'
 seshDate = '230607'
-fileName = f'{monkeyName}_{seshDate}_MTND_Spikes.mat'
+withinSesh = 1
+if withinSesh == 1:
+    fileName = f'{monkeyName}_{seshDate}_MTND_Spikes.mat'
+else:
+    fileName = f'{monkeyName}_{seshDate}_MTND_2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
-if not os.path.exists('Normalization'):
-    os.makedirs('Normalization')
-os.chdir('Normalization/')
+if withinSesh == 1:
+    if not os.path.exists('Normalization'):
+        os.makedirs('Normalization')
+    os.chdir('Normalization/')
+else:
+    if not os.path.exists('Normalization Unit 2'):
+        os.makedirs('Normalization Unit 2')
+    os.chdir('Normalization Unit 2/')
 
 # list of indices of correctTrials (non-instruct, valid trialCertify)
 corrTrials = correctTrialsMTX(allTrials)
@@ -148,11 +157,16 @@ meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
 spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
 spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
 meanSpikeReshaped = np.zeros((len(units), 3, int(((numSteps*7)+3-numSteps)/3)))
+SEMReshaped = np.zeros((len(units), 3, int(((numSteps*7)+3-numSteps)/3)))
 for count, i in enumerate(meanSpikeReshaped):
     meanSpikeReshaped[count] = (meanSpike[count, :(numSteps*7)+3-numSteps].
                                 reshape(3, int(((numSteps*7)+3-numSteps)/3)) *
                                 1000/trueStimDurMS)
-transectMeanSpike = meanSpike[:, (numSteps*7)+3-numSteps:] * 1000/trueStimDurMS
+    SEMReshaped[count] = (spikeCountSEM[count, :(numSteps*7)+3-numSteps].
+                          reshape(3, int(((numSteps*7)+3-numSteps)/3)) *
+                          1000/trueStimDurMS)
+transectMeanSpike = meanSpike[:, (numSteps*7)+3-numSteps:] * 1000 / trueStimDurMS
+transectSEM = spikeCountSEM[:, (numSteps*7)+3-numSteps:] * 1000 / trueStimDurMS
 
 # direction tuning arrays for each unit
 allDirTuning = np.load('../Direction Tuning/unitsDirTuningMat.npy')
@@ -163,10 +177,10 @@ allRFLoc = np.load('../RFLoc Tuning/unitsRFLocMat.npy')
 eleLabel = np.load('../RFLoc Tuning/eleLabels.npy')
 aziLabel = np.load('../RFLoc Tuning/aziLabels.npy')
 
-
 # plot line graph of responses across distances
 for count in range(len(units)):
     fig = plt.figure()
+    fig.suptitle(f'unit {units[count]}')
     fig.set_size_inches(10, 7)
     gs0 = gridspec.GridSpec(2, 2)
     gs00 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[0, 0])
@@ -194,15 +208,13 @@ for count in range(len(units)):
     ax1.set_yticklabels(eleLabel, fontsize=5)
     ax1.set_xticklabels(aziLabel, fontsize=5)
 
-    ax1.scatter(((i[0] + abs(min(aziLabel))) / (max(aziLabel) + abs(min(aziLabel))) * 5),
-                (i[1] + abs(min(eleLabel))) / (abs(min(eleLabel)) + max(eleLabel)) * 5,
-                s=100, marker='o', color='green')
-
     for offCount, i in enumerate(offsetAziEle):
         if offCount == 0:
             col = 'blue'
-        else:
+        elif offCount > numSteps:
             col = 'green'
+        else:
+            col = 'gold'
         ax1.scatter(((i[0] + abs(min(aziLabel))) / (max(aziLabel) + abs(min(aziLabel))) * 5),
                     (i[1] + abs(min(eleLabel))) / (abs(min(eleLabel)) + max(eleLabel)) * 5,
                     s=100, marker='o', color=col)
@@ -212,19 +224,39 @@ for count in range(len(units)):
     ax2 = fig.add_subplot(gs02[0, 0])
     x = np.arange(0, numSteps+1)
     xNorm = np.arange(1, numSteps+1)
+    spon = meanSpikeReshaped[count, 0, 0]
     nullOnly = np.concatenate(([meanSpikeReshaped[count, 1, 0]],
                               meanSpikeReshaped[count, 0, 1::2]), axis=0)
+    nullSEM = np.concatenate(([SEMReshaped[count, 1, 0]],
+                              SEMReshaped[count, 0, 1::2]), axis=0)
     prefOnly = np.concatenate(([meanSpikeReshaped[count, 2, 0]],
                               meanSpikeReshaped[count, 0, 2::2]), axis=0)
-    NP = meanSpikeReshaped[count, 1, 1::2]
-    PN = meanSpikeReshaped[count, 2, 2::2]
+    prefSEM = np.concatenate(([SEMReshaped[count, 2, 0]],
+                              SEMReshaped[count, 0, 2::2]), axis=0)
+    # NP = meanSpikeReshaped[count, 1, 1::2]
+    # npSEM = SEMReshaped[count, 1, 1::2]
+    NP = meanSpikeReshaped[count, 1, 2::2]
+    npSEM = SEMReshaped[count, 1, 2::2]
+    # PN = meanSpikeReshaped[count, 2, 2::2]
+    # pnSEM = SEMReshaped[count, 2, 2::2]
+    PN = meanSpikeReshaped[count, 2, 1::2]
+    pnSEM = SEMReshaped[count, 2, 1::2]
     ax2.plot(x, prefOnly, color='black', label='P0')
+    ax2.errorbar(x, prefOnly, yerr=prefSEM, fmt='o', ecolor='black',
+                 color='black', markersize=2)
     ax2.plot(x, nullOnly, color='grey', label='N0')
+    ax2.errorbar(x, nullOnly, yerr=nullSEM, fmt='o', ecolor='grey',
+                 color='grey', markersize=2)
     ax2.plot(xNorm, NP, color='red', label='N0 P1')
+    ax2.errorbar(xNorm, NP, yerr=npSEM, fmt='o', ecolor='red',
+                 color='red', markersize=2)
     ax2.plot(xNorm, PN, color='green', label='P0 N1')
+    ax2.errorbar(xNorm, PN, yerr=pnSEM, fmt='o', ecolor='green',
+                 color='green', markersize=2)
     ax2.set_xlabel('stimulus offset positions')
     ax2.set_ylabel('Response (spikes/sec)')
     ax2.set_ylim(bottom=0)
+    ax2.axhline(y=spon, linestyle='--', color='black', alpha=0.6)
     ax2.legend(fontsize=4)
 
     # pref response across diameter of RF
@@ -233,16 +265,27 @@ for count in range(len(units)):
                         np.arange(0, numSteps+1)),
                        axis=0)
     transReverse = transectMeanSpike[count, ::-1]
+    transSEMReverse = transectSEM[count, ::-1]
     prefTransect = np.concatenate((transReverse,
                                    [meanSpikeReshaped[count, 2, 0]],
                                    meanSpikeReshaped[count, 0, 2::2]),
                                   axis=0)
+    prefTransectSEM = np.concatenate((transSEMReverse,
+                                      [SEMReshaped[count, 2, 0]],
+                                      SEMReshaped[count, 0, 2::2]),
+                                     axis=0)
     ax3.plot(x, prefTransect, color='black')
+    ax3.errorbar(x, prefTransect, yerr=prefTransectSEM, fmt='o', ecolor='black',
+                 color='black', markersize=2)
     ax3.set_xlabel('stimulus offset positions')
     ax3.set_ylabel('Response (spikes/sec)')
     ax3.set_ylim(bottom=0)
-    plt.show()
+    ax3.axhline(y=spon, linestyle='--', color='black', alpha=0.6)
 
+    plt.savefig(f'{units[count]}.pdf')
+    plt.close('all')
+
+os.chdir('../../../Python Code')
 
 """
 # basic version

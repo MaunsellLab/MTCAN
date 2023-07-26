@@ -184,8 +184,8 @@ def gaussFit(x, y):
     mean = sum(x * y) / sum(y)
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
-                           bounds=((0, 0, 0, 0),
-                                   (np.inf, 1.50*np.max(y), np.inf, np.inf)))
+                           bounds=((-np.inf, 0, -np.inf, 0),
+                                   (np.inf, 2*np.max(y), np.inf, np.inf)))
     return popt
 
 
@@ -328,23 +328,6 @@ def fieldInTrial(fieldList, trial=None):
     return True
 
 
-def targetOnsetIndexStimDesc(stimDesc):
-    """
-    fn will identify the index of the target onset stimulus
-    fn will put out ListTypes subdictionary within stimDesc 
-    
-    Inputs: stimDesc (variable)
-    Outputs: the index of the target onset stim (int)
-    """
-
-    for count, d in enumerate(stimDesc['listTypes']):
-                if 2 in d:
-                    targetOnsetStim = count
-                    break
-    
-    return count
-
-
 def eyePosDurTrial(currTrial):
     """
     fn will return a defaultdict with the converted x,y deg for each eye
@@ -403,7 +386,7 @@ def dirClosestToPref(unitPrefDir):
             directions tested)
     """
 
-    extDirArray = np.array([0,60,120,180,240,300,360])
+    extDirArray = np.array([0, 60, 120, 180, 240, 300, 360])
     tempArr = abs(extDirArray-unitPrefDir)
     prefDirLoc = np.where(tempArr == min(tempArr))[0][0]
 
@@ -456,13 +439,13 @@ def fixedValsForGenericNorm(stimMatReIndex, stimIndexDict):
             l0s.append(l0_oh)
             l1s.append(l1_oh)
 
-    return (np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s))
+    return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s)
 
 
 def fixedValsForEMSGen(stimMatReIndex, stimIndexDict):
     """
     function will create the fixed values for running the
-    generic EMS normazliation curve_fit
+    generic EMS normalization curve_fit
     """
 
     c0s, c1s, l0s, l1s = [], [], [], []
@@ -499,7 +482,7 @@ def fixedValsForEMSGen(stimMatReIndex, stimIndexDict):
             l0s.append(l0_oh)
             l1s.append(l1_oh)
 
-    return (np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s))
+    return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s)
 
 
 def fixedValsForPairedStimL0L6(stimMatReIndex, stimIndexDict, L0L6Resp):
@@ -558,7 +541,7 @@ def fixedValsForPairedStimL0L6(stimMatReIndex, stimIndexDict, L0L6Resp):
 def fixedValsForEMSGenCondensed(stimMatReIndex, stimIndexDict, nullDir, prefDir):
     """
     function will create the fixed values for running the
-    generic EMS normazliation curve_fit
+    generic EMS normalization curve_fit
     """
 
     c0s, c1s, l0s, l1s = [], [], [], []
@@ -595,7 +578,7 @@ def fixedValsForEMSGenCondensed(stimMatReIndex, stimIndexDict, nullDir, prefDir)
             l0s.append(l0_oh)
             l1s.append(l1_oh)
 
-    return (np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s))
+    return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s)
 
 
 def fixedValsCurveFitForPairedStim(prefDir, stimMatReIndex, stimIndexDict, gParams):
@@ -713,6 +696,7 @@ def lightenColor(color, amount=0.5):
     >> lighten_color('#F034A3', 0.6)
     >> lighten_color((.3,.55,.1), 0.5)
     """
+
     import matplotlib.colors as mc
     import colorsys
     try:
@@ -729,7 +713,7 @@ def unitsInfo(units, corrTrials, allTrials):
 
     Input: 
         units (list): list of active units
-        corrTrials (list): list of correc trials
+        corrTrials (list): list of correct trials
         allTrials (dict): all trials in the dataset
     Outputs: 
         unitChannel (list):  list of which channel the unit was found

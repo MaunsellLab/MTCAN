@@ -13,7 +13,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import seaborn as sns
 
-fileList = ['230608']
+goodSessions = ['230607', '230608', '230612', '230614']
+
+fileList = ['230720']
 
 t0 = time.time()
 
@@ -22,6 +24,7 @@ for fileIterator in fileList:
     monkeyName = 'Meetz'
     seshDate = fileIterator
     fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
+    # fileName = f'{monkeyName}_{seshDate}_GRF1_2_Spikes.mat'
 
     allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -184,11 +187,11 @@ for fileIterator in fileList:
         ax_row1[0].invert_yaxis()
 
         # overlay 1SD, 2SD ellipse
-        el1SD = Ellipse((xMean, yMean), xStdDev, yStdDev, theta,
+        el1SD = Ellipse((xMean, yMean), xStdDev, yStdDev, angle=theta,
                         fill=None, edgecolor='blue')
         el1SD.set(linestyle=':')
         ax_row1[0].add_artist(el1SD)
-        el2SD = Ellipse((xMean, yMean), 2 * xStdDev, 2 * yStdDev, theta,
+        el2SD = Ellipse((xMean, yMean), 2 * xStdDev, 2 * yStdDev, angle=theta,
                         fill=None, edgecolor='black')
         el2SD.set(linestyle='--')
         ax_row1[0].add_artist(el2SD)

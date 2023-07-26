@@ -14,7 +14,7 @@ import matplotlib.patheffects as path_effects
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Meetz'
-seshDate = '230608'
+seshDate = '230720'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 

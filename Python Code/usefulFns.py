@@ -30,6 +30,7 @@ import time
 from astropy.modeling import models, fitting
 from pymatreader import read_mat
 from binsreg import *
+from scipy.stats import f_oneway
 import glob
 
 

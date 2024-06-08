@@ -5,6 +5,8 @@ matrix. From there, this script plots how normalization changes with distance.
 We also plot the preferred response across the diameter of the receptive field
 
 Chery - June 2023
+
+line 1465 : population plots
 """
 import matplotlib.pyplot as plt
 
@@ -15,9 +17,13 @@ from usefulFns import *
 
 p0 = time.time()
 
+
+############# MEETZ ##########
+
+# subpar sessions: 230606, 230706, 230712
 # fileList = ['230719']
 
-# # master file list
+# # master file list (MEETZ)
 # fileList = ['230607', '230608', '230612', '230613', '230615',
 #             '230620', '230626', '230627', '230628', '230630',
 #             '230707', '230710', '230711', '230718', '230719',
@@ -41,7 +47,7 @@ p0 = time.time()
 #             '230711_50', '230718_178', '230719_147', '230719_156', '230720_149']
 
 
-# # pref + null
+# # pref + null (MEETZ)
 # fileList = ['230607', '230608', '230612', '230613', '230615']
 #
 # unitList = ['230607_147', '230607_146', '230607_144', '230607_140', '230607_126',
@@ -54,15 +60,34 @@ p0 = time.time()
 #             '230608_143', '230608_145', '230608_149', '230612_213', '230613_187',
 #             '230615_83', '230615_166']
 
-# pref + nonpref
-fileList = ['230620', '230626', '230627', '230628', '230630',
-            '230707', '230710', '230711', '230718', '230719',
-            '230720']
+# pref + nonpref (MEETZ)
+# fileList = ['230620', '230626', '230627', '230628', '230630',
+#             '230707', '230710', '230711', '230718', '230719',
+#             '230720']
+#
+# unitList = ['230620_58', '230626_131', '230627_147', '230627_141', '230627_106',
+#             '230627_71', '230627_70', '230627_14', '230628_143', '230630_50',
+#             '230707_140', '230710_137', '230711_45', '230711_50', '230718_178',
+#             '230719_147', '230719_156', '230720_149']
 
-unitList = ['230620_58', '230626_131', '230627_147', '230627_141', '230627_106',
-            '230627_71', '230627_70', '230627_14', '230628_143', '230630_50',
-            '230707_140', '230710_137', '230711_45', '230711_50', '230718_178',
-            '230719_147', '230719_156', '230720_149']
+
+####### AKSHAN #######
+
+# pref + nonpref (AKSHAN) (potential good units/sessions)
+# fileList = ['240529', '240530', '240603', '240605', '240606', '240607' ]
+# unitList = ['240529_31', '240530_55', '240603_167', '240605_147', '240606_176', '240607_137', '240607_155',
+#             '240607_164', '240607_170', '240607_179']
+'''
+# 240607, check units some actually prefer the 'non-pref'
+'''
+# cherry-picked good sessions/units for population plots
+fileList = ['240530', '240603', '240606', '240607']
+unitList = ['240530_55', '240603_167', '240606_176', '240607_137', '240607_170', '240607_179']
+
+
+# fileList = ['240607']
+# unitList = ['240607_94']
+
 
 prefNormalized = []
 nonprefNormalized = []
@@ -100,7 +125,7 @@ allBlocksDone = []
 
 for file in fileList:
     # Load relevant file here with pyMat reader
-    monkeyName = 'Meetz'
+    monkeyName = 'Akshan'  # 'Meetz"
     seshDate = file
     withinSesh = 1
     if withinSesh == 1:
@@ -280,215 +305,215 @@ for file in fileList:
     eleLabel = np.load('../RFLoc Tuning/eleLabels.npy')
     aziLabel = np.load('../RFLoc Tuning/aziLabels.npy')
 
-    # correlations with distance
-    corrUnits = []
-    for unit in units:
-        if f'{seshDate}_{unit}' in unitList:
-            corrUnits.append(unit)
-    if len(corrUnits) > 1:
-        # offset1Corr = []
-        # offset2Corr = []
-        # offset3Corr = []
-        # offset4Corr = []
-        combs = [i for i in combinations(corrUnits, 2)]
-
-        for comb in combs:
-            n1, n2 = comb[0], comb[1]
-            n1Index = np.where(units == n1)[0][0]
-            n2Index = np.where(units == n2)[0][0]
-
-            tempCorr = []
-            tempSingleCorr = []
-            tempPairedCorr = []
-            tempRFWeight = []
-            tempRFWeightPaired = []
-            tempRFWeightSingle = []
-            # spontaneous correlation
-            n1SpikeMat = spikeCountMat[n1Index, :blocksDone, 0]
-            n2SpikeMat = spikeCountMat[n2Index, :blocksDone, 0]
-            pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
-            sponCorrPop.append(pairStimCorr)
-
-            # n1 center response
-            n1CenterP = meanSpikeReshaped[n1Index, 2, 0]
-            n1CenterNP = meanSpikeReshaped[n1Index, 1, 0]
-
-            # n2 center response
-            n2CenterP = meanSpikeReshaped[n2Index, 2, 0]
-            n2CenterNP = meanSpikeReshaped[n2Index, 1, 0]
-
-            for i in range(1, 5):
-                stimIndices = stimCountIndex[1:, 2*i-1:2*i+1].reshape(4)
-                x = np.linspace(-4, 4, 9)
-                # n1 pref transect
-                transReverse = transectMeanSpike[n1Index, ::-1]
-                prefTransect = np.concatenate((transReverse,
-                                              [meanSpikeReshaped[n1Index, 2, 0]],
-                                              meanSpikeReshaped[n1Index, 0, 2::2]),
-                                              axis=0)
-                params = gaussFit(x, prefTransect)
-                xFull = np.linspace(-4, 4, 1000)
-                respFull = gauss(xFull, *params)
-                rfWeightN1Cent = gauss(0, *params) / np.max(respFull)
-                rfWeightN1 = gauss(i, *params) / np.max(respFull)
-                combWeightN1 = (rfWeightN1Cent + rfWeightN1) / 2
-                # rfWeightN1 = prefTransect[4+i] / np.max(prefTransect)
-
-                # n2 pref transect
-                transReverse = transectMeanSpike[n2Index, ::-1]
-                prefTransect = np.concatenate((transReverse,
-                                              [meanSpikeReshaped[n2Index, 2, 0]],
-                                              meanSpikeReshaped[n2Index, 0, 2::2]),
-                                              axis=0)
-                params = gaussFit(x, prefTransect)
-                respFull = gauss(xFull, *params)
-                rfWeightN2Cent = gauss(0, *params) / np.max(respFull)
-                rfWeightN2 = gauss(i, *params) / np.max(respFull)
-                combWeightN2 = (rfWeightN2Cent + rfWeightN2) / 2
-                # rfWeightN2 = prefTransect[4+i] / np.max(prefTransect)
-
-                # rfWeight = np.sqrt(combWeightN1 * combWeightN2)
-                rfWeight = np.power(rfWeightN1Cent*rfWeightN1*rfWeightN2Cent*rfWeightN2, (1/4))
-
-                # n1 offset response
-                n1OffsetP = meanSpikeReshaped[n1Index, 0, i*2]
-                n1OffsetNP = meanSpikeReshaped[n1Index, 0, i*2-1]
-
-                # n2 center response
-                n2OffsetP = meanSpikeReshaped[n2Index, 0, i*2]
-                n2OffsetNP = meanSpikeReshaped[n2Index, 0, i*2-1]
-
-                # paired stimulus correlations for offset
-                for count, j in enumerate(stimIndices):
-                    # correlation for that Gabor pair b/w 2 units excluding trials where
-                    # spike counts exceeded 3 SD from mean
-                    n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
-                    n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
-                    pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
-                    # totCorrPop.append(pairStimCorr)
-                    # rfWeightPop.append(rfWeight)
-                    tempCorr.append(pairStimCorr)
-                    tempPairedCorr.append(pairStimCorr)
-                    tempRFWeight.append(rfWeight)
-                    tempRFWeightPaired.append(rfWeight)
-
-                    # n1/n2 condition resp normalized to max resp
-                    n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
-                    n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
-                    normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
-
-                    if i == 1:
-                        # offset1Corr.append(pairStimCorr)
-                        off1CorrPop.append(pairStimCorr)
-                    elif i == 2:
-                        # offset2Corr.append(pairStimCorr)
-                        off2CorrPop.append(pairStimCorr)
-                    elif i == 3:
-                        # offset3Corr.append(pairStimCorr)
-                        off3CorrPop.append(pairStimCorr)
-                    elif i == 4:
-                        # offset4Corr.append(pairStimCorr)
-                        off4CorrPop.append(pairStimCorr)
-                    if count == 0:
-                        n1NMI = (n1CenterNP + n1OffsetNP - meanSpikeReshaped[n1Index, 1, i*2-1]) / (
-                                 n1CenterNP + n1OffsetNP + meanSpikeReshaped[n1Index, 1, i*2-1])
-                        n2NMI = (n2CenterNP + n2OffsetNP - meanSpikeReshaped[n2Index, 1, i*2-1]) / (
-                                n2CenterNP + n2OffsetNP + meanSpikeReshaped[n2Index, 1, i*2-1])
-                        pairNMI = (n1NMI + n2NMI) / 2
-                        pairNMIPop.append(pairNMI)
-                    elif count == 1:
-                        n1NMI = (n1CenterNP + n1OffsetP - meanSpikeReshaped[n1Index, 1, i*2]) / (
-                                 n1CenterNP + n1OffsetP + meanSpikeReshaped[n1Index, 1, i*2])
-                        n2NMI = (n2CenterNP + n2OffsetP - meanSpikeReshaped[n2Index, 1, i*2]) / (
-                                n2CenterNP + n2OffsetP + meanSpikeReshaped[n2Index, 1, i*2])
-                        pairNMI = (n1NMI + n2NMI) / 2
-                        pairNMIPop.append(pairNMI)
-                    elif count == 2:
-                        n1NMI = (n1CenterP + n1OffsetNP - meanSpikeReshaped[n1Index, 2, i*2-1]) / (
-                                 n1CenterP + n1OffsetNP + meanSpikeReshaped[n1Index, 2, i*2-1])
-                        n2NMI = (n2CenterP + n2OffsetNP - meanSpikeReshaped[n2Index, 2, i*2-1]) / (
-                                n2CenterP + n2OffsetNP + meanSpikeReshaped[n2Index, 2, i*2-1])
-                        pairNMI = (n1NMI + n2NMI) / 2
-                        pairNMIPop.append(pairNMI)
-                    elif count == 3:
-                        n1NMI = (n1CenterP + n1OffsetP - meanSpikeReshaped[n1Index, 2, i*2]) / (
-                                 n1CenterP + n1OffsetP + meanSpikeReshaped[n1Index, 2, i*2])
-                        n2NMI = (n2CenterP + n2OffsetP - meanSpikeReshaped[n2Index, 2, i*2]) / (
-                                n2CenterP + n2OffsetP + meanSpikeReshaped[n2Index, 2, i*2])
-                        pairNMI = (n1NMI + n2NMI) / 2
-                        pairNMIPop.append(pairNMI)
-
-                # single stimulus correlations for offset
-                stimIndices = stimCountIndex[0, 2*i-1:2*i+1]
-                for j in stimIndices:
-                    # correlation for that Gabor pair b/w 2 units excluding trials where
-                    # spike counts exceeded 3 SD from mean
-                    n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
-                    n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
-                    pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
-                    # totCorrPop.append(pairStimCorr)
-                    # rfWeightPop.append(rfWeight)
-                    tempCorr.append(pairStimCorr)
-                    tempSingleCorr.append(pairStimCorr)
-                    tempRFWeight.append(np.sqrt(rfWeightN1 * rfWeightN2))
-                    tempRFWeightSingle.append(np.sqrt(rfWeightN1 * rfWeightN2))
-
-                    # n1/n2 condition resp normalized to max resp
-                    n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
-                    n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
-                    normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
-
-                # single stimulus correlations for center
-                stimIndices = stimCountIndex[1:, 0]
-                for j in stimIndices:
-                    # correlation for that Gabor pair b/w 2 units excluding trials where
-                    # spike counts exceeded 3 SD from mean
-                    n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
-                    n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
-                    pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
-                    # totCorrPop.append(pairStimCorr)
-                    # rfWeightPop.append(rfWeight)
-                    tempCorr.append(pairStimCorr)
-                    tempSingleCorr.append(pairStimCorr)
-                    tempRFWeight.append(np.sqrt(rfWeightN1Cent * rfWeightN2Cent))
-                    tempRFWeightSingle.append(np.sqrt(rfWeightN1Cent * rfWeightN2Cent))
-
-                    # n1/n2 condition resp normalized to max resp
-                    n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
-                    n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
-                    normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
-
-            tempCorr = np.array(tempCorr)
-            tempPairedCorr = np.array(tempPairedCorr)
-            tempSingleCorr = np.array(tempSingleCorr)
-            normVal = max(abs(sponCorrPop[-1]), np.nanmax(np.abs(tempCorr)))
-            tempCorr = tempCorr / normVal
-            tempPairedCorr = tempPairedCorr / normVal
-            tempSingleCorr = tempSingleCorr / normVal
-            sponCorrPop[-1] = sponCorrPop[-1] / normVal
-
-            for x in range(len(tempCorr)):
-                totCorrPop.append(tempCorr[x])
-                rfWeightPop.append(tempRFWeight[x])
-
-            for x in range(len(tempPairedCorr)):
-                pairedCorrPop.append(tempPairedCorr[x])
-                rfWeightPairedPop.append(tempRFWeightPaired[x])
-
-            for x in range(len(tempSingleCorr)):
-                singleCorrPop.append(tempSingleCorr[x])
-                rfWeightSinglePop.append(tempRFWeightSingle[x])
-
-
-
-        # off1CorrMean = np.mean(offset1Corr)
-        # off2CorrMean = np.mean(offset2Corr)
-        # off3CorrMean = np.mean(offset3Corr)
-        # off4CorrMean = np.mean(offset4Corr)
-        # off1CorrPop.append(off1CorrMean)
-        # off2CorrPop.append(off2CorrMean)
-        # off3CorrPop.append(off3CorrMean)
-        # off4CorrPop.append(off4CorrMean)
+    # # correlations with distance
+    # corrUnits = []
+    # for unit in units:
+    #     if f'{seshDate}_{unit}' in unitList:
+    #         corrUnits.append(unit)
+    # if len(corrUnits) > 1:
+    #     # offset1Corr = []
+    #     # offset2Corr = []
+    #     # offset3Corr = []
+    #     # offset4Corr = []
+    #     combs = [i for i in combinations(corrUnits, 2)]
+    #
+    #     for comb in combs:
+    #         n1, n2 = comb[0], comb[1]
+    #         n1Index = np.where(units == n1)[0][0]
+    #         n2Index = np.where(units == n2)[0][0]
+    #
+    #         tempCorr = []
+    #         tempSingleCorr = []
+    #         tempPairedCorr = []
+    #         tempRFWeight = []
+    #         tempRFWeightPaired = []
+    #         tempRFWeightSingle = []
+    #         # spontaneous correlation
+    #         n1SpikeMat = spikeCountMat[n1Index, :blocksDone, 0]
+    #         n2SpikeMat = spikeCountMat[n2Index, :blocksDone, 0]
+    #         pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+    #         sponCorrPop.append(pairStimCorr)
+    #
+    #         # n1 center response
+    #         n1CenterP = meanSpikeReshaped[n1Index, 2, 0]
+    #         n1CenterNP = meanSpikeReshaped[n1Index, 1, 0]
+    #
+    #         # n2 center response
+    #         n2CenterP = meanSpikeReshaped[n2Index, 2, 0]
+    #         n2CenterNP = meanSpikeReshaped[n2Index, 1, 0]
+    #
+    #         for i in range(1, 5):
+    #             stimIndices = stimCountIndex[1:, 2*i-1:2*i+1].reshape(4)
+    #             x = np.linspace(-4, 4, 9)
+    #             # n1 pref transect
+    #             transReverse = transectMeanSpike[n1Index, ::-1]
+    #             prefTransect = np.concatenate((transReverse,
+    #                                           [meanSpikeReshaped[n1Index, 2, 0]],
+    #                                           meanSpikeReshaped[n1Index, 0, 2::2]),
+    #                                           axis=0)
+    #             params = gaussFit(x, prefTransect)
+    #             xFull = np.linspace(-4, 4, 1000)
+    #             respFull = gauss(xFull, *params)
+    #             rfWeightN1Cent = gauss(0, *params) / np.max(respFull)
+    #             rfWeightN1 = gauss(i, *params) / np.max(respFull)
+    #             combWeightN1 = (rfWeightN1Cent + rfWeightN1) / 2
+    #             # rfWeightN1 = prefTransect[4+i] / np.max(prefTransect)
+    #
+    #             # n2 pref transect
+    #             transReverse = transectMeanSpike[n2Index, ::-1]
+    #             prefTransect = np.concatenate((transReverse,
+    #                                           [meanSpikeReshaped[n2Index, 2, 0]],
+    #                                           meanSpikeReshaped[n2Index, 0, 2::2]),
+    #                                           axis=0)
+    #             params = gaussFit(x, prefTransect)
+    #             respFull = gauss(xFull, *params)
+    #             rfWeightN2Cent = gauss(0, *params) / np.max(respFull)
+    #             rfWeightN2 = gauss(i, *params) / np.max(respFull)
+    #             combWeightN2 = (rfWeightN2Cent + rfWeightN2) / 2
+    #             # rfWeightN2 = prefTransect[4+i] / np.max(prefTransect)
+    #
+    #             # rfWeight = np.sqrt(combWeightN1 * combWeightN2)
+    #             rfWeight = np.power(rfWeightN1Cent*rfWeightN1*rfWeightN2Cent*rfWeightN2, (1/4))
+    #
+    #             # n1 offset response
+    #             n1OffsetP = meanSpikeReshaped[n1Index, 0, i*2]
+    #             n1OffsetNP = meanSpikeReshaped[n1Index, 0, i*2-1]
+    #
+    #             # n2 center response
+    #             n2OffsetP = meanSpikeReshaped[n2Index, 0, i*2]
+    #             n2OffsetNP = meanSpikeReshaped[n2Index, 0, i*2-1]
+    #
+    #             # paired stimulus correlations for offset
+    #             for count, j in enumerate(stimIndices):
+    #                 # correlation for that Gabor pair b/w 2 units excluding trials where
+    #                 # spike counts exceeded 3 SD from mean
+    #                 n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
+    #                 n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
+    #                 pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+    #                 # totCorrPop.append(pairStimCorr)
+    #                 # rfWeightPop.append(rfWeight)
+    #                 tempCorr.append(pairStimCorr)
+    #                 tempPairedCorr.append(pairStimCorr)
+    #                 tempRFWeight.append(rfWeight)
+    #                 tempRFWeightPaired.append(rfWeight)
+    #
+    #                 # n1/n2 condition resp normalized to max resp
+    #                 n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
+    #                 n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
+    #                 normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
+    #
+    #                 if i == 1:
+    #                     # offset1Corr.append(pairStimCorr)
+    #                     off1CorrPop.append(pairStimCorr)
+    #                 elif i == 2:
+    #                     # offset2Corr.append(pairStimCorr)
+    #                     off2CorrPop.append(pairStimCorr)
+    #                 elif i == 3:
+    #                     # offset3Corr.append(pairStimCorr)
+    #                     off3CorrPop.append(pairStimCorr)
+    #                 elif i == 4:
+    #                     # offset4Corr.append(pairStimCorr)
+    #                     off4CorrPop.append(pairStimCorr)
+    #                 if count == 0:
+    #                     n1NMI = (n1CenterNP + n1OffsetNP - meanSpikeReshaped[n1Index, 1, i*2-1]) / (
+    #                              n1CenterNP + n1OffsetNP + meanSpikeReshaped[n1Index, 1, i*2-1])
+    #                     n2NMI = (n2CenterNP + n2OffsetNP - meanSpikeReshaped[n2Index, 1, i*2-1]) / (
+    #                             n2CenterNP + n2OffsetNP + meanSpikeReshaped[n2Index, 1, i*2-1])
+    #                     pairNMI = (n1NMI + n2NMI) / 2
+    #                     pairNMIPop.append(pairNMI)
+    #                 elif count == 1:
+    #                     n1NMI = (n1CenterNP + n1OffsetP - meanSpikeReshaped[n1Index, 1, i*2]) / (
+    #                              n1CenterNP + n1OffsetP + meanSpikeReshaped[n1Index, 1, i*2])
+    #                     n2NMI = (n2CenterNP + n2OffsetP - meanSpikeReshaped[n2Index, 1, i*2]) / (
+    #                             n2CenterNP + n2OffsetP + meanSpikeReshaped[n2Index, 1, i*2])
+    #                     pairNMI = (n1NMI + n2NMI) / 2
+    #                     pairNMIPop.append(pairNMI)
+    #                 elif count == 2:
+    #                     n1NMI = (n1CenterP + n1OffsetNP - meanSpikeReshaped[n1Index, 2, i*2-1]) / (
+    #                              n1CenterP + n1OffsetNP + meanSpikeReshaped[n1Index, 2, i*2-1])
+    #                     n2NMI = (n2CenterP + n2OffsetNP - meanSpikeReshaped[n2Index, 2, i*2-1]) / (
+    #                             n2CenterP + n2OffsetNP + meanSpikeReshaped[n2Index, 2, i*2-1])
+    #                     pairNMI = (n1NMI + n2NMI) / 2
+    #                     pairNMIPop.append(pairNMI)
+    #                 elif count == 3:
+    #                     n1NMI = (n1CenterP + n1OffsetP - meanSpikeReshaped[n1Index, 2, i*2]) / (
+    #                              n1CenterP + n1OffsetP + meanSpikeReshaped[n1Index, 2, i*2])
+    #                     n2NMI = (n2CenterP + n2OffsetP - meanSpikeReshaped[n2Index, 2, i*2]) / (
+    #                             n2CenterP + n2OffsetP + meanSpikeReshaped[n2Index, 2, i*2])
+    #                     pairNMI = (n1NMI + n2NMI) / 2
+    #                     pairNMIPop.append(pairNMI)
+    #
+    #             # single stimulus correlations for offset
+    #             stimIndices = stimCountIndex[0, 2*i-1:2*i+1]
+    #             for j in stimIndices:
+    #                 # correlation for that Gabor pair b/w 2 units excluding trials where
+    #                 # spike counts exceeded 3 SD from mean
+    #                 n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
+    #                 n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
+    #                 pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+    #                 # totCorrPop.append(pairStimCorr)
+    #                 # rfWeightPop.append(rfWeight)
+    #                 tempCorr.append(pairStimCorr)
+    #                 tempSingleCorr.append(pairStimCorr)
+    #                 tempRFWeight.append(np.sqrt(rfWeightN1 * rfWeightN2))
+    #                 tempRFWeightSingle.append(np.sqrt(rfWeightN1 * rfWeightN2))
+    #
+    #                 # n1/n2 condition resp normalized to max resp
+    #                 n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
+    #                 n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
+    #                 normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
+    #
+    #             # single stimulus correlations for center
+    #             stimIndices = stimCountIndex[1:, 0]
+    #             for j in stimIndices:
+    #                 # correlation for that Gabor pair b/w 2 units excluding trials where
+    #                 # spike counts exceeded 3 SD from mean
+    #                 n1SpikeMat = spikeCountMat[n1Index, :blocksDone, j]
+    #                 n2SpikeMat = spikeCountMat[n2Index, :blocksDone, j]
+    #                 pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+    #                 # totCorrPop.append(pairStimCorr)
+    #                 # rfWeightPop.append(rfWeight)
+    #                 tempCorr.append(pairStimCorr)
+    #                 tempSingleCorr.append(pairStimCorr)
+    #                 tempRFWeight.append(np.sqrt(rfWeightN1Cent * rfWeightN2Cent))
+    #                 tempRFWeightSingle.append(np.sqrt(rfWeightN1Cent * rfWeightN2Cent))
+    #
+    #                 # n1/n2 condition resp normalized to max resp
+    #                 n1NormalizedResp = meanSpike[n1Index, j] / np.max(meanSpike[n1Index])
+    #                 n2NormalizedResp = meanSpike[n2Index, j] / np.max(meanSpike[n2Index])
+    #                 normalizedRespWeightPop.append((n1NormalizedResp + n2NormalizedResp)/2)
+    #
+    #         tempCorr = np.array(tempCorr)
+    #         tempPairedCorr = np.array(tempPairedCorr)
+    #         tempSingleCorr = np.array(tempSingleCorr)
+    #         normVal = max(abs(sponCorrPop[-1]), np.nanmax(np.abs(tempCorr)))
+    #         tempCorr = tempCorr / normVal
+    #         tempPairedCorr = tempPairedCorr / normVal
+    #         tempSingleCorr = tempSingleCorr / normVal
+    #         sponCorrPop[-1] = sponCorrPop[-1] / normVal
+    #
+    #         for x in range(len(tempCorr)):
+    #             totCorrPop.append(tempCorr[x])
+    #             rfWeightPop.append(tempRFWeight[x])
+    #
+    #         for x in range(len(tempPairedCorr)):
+    #             pairedCorrPop.append(tempPairedCorr[x])
+    #             rfWeightPairedPop.append(tempRFWeightPaired[x])
+    #
+    #         for x in range(len(tempSingleCorr)):
+    #             singleCorrPop.append(tempSingleCorr[x])
+    #             rfWeightSinglePop.append(tempRFWeightSingle[x])
+    #
+    #
+    #
+    #     # off1CorrMean = np.mean(offset1Corr)
+    #     # off2CorrMean = np.mean(offset2Corr)
+    #     # off3CorrMean = np.mean(offset3Corr)
+    #     # off4CorrMean = np.mean(offset4Corr)
+    #     # off1CorrPop.append(off1CorrMean)
+    #     # off2CorrPop.append(off2CorrMean)
+    #     # off3CorrPop.append(off3CorrMean)
+    #     # off4CorrPop.append(off4CorrMean)
 
     # figure (line plots)
     for count in range(len(units)):
@@ -602,14 +627,14 @@ for file in fileList:
         ax2.plot(x, nullOnly, color='grey', label='N0')
         ax2.errorbar(x, nullOnly, yerr=nullSEM, fmt='o', ecolor='grey',
                      color='grey', markersize=2)
-        # ax2.plot(xNorm, NP, color='red', label='N0 P1')
-        # ax2.errorbar(xNorm, NP, yerr=npSEM, fmt='o', ecolor='red',
-        #              color='red', markersize=2)
+        ax2.plot(xNorm, NP, color='red', label='N0 P1')
+        ax2.errorbar(xNorm, NP, yerr=npSEM, fmt='o', ecolor='red',
+                     color='red', markersize=2)
         ax2.plot(xNorm, PN, color='green', label='P0 N1')
         ax2.errorbar(xNorm, PN, yerr=pnSEM, fmt='o', ecolor='green',
                      color='green', markersize=2)
         ax2.plot(xNorm, pCentPred, color='green', linestyle='--', alpha=0.8)
-        # ax2.plot(xNorm, npCentPred, color='red', linestyle='--', alpha=0.8)
+        ax2.plot(xNorm, npCentPred, color='red', linestyle='--', alpha=0.8)
         ax2.set_xlabel('stimulus offset positions')
         ax2.set_ylabel('Response (spikes/sec)')
         ax2.set_ylim(bottom=0, top=np.max(meanSpikeReshaped[count])*1.1)
@@ -926,8 +951,6 @@ for file in fileList:
                                                      np.max(spikeCountMat[count, :blocksDone, pT1Indx]))
             adaptC += 1
 
-    '''
-        
     # figure (hists)
     for count in range(len(units)):
         fig = plt.figure()
@@ -1165,8 +1188,6 @@ for file in fileList:
         plt.tight_layout()
         plt.savefig(f'{seshDate}_{units[count]} histogram.pdf')
         plt.close('all')
-
-    '''
 
     # use this if I need to run another data file immediately afterwards
     os.chdir('../../../Python Code')
@@ -1502,18 +1523,28 @@ for filler in range(1):
     # respFull = gauss(xFull, *params)
 
     # rf weighted average
+    # RF weight is by max response of pref stimulus in transect
     # pCentPred = ((prefMean[0] + nonprefMean[1:])**1) / (
     #             1 + prefMean[1:] / np.max(prefMean))
     # npCentPred = ((nonprefMean[0] + prefMean[1:])**1) / (
     #             1 + prefMean[1:] / np.max(prefMean))
+
+    # RF weight is by max of fitted Gaussian
     # pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / (
     #             ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
     # npCentPred = ((nonprefMean[0] + prefMean[1:])**exp) / (
     #              ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
 
-    # simple average
-    pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / 2
-    npCentPred = ((nonprefMean[0] + prefMean[1:])**exp) / 2
+    # RF weight is applied to numerator as well
+    pCentPred = ((prefMean[0] + (nonprefMean[1:] / np.max(respFull)))**exp) / (
+                ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
+
+    npCentPred = ((nonprefMean[0] + (prefMean[1:] / np.max(respFull)))**exp) / (
+                 ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
+
+    # # simple average
+    # pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / 2
+    # npCentPred = ((nonprefMean[0] + prefMean[1:])**exp) / 2
 
     ax2.plot(x, prefMean, color='black', label='PO')
     ax2.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',

@@ -13,15 +13,21 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import seaborn as sns
 
-goodSessions = ['230607', '230608', '230612', '230614']
+#### MEETZ
+# goodSessions = ['230607', '230608', '230612', '230614']
+#
+# fileList = ['230720']
 
-fileList = ['230720']
+#### AKSHAN
+
+# goodSessions = ['240529', '240530', '240603', '240605', '240606', '240607']
+fileList = ['240607']
 
 t0 = time.time()
 
 for fileIterator in fileList:
     # Load relevant file here with pyMat reader
-    monkeyName = 'Meetz'
+    monkeyName = 'Akshan' #'Meetz'
     seshDate = fileIterator
     fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
     # fileName = f'{monkeyName}_{seshDate}_GRF1_2_Spikes.mat'

@@ -64,12 +64,70 @@ plt.show(block=False)
 # plt.close()
 
 
+'''
+def computeMVGrid(xD, yD, startFrame, xBounds, yBounds):
+    """
+    Given x and y coordinates for all dots in a trial,
+    the function will compute all the motion vectors for one frame update that occur in a subgrid
+    Inputs: xDots, yDots (2D array): rows=x/y position for each frame, columns = unique dot
+    startFrame: the index of the frame after the mv update.
+    xBounds, the x limits for the grid
+    yBounds, the y limits for the grid
+    """
+
+    xF0 = xD[startFrame - 1, :].astype(float)
+    xF1 = xD[startFrame, :].astype(float)
+    yF0 = yD[startFrame - 1, :].astype(float)
+    yF1 = yD[startFrame, :].astype(float)
+
+    # mv mid points
+    xMidPoint = ((xF1[:, None] + xF0[None, :]) / 2)
+    yMidPoint = ((yF1[:, None] + yF0[None, :]) / 2)
+    midPointInGrid = np.where((xMidPoint >= xBounds[0]) & (xMidPoint < xBounds[1]) &
+                              (yMidPoint >= yBounds[0]) & (yMidPoint < yBounds[1]))
+
+    # get dots in frame0 that start in the subgrid
+    startInGrid = np.where((xF0 >= xBounds[0]) & (xF0 < xBounds[1]) &
+                           (yF0 >= yBounds[0]) & (yF0 < yBounds[1]))[0]
+
+    # get dots in frame1 that end in the subgrid
+    endsInGrid = np.where((xF1 >= xBounds[0]) & (xF1 < xBounds[1]) &
+                           (yF1 >= yBounds[0]) & (yF1 < yBounds[1]))[0]
+
+
+    # create indices for mvs
+    gridStartIndex = np.zeros((len(xF0), len(xF0)))
+    gridStartIndex[:, startInGrid] = 1
+    gridEndIndex = np.zeros((len(xF0), len(xF0)))
+    gridEndIndex[endsInGrid, :] = 1
+    midPointCentIndex = np.zeros((len(xF0), len(xF0)))
+    midPointCentIndex[midPointInGrid] = 1
+
+    validMV = ((gridStartIndex.astype('?') | gridEndIndex.astype('?'))
+               & midPointCentIndex.astype('?')).flatten()
+    validMVIndex = np.where(validMV == True)[0]
+
+    # calculate MVs
+    xDiff = (xF1[:, None] - xF0[None, :])
+    yDiff = (yF1[:, None] - yF0[None, :])
+
+    magnitude = np.sqrt((xDiff ** 2) + (yDiff ** 2)).flatten() / (2 / 75)
+    dirs = np.arctan2(yDiff, xDiff).flatten()
+    filteredMag = magnitude[validMVIndex]
+    filteredDirs = dirs[validMVIndex]
+
+    return filteredMag, filteredDirs
+
+
 def computeMVCond(xD, yD, startFrame, orig, rad, subPatch=True):
     """
     Given x and y coordinates for all dots in a trial,
     the function will compute all the motion vectors for one frame update
     Inputs: xDots, yDots (2D array): rows=x/y position for each frame, columns = unique dot
     startFrame: the index of the frame after the mv update.
+    orig: coordinates of the patch origin
+    rad: radius of subpatch
+    subPatch: true if center, false if annulus
     """
 
     xF0 = xD[startFrame - 1, :].astype(float)

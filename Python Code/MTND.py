@@ -74,19 +74,19 @@ p0 = time.time()
 ####### AKSHAN #######
 
 # pref + nonpref (AKSHAN) (potential good units/sessions)
-# fileList = ['240529', '240530', '240603', '240605', '240606', '240607' ]
+# fileList = ['240529', '240530', '240603', '240605', '240606', '240607' , '240610']
 # unitList = ['240529_31', '240530_55', '240603_167', '240605_147', '240606_176', '240607_137', '240607_155',
-#             '240607_164', '240607_170', '240607_179']
+#             '240607_164', '240607_170', '240607_179', '240610_169']
 '''
 # 240607, check units some actually prefer the 'non-pref'
 '''
 # cherry-picked good sessions/units for population plots
-fileList = ['240530', '240603', '240606', '240607']
-unitList = ['240530_55', '240603_167', '240606_176', '240607_137', '240607_170', '240607_179']
+# fileList = ['240530', '240603', '240606', '240607']
+# unitList = ['240530_55', '240603_167', '240606_176', '240607_137', '240607_170', '240607_179',
+#             ]
 
-
-# fileList = ['240607']
-# unitList = ['240607_94']
+fileList = ['240610']
+unitList = ['2406010_169']
 
 
 prefNormalized = []
@@ -596,7 +596,6 @@ for file in fileList:
         ax3.set_ylim(bottom=0)
         ax3.axhline(y=spon, linestyle='--', color='blue', alpha=0.8)
 
-
         # normalization vs distance (PN, NP)
         ax2 = fig.add_subplot(gs02[0, 0])
         x = np.arange(0, numSteps+1)
@@ -610,9 +609,9 @@ for file in fileList:
         prefSEM = np.concatenate(([SEMReshaped[count, 2, 0]],
                                   SEMReshaped[count, 0, 2::2]), axis=0)
         # RF weighted average
-        pCentPred = (prefOnly[0] + nullOnly[1:]) / (
+        pCentPred = (prefOnly[0] + (nullOnly[1:] / np.max(prefTransect))) / (
                     (prefOnly[0] + prefOnly[1:]) / np.max(prefTransect))
-        npCentPred = (nullOnly[0] + prefOnly[1:]) / (
+        npCentPred = (nullOnly[0] + (prefOnly[1:] / np.max(prefTransect))) / (
                      (prefOnly[0] + prefOnly[1:]) / np.max(prefTransect))
         # # simple average
         # pCentPred = (prefOnly[0] + nullOnly[1:]) / 2
@@ -1535,7 +1534,7 @@ for filler in range(1):
     # npCentPred = ((nonprefMean[0] + prefMean[1:])**exp) / (
     #              ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
 
-    # RF weight is applied to numerator as well
+    # RF weight is applied to numerator as well (USE THIS)
     pCentPred = ((prefMean[0] + (nonprefMean[1:] / np.max(respFull)))**exp) / (
                 ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
 
@@ -1831,20 +1830,20 @@ for filler in range(1):
     binMeanNNResp = np.array([np.mean(i) for i in equalBinsNNResp])
     binSEMNNResp = np.array([np.std(i) for i in equalBinsNNResp]) / np.sqrt(n)
 
-    # # pn/np pred
-    # pnPred = ((binMeanPrefResp[0] + binMeanNonprefResp[1:])**exp) / (
-    #     (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(binMeanTransectResp))
-    # npPred = ((binMeanNonprefResp[0] + binMeanPrefResp[1:])**exp) / (
-    #     (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(binMeanTransectResp))
-    #
+    # # pn/np pred (RF Weight)
+    pnPred = ((binMeanPrefResp[0] + (binMeanNonprefResp[1:] / np.max(transFitResp)))**exp) / (
+        (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
+    npPred = ((binMeanNonprefResp[0] + (binMeanPrefResp[1:] / np.max(transFitResp)))**exp) / (
+        (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
+
     # pnPred = ((gauss(0, *transParams) + binMeanNonprefResp[1:])**exp) / (
     #         (gauss(0, *transParams) + gauss(binMeanSep, *transParams)) / np.max(transFitResp))
     # npPred = ((binMeanNonprefResp[0] + gauss(binMeanSep, *transParams))**exp) / (
     #         (gauss(0, *transParams) + gauss(binMeanSep, *transParams)) / np.max(transFitResp))
 
     # pn/np pred (simple average)
-    pnPred = ((binMeanPrefResp[0] + binMeanNonprefResp[1:]) / 2)
-    npPred = ((binMeanNonprefResp[0] + binMeanPrefResp[1:]) / 2)
+    # pnPred = ((binMeanPrefResp[0] + binMeanNonprefResp[1:]) / 2)
+    # npPred = ((binMeanNonprefResp[0] + binMeanPrefResp[1:]) / 2)
 
 
 

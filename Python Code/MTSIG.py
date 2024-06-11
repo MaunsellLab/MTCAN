@@ -14,11 +14,17 @@ import psignifit as ps
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 from scipy.optimize import curve_fit
+from scipy.optimize import OptimizeWarning
+import warnings
+
+# fileList = ['240603', '240606', '240610']
+# unitList = ['240603_167', '240606_176', '240610_169']
+
 
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240607'
+seshDate = '240606'
 fileName = f'{monkeyName}_{seshDate}_MTSIG_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -75,6 +81,8 @@ contrasts = header['blockStatus']['data']['contrasts'][0] * 100
 contrasts = np.insert(contrasts, 0, 0)
 spikeCountMat = np.zeros((len(units), blocksDone+1, numContrasts*4))
 stimCount = np.zeros((2, 2, numContrasts), dtype=int)
+sponRate = np.zeros((len(units), numContrasts*4*(blocksDone+1)))
+sponIndex = 0
 stimCountIndex = np.arange(numContrasts*4)
 stimCountIndex = stimCountIndex.reshape(2, 2, numContrasts)
 onLatency = 50 / 1000  # time in MS for counting window latency after stim on
@@ -109,6 +117,8 @@ for corrTrial in corrTrials:
                                               (unitTimeStamps <= (stimOffTimeS + offLatency)))[0]
                         spikeCountMat[unitCount][stCount][stimIndex] \
                             = len(stimSpikes)
+                        sponRate[unitCount][sponIndex] = len(np.where((unitTimeStamps >= (stimOnTimeS - (100/1000))) &
+                                                                      (unitTimeStamps <= stimOnTimeS))[0])
 
                         # PSTHs
                         stimOnPreSNEV = stimOnTimeS - (histPrePostMS / 1000)
@@ -119,6 +129,7 @@ for corrTrial in corrTrials:
                         histStimSpikes = np.int32(histStimSpikes * 1000)
                         spikeHists[unitCount, stimIndex, histStimSpikes] += 1
 
+                sponIndex += 1
 
 # mean, SEM, and reshaping of spikeCount matrices
 meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
@@ -134,34 +145,42 @@ for count, i in enumerate(meanSpikeReshaped):
 
 
 # plot CRF
-
-unit = 155
+unit = 176
 unitID = np.where(units == unit)[0][0]
-baselineResp = 2
+baselineResp = np.mean(sponRate[unitID][:numContrasts*4*blocksDone]) * 1000/trueStimDurMS
 
 colorID = 0
 plotColors = ['green', 'red', 'green', 'red']
 plotAlphas = [1, 1, 0.5, 0.5]
 plt.figure(figsize=(12, 8))
+warnings.simplefilter('ignore', OptimizeWarning)
+
 for i in range(2):
     for j in range(2):
-        if j == 1:
-            response = meanSpikeReshaped[unitID][i][j]
-            response = np.insert(response, 0, baselineResp)
+        response = meanSpikeReshaped[unitID][i][j]
+        response = np.insert(response, 0, baselineResp)
+        try:
+            plt.scatter(contrasts, response, color=plotColors[colorID],
+                        alpha=plotAlphas[colorID])
+            initialGuess = [baselineResp, max(response), np.median(contrasts), 2.0]
+            pOpt, _ = curve_fit(contrastFn, contrasts, response,
+                                bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
+            plt.plot(np.logspace(-1, 2, 100), contrastFn(np.logspace(-1, 2, 100), *pOpt),
+                     color=plotColors[colorID], alpha=plotAlphas[colorID],
+                     label=f'{pOpt[2]:.2f}')
+        except (RuntimeError, ValueError) as e:
             plt.scatter(contrasts, response, color=plotColors[colorID], alpha=plotAlphas[colorID])
-            pOpt, _ = curve_fit(contrastFn, contrasts, response, bounds=(0, [np.inf, np.inf, np.inf]))
-            plt.plot(np.logspace(0, 2, 100), contrastFn(np.logspace(0, 2, 100), *pOpt),
-                     color=plotColors[colorID], alpha=plotAlphas[colorID], label=f'{pOpt[1]:.2f}')
         colorID += 1
 
-plt.xscale('log')
+plt.xscale('symlog', linthresh=0.1)
 plt.xlabel('Contrast (%)')
 plt.ylabel('Spikes/s')
 plt.title(f'Contrast Response Function, unit {unit}')
 plt.legend()
 sns.despine(offset=5)
 
-plt.show()
+
+# plt.show()
 
 plt.savefig(f'{unit}.pdf')
 plt.close('all')

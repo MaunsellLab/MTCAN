@@ -74,19 +74,27 @@ p0 = time.time()
 ####### AKSHAN #######
 
 # pref + nonpref (AKSHAN) (potential good units/sessions)
-# fileList = ['240529', '240530', '240603', '240605', '240606', '240607' , '240610']
+# fileList = ['240529', '240530', '240603', '240605', '240606', '240607' ,
+#             '240610', '240611', '240613']
 # unitList = ['240529_31', '240530_55', '240603_167', '240605_147', '240606_176', '240607_137', '240607_155',
 #             '240607_164', '240607_170', '240607_179', '240610_169']
 '''
 # 240607, check units some actually prefer the 'non-pref'
+# 240611, lots of work to clean up data
 '''
 # cherry-picked good sessions/units for population plots
-# fileList = ['240530', '240603', '240606', '240607']
+# fileList = ['240530', '240603', '240606', '240607', '240611', '240613', '240628']
 # unitList = ['240530_55', '240603_167', '240606_176', '240607_137', '240607_170', '240607_179',
-#             ]
+#             '240611_136', '240613_138', '240628_19']
 
-fileList = ['240610']
-unitList = ['2406010_169']
+# list if I consider poorly centered stimuli
+# fileList = ['240530', '240603', '240606', '240607', '240611', '240613', '240703']
+# unitList = ['240530_55', '240603_167', '240606_176', '240607_137', '240607_170', '240607_179',
+#             '240611_62', '240611_67', '240611_80', '240611_131', '240611_132', '240611_135',
+#             '240611_136', '240611_140', '240611_145', '240611_151', '240613_138', '240703_91']
+
+fileList = ['240709']
+unitList = ['240709_7']
 
 
 prefNormalized = []
@@ -125,7 +133,7 @@ allBlocksDone = []
 
 for file in fileList:
     # Load relevant file here with pyMat reader
-    monkeyName = 'Akshan'  # 'Meetz"
+    monkeyName = 'Akshan'  # 'Meetz'
     seshDate = file
     withinSesh = 1
     if withinSesh == 1:
@@ -1534,12 +1542,19 @@ for filler in range(1):
     # npCentPred = ((nonprefMean[0] + prefMean[1:])**exp) / (
     #              ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
 
-    # RF weight is applied to numerator as well (USE THIS)
-    pCentPred = ((prefMean[0] + (nonprefMean[1:] / np.max(respFull)))**exp) / (
-                ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
 
-    npCentPred = ((nonprefMean[0] + (prefMean[1:] / np.max(respFull)))**exp) / (
-                 ((prefMean[0] + prefMean[1:])**1) / np.max(respFull))
+    # RF weight is applied to numerator as well (USE THIS)
+    # pCentPred = ((prefMean[0] / np.max(respFull)) + (nonprefMean[1:] * (prefMean[1:]/np.max(respFull)))) / (
+    #             (prefMean[0] + prefMean[1:]) / np.max(respFull))
+    #
+    # npCentPred = ((nonprefMean[0] / np.max(respFull)) + (prefMean[1:] * (prefMean[1:]/np.max(respFull)))) / (
+    #              (prefMean[0] + prefMean[1:]) / np.max(respFull))
+
+    # RF weight is by max of fitted Gaussian (OLD WAY)
+    pCentPred = (prefMean[0] + (nonprefMean[1:]) / np.max(respFull)) / (
+                (prefMean[0] + prefMean[1:]) / np.max(respFull))
+    npCentPred = (nonprefMean[0] + (prefMean[1:]) / np.max(respFull)) / (
+                 (prefMean[0] + prefMean[1:]) / np.max(respFull))
 
     # # simple average
     # pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / 2
@@ -1686,10 +1701,10 @@ for filler in range(1):
 
     # raw vs predicted norm PN, NP, PP, NN
     # weighted average
-    pCentPred = ((np.reshape(prefNormalized[:, 0], (numUnits, 1)) + nonprefNormalized[:, 1:])**exp) / (
+    pCentPred = (np.reshape(prefNormalized[:, 0], (numUnits, 1)) + nonprefNormalized[:, 1:]) / (
                 (np.reshape(prefNormalized[:, 0], (numUnits, 1)) + prefNormalized[:, 1:]) / (
                  (np.reshape(np.max(transectNormalized, axis=1), (numUnits, 1)))))
-    meanPCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / (
+    meanPCentPred = (prefMean[0] + nonprefMean[1:]) / (
                     ((prefMean[0] + prefMean[1:])**1) / np.max(transectMean))
     nCentPred = ((np.reshape(nonprefNormalized[:, 0], (numUnits, 1)) + prefNormalized[:, 1:])**exp) / (
                 (np.reshape(prefNormalized[:, 0], (numUnits, 1)) + prefNormalized[:, 1:]) / (
@@ -1831,9 +1846,9 @@ for filler in range(1):
     binSEMNNResp = np.array([np.std(i) for i in equalBinsNNResp]) / np.sqrt(n)
 
     # # pn/np pred (RF Weight)
-    pnPred = ((binMeanPrefResp[0] + (binMeanNonprefResp[1:] / np.max(transFitResp)))**exp) / (
+    pnPred = (binMeanPrefResp[0] + (binMeanNonprefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
         (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
-    npPred = ((binMeanNonprefResp[0] + (binMeanPrefResp[1:] / np.max(transFitResp)))**exp) / (
+    npPred = (binMeanNonprefResp[0] + (binMeanPrefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
         (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
 
     # pnPred = ((gauss(0, *transParams) + binMeanNonprefResp[1:])**exp) / (
@@ -1844,8 +1859,6 @@ for filler in range(1):
     # pn/np pred (simple average)
     # pnPred = ((binMeanPrefResp[0] + binMeanNonprefResp[1:]) / 2)
     # npPred = ((binMeanNonprefResp[0] + binMeanPrefResp[1:]) / 2)
-
-
 
     ax7.plot(binMeanNormSep, binMeanPrefResp, color='black')
     ax7.errorbar(binMeanNormSep, binMeanPrefResp, yerr=binSEMPrefResp,

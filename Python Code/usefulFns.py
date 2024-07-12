@@ -5,6 +5,7 @@ from scipy import ndimage
 from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage.filters import gaussian_filter
 from scipy import stats
+from scipy.stats import mannwhitneyu
 from sklearn.metrics import r2_score
 from sklearn.metrics import explained_variance_score
 from itertools import combinations
@@ -171,14 +172,29 @@ def histSpikes(stimOnTimeS, stimOffTimeS, histPrePostMS, unitTimeStamps):
 
 
 def contrastFn(c, r0 ,rMax, c50, n):
-    '''
+    """
     equation for fitting contrast response functions (Naka-Rushton)
     rMax is maximum response, c50 is the semi-saturation constant
     and n is the exponent that describes the slope of the function
-
-    '''
+    """
 
     return r0 + (rMax * (c ** n) / (c ** n + c50 ** n))
+
+
+def confidenceIntervalCRF(popt, pcov, x, confidence=0.95):
+    """
+    function to calculate confidence interval for contrast response function fits
+    """
+
+    alpha = 1.0 - confidence
+    n = len(x)
+    p = len(popt)
+    dof = max(0, n - p)
+    tval = np.sqrt(np.diag(pcov)) * 1.96
+    lower = contrastFn(x, *(popt - tval))
+    upper = contrastFn(x, *(popt + tval))
+
+    return lower, upper
 
 
 def gauss(x, H, A, x0, sigma):

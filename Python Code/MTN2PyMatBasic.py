@@ -7,7 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 
-# good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123
+# good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123, 230126
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
 

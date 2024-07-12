@@ -17,14 +17,14 @@ from scipy.optimize import curve_fit
 from scipy.optimize import OptimizeWarning
 import warnings
 
-# fileList = ['240603', '240606', '240610']
-# unitList = ['240603_167', '240606_176', '240610_169']
+# fileList = ['240603', '240606', '240610', '240701']
+# unitList = ['240603_167', '240606_176', '240610_169', '240701_1']
 
 
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240606'
+seshDate = '240701'
 fileName = f'{monkeyName}_{seshDate}_MTSIG_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -131,7 +131,7 @@ for corrTrial in corrTrials:
 
                 sponIndex += 1
 
-# mean, SEM, and reshaping of spikeCount matrices
+# mean, SEM, and reshaping of spikeCount matrices (if pref and non pref are different)
 meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
 spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
 spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
@@ -143,9 +143,8 @@ for count, i in enumerate(meanSpikeReshaped):
     SEMReshaped[count] = (spikeCountSEM[count].reshape(2, 2, numContrasts) *
                           1000/trueStimDurMS)
 
-
 # plot CRF
-unit = 176
+unit = 1
 unitID = np.where(units == unit)[0][0]
 baselineResp = np.mean(sponRate[unitID][:numContrasts*4*blocksDone]) * 1000/trueStimDurMS
 
@@ -163,11 +162,15 @@ for i in range(2):
             plt.scatter(contrasts, response, color=plotColors[colorID],
                         alpha=plotAlphas[colorID])
             initialGuess = [baselineResp, max(response), np.median(contrasts), 2.0]
-            pOpt, _ = curve_fit(contrastFn, contrasts, response,
+            pOpt, pCov = curve_fit(contrastFn, contrasts, response,
                                 bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
-            plt.plot(np.logspace(-1, 2, 100), contrastFn(np.logspace(-1, 2, 100), *pOpt),
-                     color=plotColors[colorID], alpha=plotAlphas[colorID],
-                     label=f'{pOpt[2]:.2f}')
+            xFit = np.logspace(-1, 2, 100)
+            yFit = contrastFn(xFit, *pOpt)
+            lower, upper = confidenceIntervalCRF(pOpt, pCov, xFit)
+            plt.plot(xFit, yFit, color=plotColors[colorID],
+                     alpha=plotAlphas[colorID], label=f'{pOpt[2]:.2f}')
+            if j == 2:
+                plt.fill_between(xFit, lower, upper, color=plotColors[colorID], alpha=0.2)
         except (RuntimeError, ValueError) as e:
             plt.scatter(contrasts, response, color=plotColors[colorID], alpha=plotAlphas[colorID])
         colorID += 1
@@ -179,32 +182,9 @@ plt.title(f'Contrast Response Function, unit {unit}')
 plt.legend()
 sns.despine(offset=5)
 
-
 # plt.show()
 
 plt.savefig(f'{unit}.pdf')
 plt.close('all')
 
-
-
-
-
-
-# Plot each subject individually
-fig, axs = plt.subplots(2, 2, figsize=(15, 12))
-for i in range(responses_matrix.shape[0]):
-    for j in range(responses_matrix.shape[1]):
-        responses = responses_matrix[i, j]
-        popt, _ = curve_fit(naka_rushton, contrasts, responses, bounds=(0, [np.inf, np.inf, np.inf]))
-        axs[i, j].scatter(contrasts, responses, color='blue', label='Data Points')
-        axs[i, j].plot(np.logspace(0, 2, 100), naka_rushton(np.logspace(0, 2, 100), *popt), color='red', label='Fitted Function')
-        axs[i, j].set_xscale('log')
-        axs[i, j].set_xlabel('Contrast (%)')
-        axs[i, j].set_ylabel('Response')
-        axs[i, j].set_title(f'Subject ({i+1},{j+1})')
-        axs[i, j].legend()
-        axs[i, j].grid(True)
-
-plt.tight_layout()
-plt.show()
 

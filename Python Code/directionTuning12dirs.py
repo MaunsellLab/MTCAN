@@ -14,7 +14,7 @@ import matplotlib.patheffects as path_effects
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240610'
+seshDate = '240709'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -76,35 +76,36 @@ for uCount, unit in enumerate(units):
             map0StimLim = currTrial['numMap0Stim']['data']
             map0Count = 0
             stimDesc = currTrial['stimDesc']['data']
-            spikeData = currTrial['spikeData']
-            stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
-            for stim in stimDesc:
-                if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
-                    dirIndex = int(stim['directionIndex'])
-                    stCount = int(stimCount[0][dirIndex])
-                    stimOnTimeS = ((1000 / frameRateHz * stim['stimOnFrame'])
-                                   / 1000) + stim1TimeS
-                    stimOffTimeS = ((1000 / frameRateHz * stim['stimOffFrame'])
-                                    / 1000) + stim1TimeS
-                    stimCount[0][dirIndex] += 1
-                    map0Count += 1
-                    if unit in spikeData['unit']:
-                        spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
-                        unitIndex = np.where(spikeData['unit'] == unit)[0]
-                        unitTimeStamps = spikeData['timeStamp'][unitIndex]
-                        # spike count during stim presentation
-                        stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) &
-                                              (unitTimeStamps <= stimOffTimeS))
-                        spikeCountMat[stCount, dirIndex] = len(stimSpikes[0])
-                        # spontaneous spike count (100ms before stim on)
-                        sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS - (sponWindowMS / 1000))) &
-                                              (unitTimeStamps <= stimOnTimeS))
-                        sponSpikesArr.extend([len(sponSpikes[0])])
+            if 'spikeData' in currTrial:
+                spikeData = currTrial['spikeData']
+                stim1TimeS = currTrial['taskEvents']['stimulusOn']['time'][0]
+                for stim in stimDesc:
+                    if stim['gaborIndex'] == 1 and map0Count < map0StimLim:
+                        dirIndex = int(stim['directionIndex'])
+                        stCount = int(stimCount[0][dirIndex])
+                        stimOnTimeS = ((1000 / frameRateHz * stim['stimOnFrame'])
+                                       / 1000) + stim1TimeS
+                        stimOffTimeS = ((1000 / frameRateHz * stim['stimOffFrame'])
+                                        / 1000) + stim1TimeS
+                        stimCount[0][dirIndex] += 1
+                        map0Count += 1
+                        if unit in spikeData['unit']:
+                            spikeData['timeStamp'] = np.around(spikeData['timeStamp'], 3)
+                            unitIndex = np.where(spikeData['unit'] == unit)[0]
+                            unitTimeStamps = spikeData['timeStamp'][unitIndex]
+                            # spike count during stim presentation
+                            stimSpikes = np.where((unitTimeStamps >= stimOnTimeS) &
+                                                  (unitTimeStamps <= stimOffTimeS))
+                            spikeCountMat[stCount, dirIndex] = len(stimSpikes[0])
+                            # spontaneous spike count (100ms before stim on)
+                            sponSpikes = np.where((unitTimeStamps >= (stimOnTimeS - (sponWindowMS / 1000))) &
+                                                  (unitTimeStamps <= stimOnTimeS))
+                            sponSpikesArr.extend([len(sponSpikes[0])])
 
-                        # histograms
-                        histStimSpikes = histSpikes(stimOnTimeS, stimOffTimeS,
-                                                    histPrePostMS, unitTimeStamps)
-                        spikeHists[dirIndex, histStimSpikes] += 1
+                            # histograms
+                            histStimSpikes = histSpikes(stimOnTimeS, stimOffTimeS,
+                                                        histPrePostMS, unitTimeStamps)
+                            spikeHists[dirIndex, histStimSpikes] += 1
 
     # summary stats
     spikeCountMean = np.mean(spikeCountMat[:numBlocks, :], axis=0)

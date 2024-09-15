@@ -343,18 +343,20 @@ for file in fileList:
         offsetDegSepNormPop.append(offsetDegSepNorm)
         rfGaborSigmaPop.append(rfGaborSigma)
 
+        # add preferred response at center, null at center, pref at first offset (including transect)
+        # responses across all blocks from all valid neurons, to look at adaptation of response.
         p0Indx = stimCountIndex[2, 0]
         adaptationMat[adaptC, 0, :blocksDone] = (spikeCountMat[count, :blocksDone, p0Indx] /
-                                                 np.max(spikeCountMat[count, :blocksDone, p0Indx]))
+                                                 np.max(spikeCountMat[count, :3, p0Indx]))
         n0Indx = stimCountIndex[1, 0]
         adaptationMat[adaptC, 1, :blocksDone] = (spikeCountMat[count, :blocksDone, n0Indx] /
-                                                 np.max(spikeCountMat[count, :blocksDone, n0Indx]))
+                                                 np.max(spikeCountMat[count, :3, n0Indx]))
         p1Indx = stimCountIndex[0, 2]
         adaptationMat[adaptC, 2, :blocksDone] = (spikeCountMat[count, :blocksDone, p1Indx] /
-                                                 np.max(spikeCountMat[count, :blocksDone, p1Indx]))
+                                                 np.max(spikeCountMat[count, :3, p1Indx]))
         pT1Indx = transectCountIndex[0]
         adaptationMat[adaptC, 3, :blocksDone] = (spikeCountMat[count, :blocksDone, pT1Indx] /
-                                                 np.max(spikeCountMat[count, :blocksDone, pT1Indx]))
+                                                 np.max(spikeCountMat[count, :3, pT1Indx]))
         adaptC += 1
 
     # to open another file in the loop
@@ -504,18 +506,18 @@ for filler in range(1):
     # npCentPred = ((nonprefMean[0] * weights[0]) + (prefMean[1:] * weights[1:]) + meanSpon) / (
     #              weights[0] + weights[1:])
 
-    # # RF weight is applied to numerator as well (USE THIS) : Raw Rate (maybe good)
-    pCentPred = ((prefMean[0] * weights[0]) + (nonprefMean[1:] * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
-                weights[0] + weights[1:] + 0.07)
-
-    npCentPred = ((nonprefMean[0] * weights[0]) + (prefMean[1:] * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
-                 weights[0] + weights[1:] + 0.07)
-
-    # pCentPred = (((prefMean[0]-meanSpon) * weights[0]) + ((nonprefMean[1:]-meanSpon) * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
+    # # # RF weight is applied to numerator as well (USE THIS) : Raw Rate (maybe good)
+    # pCentPred = ((prefMean[0] * weights[0]) + (nonprefMean[1:] * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
     #             weights[0] + weights[1:] + 0.07)
     #
-    # npCentPred = (((nonprefMean[0]-meanSpon) * weights[0]) + ((prefMean[1:]-meanSpon) * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
+    # npCentPred = ((nonprefMean[0] * weights[0]) + (prefMean[1:] * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
     #              weights[0] + weights[1:] + 0.07)
+
+    pCentPred = (((prefMean[0]) + (nonprefMean[1:])) / (
+                weights[0] + weights[1:]))
+
+    npCentPred = (((nonprefMean[0]) + (prefMean[1:])) / (
+                 weights[0] + weights[1:]))
 
     # # simple average
     # pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / 2
@@ -915,10 +917,28 @@ plt.legend(loc='upper right')
 plt.show()
 
 
-# fit generic normalization  vs  RF Weighted Normalization model to the data
+# plot adaptation profiles
+meanPrefResp = np.nanmedian(adaptationMat[:numUnits, 0, :], axis=0)
+semPrefResp = stats.sem(adaptationMat[:numUnits, 0, :], axis=0, nan_policy='omit')
+
+trials = np.arange(adaptationMat[:numUnits, 0, :].shape[1])
+plt.errorbar(trials, meanPrefResp, yerr=semPrefResp, fmt='-o', capsize=5, capthick=2, label='Mean Response with SEM')
+plt.xlabel('Block Number')
+plt.ylabel('Response')
+plt.title('Average Neuron Response with SEM')
+plt.legend()
+
+plt.show()
+
+
+# fit different normalization models to the data
+# RF Weight, Heeger, Ni, Bram models
+
 genericNormR2Scores = []
 weightedNormR2Scores = []
 heegerNormR2Scores = []
+weightedNormFewerParamsR2Scores = []
+emsNormR2Scores = []
 genNormPos1 = []
 genNormPos2 = []
 genNormPos3 = []
@@ -931,6 +951,12 @@ heegerNormPos1 = []
 heegerNormPos2 = []
 heegerNormPos3 = []
 heegerNormPos4 = []
+emsNormPos1 = []
+emsNormPos2 = []
+emsNormPos3 = []
+emsNormPos4 = []
+weight3Params = []
+weight5Params = []
 
 for i in range(len(prefNormalized)):
     for j in range(1, 5):
@@ -939,47 +965,100 @@ for i in range(len(prefNormalized)):
                                                 ppNormalized[i], nnNormalized[i],
                                                 sponNormalized[i], j)
         # bram norm model
-        pOpt, pCov, = curve_fit(genericNorm, fixedVals.T, responses, maxfev=10000000,
-                                bounds=[[0, 0, 0, 0, 0], [1, 1, 1, 1, 0.10]])
-        y_pred = genericNorm(fixedVals.T, *pOpt)
-        r2Gen = r2_score(responses.squeeze(), y_pred)
+        pOpt1, pCov1, = curve_fit(genericNorm, fixedVals.T, responses, maxfev=10000000)  # ,
+                                # bounds=[[0, 0, 0, 0, 0], [1, 1, 1, 1, 0.10]])
+        y_pred1 = genericNorm(fixedVals.T, *pOpt1)
+        r2Gen = r2_score(responses.squeeze(), y_pred1)
         genericNormR2Scores.append(r2Gen)
 
         # heeger norm model
-        pOpt, pCov, = curve_fit(heegerNorm, fixedVals.T, responses, maxfev=10000000,
-                                bounds=[[0, 0, 0], [1, 1, 0.10]])
-        y_pred = heegerNorm(fixedVals.T, *pOpt)
-        r2Heeger = r2_score(responses.squeeze(), y_pred)
+        pOpt2, pCov2, = curve_fit(heegerNorm, fixedVals.T, responses, maxfev=10000000,
+                                  bounds=[[0, 0, 0], [np.inf, np.inf, np.inf]])
+        y_pred2 = heegerNorm(fixedVals.T, *pOpt2)
+        r2Heeger = r2_score(responses.squeeze(), y_pred2)
         heegerNormR2Scores.append(r2Heeger)
 
-        # RF weight model
-        pOpt, pCov, = curve_fit(weightedNorm, fixedVals.T, responses, maxfev=10000000,
-                                bounds=[[0, 0, 0, 0, 0], [1, 1, 1, 1, 0.10]])
-        y_pred = weightedNorm(fixedVals.T, *pOpt)
-        r2Weight = r2_score(responses.squeeze(), y_pred)
+        # RF weight model (5 params)
+        pOpt3, pCov3, = curve_fit(weightedNorm, fixedVals.T, responses, maxfev=10000000,
+                                  bounds=[[0, 0, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]])
+        y_pred3 = weightedNorm(fixedVals.T, *pOpt3)
+        r2Weight = r2_score(responses.squeeze(), y_pred3)
         weightedNormR2Scores.append(r2Weight)
+        residuals3 = responses - y_pred3
+
+        # EMS norm model (5 params)
+        pOpt5, pCov5, = curve_fit(emsNorm, fixedVals.T, responses, maxfev=10000000,
+                                  bounds=[[-np.inf, -np.inf, -10, -10, -np.inf], [np.inf, np.inf, 10, 10, np.inf]])
+        y_pred5 = emsNorm(fixedVals.T, *pOpt5)
+        r2EMS = r2_score(responses.squeeze(), y_pred5)
+        emsNormR2Scores.append(r2EMS)
+
+
+        # RF weight model fewer params (3 params)
+        responses, fixedVals = fixedValsForRFWeightFewerParams(prefNormalized[i], nonprefNormalized[i],
+                                                               pnNormalized[i], npNormalized[i],
+                                                               ppNormalized[i], nnNormalized[i],
+                                                               sponNormalized[i], j)
+
+        pOpt4, pCov4, = curve_fit(weightedNormFewerParams, fixedVals.T, responses, maxfev=10000000,
+                                bounds=[[0, 0, 0], [1, 1, 0.10]])
+        y_pred4 = weightedNormFewerParams(fixedVals.T, *pOpt4)
+        r2WeightFewerParams = r2_score(responses.squeeze(), y_pred4)
+        weightedNormFewerParamsR2Scores.append(r2WeightFewerParams)
+        residuals4 = responses - y_pred4
 
         if j == 1:
             genNormPos1.append(r2Gen)
             heegerNormPos1.append(r2Heeger)
             weightedNormPos1.append(r2Weight)
+            emsNormPos1.append(r2EMS)
         elif j == 2:
             genNormPos2.append(r2Gen)
             heegerNormPos2.append(r2Heeger)
             weightedNormPos2.append(r2Weight)
+            emsNormPos2.append(r2EMS)
         elif j == 3:
             genNormPos3.append(r2Gen)
             heegerNormPos3.append(r2Heeger)
             weightedNormPos3.append(r2Weight)
+            emsNormPos3.append(r2EMS)
         else:
             genNormPos4.append(r2Gen)
             heegerNormPos4.append(r2Heeger)
             weightedNormPos4.append(r2Weight)
+            emsNormPos4.append(r2EMS)
+
+        # adjusted R2 comparing weighted model (3 parameters) vs weighted model
+        # (5 parameters)
+        # Calculate RSS
+        rss3 = np.sum(residuals3 ** 2)
+        rss4 = np.sum(residuals4 ** 2)
+
+        # Calculate TSS
+        tss = np.sum((responses - np.mean(responses)) ** 2)
+
+        # Calculate R-squared and Adjusted R-squared
+        r2_3 = 1 - (rss3 / tss)
+        r2_4 = 1 - (rss4 / tss)
+
+        n = len(responses)
+        p3 = len(pOpt3)
+        p4 = len(pOpt4)
+
+        adjR2_3 = 1 - ((1 - r2_3) * (n - 1) / (n - p3 - 1))
+        adjR2_4 = 1 - ((1 - r2_4) * (n - 1) / (n - p4 - 1))
+
+        weight3Params.append(adjR2_4)
+        weight5Params.append(adjR2_3)
 
 
 genericMedian = np.median(genericNormR2Scores)
 weightedMedian = np.median(weightedNormR2Scores)
 heegerMedian = np.median(heegerNormR2Scores)
+weightedFewerParamsMedian = np.median(weightedNormFewerParamsR2Scores)
+weight3ParamsMedian = np.median(weight3Params)
+weight5ParamsMedian = np.median(weight5Params)
+emsNormMedian = np.median(emsNormR2Scores)
 
 # figure 0 comparing heeger model to rf weighted model
 for i in range(1):
@@ -1108,37 +1187,78 @@ for i in range(1):
     plt.show()
 
 
-# figure 2
+# figure 2 violin/box plots of all 4 models and their performance at different offset points
 for i in range(1):
     genNormData = [genNormPos1, genNormPos2, genNormPos3, genNormPos4]
     heegerNormData = [heegerNormPos1, heegerNormPos2, heegerNormPos3, heegerNormPos4]
     weightedNormData = [weightedNormPos1, weightedNormPos2, weightedNormPos3, weightedNormPos4]
+    emsNormData = [emsNormPos1, emsNormPos2, emsNormPos3, emsNormPos4]
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+    fig, axes = plt.subplots(1, 4, figsize=(15, 4))
 
     # Plot the violin plots for genNorm arrays
-    sns.violinplot(data=genNormData, ax=axes[0])
-    axes[0].set_title('Violin Plot for genNorm Arrays')
+    sns.boxplot(data=genNormData, ax=axes[0])
+    axes[0].set_title('Box Plot for bramNorm Arrays')
     axes[0].set_xlabel('Position')
     axes[0].set_ylabel('Values')
     axes[0].set_xticks([0, 1, 2, 3])
     axes[0].set_xticklabels(['Pos1', 'Pos2', 'Pos3', 'Pos4'])
+    axes[0].set_ylim(0, 1.2)
+
+    # Calculate and annotate median values
+    medians = [np.median(data) for data in genNormData]
+    maxY = max(max(data) for data in genNormData)
+    yText = maxY + 0.1
+    for j, median in enumerate(medians):
+        axes[0].text(j, yText, f'{median:.2f}', ha='center', va='bottom')
 
     # Plot the violin plots for heegerNorm arrays
-    sns.violinplot(data=heegerNormData, ax=axes[1])
-    axes[1].set_title('Violin Plot for heegerNorm Arrays')
+    sns.boxplot(data=heegerNormData, ax=axes[1])
+    axes[1].set_title('Box Plot for heegerNorm Arrays')
     axes[1].set_xlabel('Position')
     axes[1].set_ylabel('Values')
     axes[1].set_xticks([0, 1, 2, 3])
     axes[1].set_xticklabels(['Pos1', 'Pos2', 'Pos3', 'Pos4'])
+    axes[1].set_ylim(0, 1.2)
 
-    # Plot the violin plots for weightedNorm arrays
-    sns.violinplot(data=weightedNormData, ax=axes[2])
-    axes[2].set_title('Violin Plot for weightedNorm Arrays')
+    # Calculate and annotate median values
+    medians = [np.median(data) for data in heegerNormData]
+    maxY = max(max(data) for data in heegerNormData)
+    yText = maxY + 0.1
+    for j, median in enumerate(medians):
+        axes[1].text(j, yText, f'{median:.2f}', ha='center', va='bottom')
+
+    # Plot the violin plots for emsNorm arrays
+    sns.boxplot(data=emsNormData, ax=axes[2])
+    axes[2].set_title('Box Plot for emsNorm Arrays')
     axes[2].set_xlabel('Position')
     axes[2].set_ylabel('Values')
     axes[2].set_xticks([0, 1, 2, 3])
     axes[2].set_xticklabels(['Pos1', 'Pos2', 'Pos3', 'Pos4'])
+    axes[2].set_ylim(0, 1.2)
+
+    # Calculate and annotate median values
+    medians = [np.median(data) for data in emsNormData]
+    maxY = max(max(data) for data in emsNormData)
+    yText = maxY + 0.1
+    for j, median in enumerate(medians):
+        axes[2].text(j, yText, f'{median:.2f}', ha='center', va='bottom')
+
+    # Plot the violin plots for weightedNorm arrays
+    sns.boxplot(data=weightedNormData, ax=axes[3])
+    axes[3].set_title('Box Plot for weightedNorm Arrays')
+    axes[3].set_xlabel('Position')
+    axes[3].set_ylabel('Values')
+    axes[3].set_xticks([0, 1, 2, 3])
+    axes[3].set_xticklabels(['Pos1', 'Pos2', 'Pos3', 'Pos4'])
+    axes[3].set_ylim(0, 1.2)
+
+    # Calculate and annotate median values
+    medians = [np.median(data) for data in weightedNormData]
+    maxY = max(max(data) for data in weightedNormData)
+    yText = maxY + 0.1
+    for j, median in enumerate(medians):
+        axes[3].text(j, yText, f'{median:.2f}', ha='center', va='bottom')
 
     plt.tight_layout()
     plt.show()

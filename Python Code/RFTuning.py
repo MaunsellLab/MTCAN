@@ -22,11 +22,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import seaborn as sns
 
-fileList = ['221010', '221013', '221108', '221110', '221115', '221117',
-            '221124', '221128', '221206', '221208', '221229', '230123',
-            '230126']
+# fileList = ['221010', '221013', '221108', '221110', '221115', '221117',
+#             '221124', '221128', '221206', '221208', '221229', '230123',
+#             '230126']
 
-fileList = ['230606']
+fileList = ['240826']
 unitParams = []
 sessionXYMean = []
 loc0XY = []
@@ -40,7 +40,7 @@ t0 = time.time()
 
 for fileIterator in fileList:
     # Load relevant file here with pyMat reader
-    monkeyName = 'Meetz'
+    monkeyName = 'Akshan'
     seshDate = fileIterator
     fileName = f'{monkeyName}_{seshDate}_GRF1_Spikes.mat'
 
@@ -201,104 +201,104 @@ for fileIterator in fileList:
         loc1DistFromRFCent.append(loc1OffsetFromCenter)
 
         # # Plot figure
-        # fig = plt.figure()
-        # fig.set_size_inches(6, 8)
-        # aziLabel = np.around(np.linspace(minAzi, maxAzi, numAzi), 2)
-        # eleLabel = np.around(np.linspace(minEle, maxEle, numEle), 2)
-        #
-        # date = header['date']
-        #
-        # text = fig.text(0.05, 0.75, f'RF tuning for unit {unit}\n\
-        # {date}\n\
-        # - - - - - - - - - - - - - - - \n\
-        # Stimulus Duration: {trueStimDurMS} ms\n\
-        # Number of Blocks: {int(stimCount[0][0])}\n\
-        # Interstimulus Duration: {interstimDurMS}\n\
-        # Channel: {unitsChannel[uCount]}\n\
-        # Stim0 Azi: {stim0Azi:.1f}, Ele: {stim0Ele:.1f}\n\
-        # Stim1 Azi: {stim1Azi:.1f}, Ele: {stim1Ele:.1f}', size=10, fontweight='bold')
-        # text.set_path_effects([path_effects.Normal()])
-        #
-        # # heatmap
-        # ax_row1 = []
-        # ax_row1.append(plt.subplot2grid((numEle + 3, 6), (0, 3), colspan=3, rowspan=3))
-        # # bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
-        # bSmooth = gaussian_filter(spikeCountMean, sigma=1)
-        # ax_row1[0] = sns.heatmap(spikeCountMean * 1000 / trueStimDurMS, vmin=0)
-        # # ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5,
-        # #                    bSmooth.shape[0]), bSmooth, colors='yellow')
-        # ax_row1[0].set_xlabel('azimuth (˚)', fontsize=8)
-        # ax_row1[0].set_ylabel('elevation (˚)', fontsize=8)
-        # ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
-        # ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
-        # ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
-        #
-        # # marker lines
-        # ax_row1[0].scatter(((stim0Azi + abs(minAzi)) / (maxAzi + abs(minAzi)) * numAzi),
-        #                    (stim0Ele + abs(minEle)) / (abs(minEle) + maxEle) * numEle,
-        #                    s=100, marker='o', color='red')
-        # ax_row1[0].scatter(((stim1Azi + abs(minAzi)) / (maxAzi + abs(minAzi)) * numAzi),
-        #                    (stim1Ele + abs(minEle)) / (abs(minEle) + maxEle) * numEle,
-        #                    s=100, marker='o', color='green')
-        #
-        # ax_row1[0].invert_yaxis()
-        #
-        # # overlay 1SD, 2SD ellipse
-        # el1SD = Ellipse((xMean, yMean), xStdDev, yStdDev, theta,
-        #                 fill=None, edgecolor='blue')
-        # el1SD.set(linestyle=':')
-        # ax_row1[0].add_artist(el1SD)
-        # el2SD = Ellipse((xMean, yMean), 2 * xStdDev, 2 * yStdDev, theta,
-        #                 fill=None, edgecolor='black')
-        # el2SD.set(linestyle='--')
-        # ax_row1[0].add_artist(el2SD)
-        #
-        # ax_row2 = []
-        # for i in np.arange(numEle + 2, 2, -1):
-        #     ax = []
-        #     for j in np.arange(0, numAzi):
-        #         ax.append(plt.subplot2grid((numEle + 3, 6), (i, j)))
-        #     ax_row2.append(np.array(ax))
-        # ax_row2 = np.array(ax_row2)  # 6 x 6
-        #
-        # # PSTHs
-        # yMax = 0
-        # for i in range(numEle):
-        #     for j in range(numAzi):
-        #         spikeHist = spikeHists[:, i, j] * 1000 / stimCount[i, j]
-        #         gaussSmooth = gaussian_filter1d(spikeHist, 5)
-        #         if max(gaussSmooth) > yMax:
-        #             yMax = max(gaussSmooth)
-        #         ax_row2[i, j].plot(gaussSmooth)
-        #         # ax_row2[i,j].set_title(f"Ele:{eleLabel[i]},Azi:{aziLabel[j]}", fontsize=4)
-        #         # ax_row2[i,j].set_ylim(bottom=0)
-        #         # ax_row2[i,j].set_ylim([0, 100])
-        #         # ax_row2[i,j].set_yticks([0,50,100])
-        #         # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
-        #         ax_row2[i, j].tick_params(axis='y', which='major', labelsize=4)
-        #         ax_row2[i, j].set_xticks([0, histPrePostMS, histPrePostMS + trueStimDurMS,
-        #                                   2 * histPrePostMS + trueStimDurMS])
-        #         ax_row2[i, j].set_xticklabels([-histPrePostMS, 0, 0 + trueStimDurMS,
-        #                                        trueStimDurMS + histPrePostMS],
-        #                                       fontsize=3)
-        #         ax_row2[i, j].axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
-        #                               color='grey', alpha=0.2)
-        #         ax_row2[i, j].axhline(y=sponSpikesMean * 1000 / sponWindowMS,
-        #                               linestyle='--', color='grey')
-        #         if i == 0 and j == 0:
-        #             ax_row2[i, j].set_xlabel('Time (ms)', fontsize=7)
-        #             ax_row2[i, j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
-        #             ax_row2[i, j].yaxis.set_label_coords(-0.5, 1.75)
-        # plt.tight_layout(pad=0.1, w_pad=-0.25, h_pad=-1.45)
-        #
-        # for i in range(numEle):
-        #     for j in range(numAzi):
-        #         ax_row2[i, j].set_ylim([0, yMax * 1.1])
-        #
-        # # saves plot as pdf
-        # plt.savefig(f'{unit}.pdf')
-        # plt.close('all')
-        # continue
+        fig = plt.figure()
+        fig.set_size_inches(6, 8)
+        aziLabel = np.around(np.linspace(minAzi, maxAzi, numAzi), 2)
+        eleLabel = np.around(np.linspace(minEle, maxEle, numEle), 2)
+
+        date = header['date']
+
+        text = fig.text(0.05, 0.75, f'RF tuning for unit {unit}\n\
+        {date}\n\
+        - - - - - - - - - - - - - - - \n\
+        Stimulus Duration: {trueStimDurMS} ms\n\
+        Number of Blocks: {int(stimCount[0][0])}\n\
+        Interstimulus Duration: {interstimDurMS}\n\
+        Channel: {unitsChannel[uCount]}\n\
+        Stim0 Azi: {stim0Azi:.1f}, Ele: {stim0Ele:.1f}\n\
+        Stim1 Azi: {stim1Azi:.1f}, Ele: {stim1Ele:.1f}', size=10, fontweight='bold')
+        text.set_path_effects([path_effects.Normal()])
+
+        # heatmap
+        ax_row1 = []
+        ax_row1.append(plt.subplot2grid((numEle + 3, 6), (0, 3), colspan=3, rowspan=3))
+        # bSmooth = gaussian_filter1d(spikeCountMean, sigma=0.5)
+        bSmooth = gaussian_filter(spikeCountMean, sigma=1)
+        ax_row1[0] = sns.heatmap(spikeCountMean * 1000 / trueStimDurMS, vmin=0)
+        # ax_row1[0].contour(np.arange(.5, bSmooth.shape[1]), np.arange(.5,
+        #                    bSmooth.shape[0]), bSmooth, colors='yellow')
+        ax_row1[0].set_xlabel('azimuth (˚)', fontsize=8)
+        ax_row1[0].set_ylabel('elevation (˚)', fontsize=8)
+        ax_row1[0].set_title('Heatmap of unit RF location', fontsize=9)
+        ax_row1[0].set_yticklabels(eleLabel, fontsize=5)
+        ax_row1[0].set_xticklabels(aziLabel, fontsize=5)
+
+        # marker lines
+        ax_row1[0].scatter(((stim0Azi + abs(minAzi)) / (maxAzi + abs(minAzi)) * numAzi),
+                           (stim0Ele + abs(minEle)) / (abs(minEle) + maxEle) * numEle,
+                           s=100, marker='o', color='red')
+        ax_row1[0].scatter(((stim1Azi + abs(minAzi)) / (maxAzi + abs(minAzi)) * numAzi),
+                           (stim1Ele + abs(minEle)) / (abs(minEle) + maxEle) * numEle,
+                           s=100, marker='o', color='green')
+
+        ax_row1[0].invert_yaxis()
+
+        # overlay 1SD, 2SD ellipse
+        el1SD = Ellipse((xMean, yMean), xStdDev, yStdDev, theta,
+                        fill=None, edgecolor='blue')
+        el1SD.set(linestyle=':')
+        ax_row1[0].add_artist(el1SD)
+        el2SD = Ellipse((xMean, yMean), 2 * xStdDev, 2 * yStdDev, theta,
+                        fill=None, edgecolor='black')
+        el2SD.set(linestyle='--')
+        ax_row1[0].add_artist(el2SD)
+
+        ax_row2 = []
+        for i in np.arange(numEle + 2, 2, -1):
+            ax = []
+            for j in np.arange(0, numAzi):
+                ax.append(plt.subplot2grid((numEle + 3, 6), (i, j)))
+            ax_row2.append(np.array(ax))
+        ax_row2 = np.array(ax_row2)  # 6 x 6
+
+        # PSTHs
+        yMax = 0
+        for i in range(numEle):
+            for j in range(numAzi):
+                spikeHist = spikeHists[:, i, j] * 1000 / stimCount[i, j]
+                gaussSmooth = gaussian_filter1d(spikeHist, 5)
+                if max(gaussSmooth) > yMax:
+                    yMax = max(gaussSmooth)
+                ax_row2[i, j].plot(gaussSmooth)
+                # ax_row2[i,j].set_title(f"Ele:{eleLabel[i]},Azi:{aziLabel[j]}", fontsize=4)
+                # ax_row2[i,j].set_ylim(bottom=0)
+                # ax_row2[i,j].set_ylim([0, 100])
+                # ax_row2[i,j].set_yticks([0,50,100])
+                # ax_row2[i,j].set_yticklabels([0,50,100], fontsize=5)
+                ax_row2[i, j].tick_params(axis='y', which='major', labelsize=4)
+                ax_row2[i, j].set_xticks([0, histPrePostMS, histPrePostMS + trueStimDurMS,
+                                          2 * histPrePostMS + trueStimDurMS])
+                ax_row2[i, j].set_xticklabels([-histPrePostMS, 0, 0 + trueStimDurMS,
+                                               trueStimDurMS + histPrePostMS],
+                                              fontsize=3)
+                ax_row2[i, j].axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
+                                      color='grey', alpha=0.2)
+                ax_row2[i, j].axhline(y=sponSpikesMean * 1000 / sponWindowMS,
+                                      linestyle='--', color='grey')
+                if i == 0 and j == 0:
+                    ax_row2[i, j].set_xlabel('Time (ms)', fontsize=7)
+                    ax_row2[i, j].set_ylabel('Firing Rate (spikes/sec)', fontsize=7)
+                    ax_row2[i, j].yaxis.set_label_coords(-0.5, 1.75)
+        plt.tight_layout(pad=0.1, w_pad=-0.25, h_pad=-1.45)
+
+        for i in range(numEle):
+            for j in range(numAzi):
+                ax_row2[i, j].set_ylim([0, yMax * 1.1])
+
+        # saves plot as pdf
+        plt.savefig(f'{unit}.pdf')
+        plt.close('all')
+        continue
 
     # calculate average XY RF position for units from session, excluding
     # units with values more than 1.5 SD away from the mean

@@ -171,7 +171,7 @@ def histSpikes(stimOnTimeS, stimOffTimeS, histPrePostMS, unitTimeStamps):
     return histStimSpikes
 
 
-def contrastFn(c, r0 ,rMax, c50, n):
+def contrastFn(c, r0, rMax, c50, n):
     """
     equation for fitting contrast response functions (Naka-Rushton)
     rMax is maximum response, c50 is the semi-saturation constant
@@ -213,7 +213,8 @@ def gaussFit(x, y):
     sigma = np.sqrt(sum(y * (x - mean) ** 2) / sum(y))
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma],
                            bounds=((-np.inf, 0, -np.inf, 0),
-                                   (np.inf, 2*np.max(y), np.inf, np.inf)))
+                                   (np.inf, np.inf, np.inf, np.inf)),
+                           maxfev=10000000)
     return popt
 
 

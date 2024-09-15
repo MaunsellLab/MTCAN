@@ -17,14 +17,17 @@ from scipy.optimize import curve_fit
 from scipy.optimize import OptimizeWarning
 import warnings
 
-# fileList = ['240603', '240606', '240610', '240701']
-# unitList = ['240603_167', '240606_176', '240610_169', '240701_1']
+# fileList = ['240603', '240606', '240610', '240701', '240903', '240905]
+# 240903 has two files (MTSIG and MTSIG_unit2) with two units 3 and 8
+# unitList = ['240603_167', '240606_176', '240610_169', '240701_1', '240903_3', '240903_8'
+#             '240905_4']
 
 
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240701'
+seshDate = '240913'
+# fileName = f'{monkeyName}_{seshDate}_MTSIG_unit2_Spikes.mat'
 fileName = f'{monkeyName}_{seshDate}_MTSIG_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -75,7 +78,10 @@ else:
     trueStimDurMS = np.int32(np.around(1000 / frameRateHz * stimDurFrame[0]))
 
 # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
-blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone'][0]
+if 'blockStatus' in allTrials[corrTrials[-1]]:
+    blocksDone = allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone'][0]
+else:
+    blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone'][0]
 numContrasts = header['blockStatus']['data']['numContrasts'][0]
 contrasts = header['blockStatus']['data']['contrasts'][0] * 100
 contrasts = np.insert(contrasts, 0, 0)
@@ -144,7 +150,7 @@ for count, i in enumerate(meanSpikeReshaped):
                           1000/trueStimDurMS)
 
 # plot CRF
-unit = 1
+unit = 24
 unitID = np.where(units == unit)[0][0]
 baselineResp = np.mean(sponRate[unitID][:numContrasts*4*blocksDone]) * 1000/trueStimDurMS
 
@@ -156,14 +162,14 @@ warnings.simplefilter('ignore', OptimizeWarning)
 
 for i in range(2):
     for j in range(2):
-        response = meanSpikeReshaped[unitID][i][j]
+        response = meanSpikeReshaped[unitID][i][j].copy()
         response = np.insert(response, 0, baselineResp)
         try:
             plt.scatter(contrasts, response, color=plotColors[colorID],
                         alpha=plotAlphas[colorID])
             initialGuess = [baselineResp, max(response), np.median(contrasts), 2.0]
             pOpt, pCov = curve_fit(contrastFn, contrasts, response,
-                                bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
+                                   bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
             xFit = np.logspace(-1, 2, 100)
             yFit = contrastFn(xFit, *pOpt)
             lower, upper = confidenceIntervalCRF(pOpt, pCov, xFit)
@@ -182,9 +188,34 @@ plt.title(f'Contrast Response Function, unit {unit}')
 plt.legend()
 sns.despine(offset=5)
 
-# plt.show()
+plt.show()
 
 plt.savefig(f'{unit}.pdf')
 plt.close('all')
 
 
+# fit using Psignifit
+import psignifit as ps
+options = dict()
+options['sigmoidName'] = 'logn'
+
+for i in range(2):
+    for j in range(2):
+        response = meanSpikeReshaped[unitID][i][j].copy()
+        response = np.insert(response, 0, baselineResp)
+        response[-1] = meanSpikeReshaped[unitID][0][0][-1]
+        data = np.column_stack([contrasts, response, np.ones_like(response) * blocksDone])
+        result = ps.psignifit(data, options)
+        print(result['Fit'][0])
+
+
+
+
+response = meanSpikeReshaped[unitID][1][0].copy()
+response = np.insert(response, 0, baselineResp)
+
+# Assuming your data is formatted as [contrast level, number of successes, number of trials]
+data = np.column_stack([contrasts, response, np.ones_like(response) * blocksDone])  # Example, adjust the trials count
+# Fit the data
+result = ps.psignifit(data, options)
+ps.psigniplot.plotPsych(result)

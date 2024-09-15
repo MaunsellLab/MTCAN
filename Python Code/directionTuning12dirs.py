@@ -14,7 +14,7 @@ import matplotlib.patheffects as path_effects
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240709'
+seshDate = '240913'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -43,7 +43,10 @@ sponWindowMS = 100
 allTuningMat = np.zeros((len(units), numDir))
 allSEMMat = np.zeros((len(units), numDir))
 # numBlocks = header['mappingBlockStatus']['data']['blockLimit']
-numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
+if 'mappingBlockStatus' in allTrials[-1]:
+    numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
+else:
+    numBlocks = allTrials[-2]['mappingBlockStatus']['data']['blocksDone']
 
 # assert frame consistency during stimulus duration
 stimDurFrame = []

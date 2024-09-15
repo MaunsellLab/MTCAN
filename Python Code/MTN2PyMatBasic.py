@@ -7,14 +7,31 @@ import time
 import numpy as np
 import pandas as pd
 
+########################################### MEETZ ###########################################
 # good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123, 230126
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
 
+# # for loop to run through all files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126']
+
+########################################### AKSHAN ###########################################
+
 # for loop to run through all files
-fileList = ['221010', '221013', '221108', '221110', '221115', '221117',
-            '221124', '221128', '221206', '221208', '221229', '230123',
-            '230126']
+# fileList = ['Akshan_240826']
+
+
+########################################### Both ###########################################
+# for loop to run through all files
+fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+            'Meetz_230126', 'Akshan_240826']
+
+
 t0 = time.time()
 totUnits = []
 totR2 = []
@@ -68,8 +85,7 @@ n1n2ElectrodeDiff = []
 for fileIterator in fileList:
 
     # Load relevant file here with pyMat reader
-    monkeyName = 'Meetz'
-    seshDate = fileIterator
+    monkeyName, seshDate = fileIterator.split('_')
     fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
     allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -350,7 +366,8 @@ for fileIterator in fileList:
     wideCombs = [i for i in combinations(wideUnits, 2)]
     # combinations of units separated by more than 250ums
     distCombs = []
-    for i in combs:
+    for i in combs:  #### working version
+    # for i in filterCombs:
         n1 = unitsChannel[np.where(units == i[0])[0][0]]
         n2 = unitsChannel[np.where(units == i[1])[0][0]]
         n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
@@ -667,7 +684,7 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        for pairCount, pair in enumerate(combs):
+        for pairCount, pair in enumerate(distCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
@@ -1021,7 +1038,8 @@ for unitCount, unit in enumerate(units):
     orientCount = 0
     orientList = ['pref+pref', 'pref+null', 'null+pref', 'null+null',
                  'pref+blank', 'null+blank','blank+pref', 'blank+null']
-    for j in [(prefDir,prefDir),(prefDir,nullDir),(nullDir,prefDir),(nullDir,nullDir),]:
+    for j in [(prefDir, prefDir), (prefDir, nullDir),
+              (nullDir, prefDir), (nullDir, nullDir),]:
         loc0Dir, loc1Dir = j
         sIndex = stimIndexDF.index[(stimIndexDF['loc0 Direction'] == loc0Dir) &
                                    (stimIndexDF['loc0 Contrast'] == highContrast) &
@@ -1329,7 +1347,7 @@ for unitCount, unit in enumerate(units):
     ax4 = plt.legend(loc='upper right', prop={'size': 6}, bbox_to_anchor=(1.25, 1.0))
 
     # norm fit parameters with EMS generic (l1-l6)
-    ax5 = fig.add_subplot(gs03[0,0])
+    ax5 = fig.add_subplot(gs03[0, 0])
     ax5.text(0.5,0.5, f'L0_0: {unitNormFitEstimate[unitCount][0]:.2f}\n\
     L0_60: {unitNormFitEstimate[unitCount][1]:.2f}\n\
     L0_120: {unitNormFitEstimate[unitCount][2]:.2f}\n\

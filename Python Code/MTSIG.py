@@ -26,7 +26,7 @@ import warnings
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240913'
+seshDate = '240906'
 # fileName = f'{monkeyName}_{seshDate}_MTSIG_unit2_Spikes.mat'
 fileName = f'{monkeyName}_{seshDate}_MTSIG_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
@@ -150,45 +150,47 @@ for count, i in enumerate(meanSpikeReshaped):
                           1000/trueStimDurMS)
 
 # plot CRF
-unit = 24
-unitID = np.where(units == unit)[0][0]
-baselineResp = np.mean(sponRate[unitID][:numContrasts*4*blocksDone]) * 1000/trueStimDurMS
+unit = 21
 
-colorID = 0
-plotColors = ['green', 'red', 'green', 'red']
-plotAlphas = [1, 1, 0.5, 0.5]
-plt.figure(figsize=(12, 8))
-warnings.simplefilter('ignore', OptimizeWarning)
+for unit in units:
+    unitID = np.where(units == unit)[0][0]
+    baselineResp = np.mean(sponRate[unitID][:numContrasts*4*blocksDone]) * 1000/trueStimDurMS
 
-for i in range(2):
-    for j in range(2):
-        response = meanSpikeReshaped[unitID][i][j].copy()
-        response = np.insert(response, 0, baselineResp)
-        try:
-            plt.scatter(contrasts, response, color=plotColors[colorID],
-                        alpha=plotAlphas[colorID])
-            initialGuess = [baselineResp, max(response), np.median(contrasts), 2.0]
-            pOpt, pCov = curve_fit(contrastFn, contrasts, response,
-                                   bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
-            xFit = np.logspace(-1, 2, 100)
-            yFit = contrastFn(xFit, *pOpt)
-            lower, upper = confidenceIntervalCRF(pOpt, pCov, xFit)
-            plt.plot(xFit, yFit, color=plotColors[colorID],
-                     alpha=plotAlphas[colorID], label=f'{pOpt[2]:.2f}')
-            if j == 2:
-                plt.fill_between(xFit, lower, upper, color=plotColors[colorID], alpha=0.2)
-        except (RuntimeError, ValueError) as e:
-            plt.scatter(contrasts, response, color=plotColors[colorID], alpha=plotAlphas[colorID])
-        colorID += 1
+    colorID = 0
+    plotColors = ['green', 'red', 'green', 'red']
+    plotAlphas = [1, 1, 0.5, 0.5]
+    plt.figure(figsize=(12, 8))
+    warnings.simplefilter('ignore', OptimizeWarning)
 
-plt.xscale('symlog', linthresh=0.1)
-plt.xlabel('Contrast (%)')
-plt.ylabel('Spikes/s')
-plt.title(f'Contrast Response Function, unit {unit}')
-plt.legend()
-sns.despine(offset=5)
+    for i in range(2):
+        for j in range(2):
+            response = meanSpikeReshaped[unitID][i][j].copy()
+            response = np.insert(response, 0, baselineResp)
+            try:
+                plt.scatter(contrasts, response, color=plotColors[colorID],
+                            alpha=plotAlphas[colorID])
+                initialGuess = [baselineResp, max(response), np.median(contrasts), 2.0]
+                pOpt, pCov = curve_fit(contrastFn, contrasts, response,
+                                       bounds=([baselineResp, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
+                xFit = np.logspace(-1, 2, 100)
+                yFit = contrastFn(xFit, *pOpt)
+                lower, upper = confidenceIntervalCRF(pOpt, pCov, xFit)
+                plt.plot(xFit, yFit, color=plotColors[colorID],
+                         alpha=plotAlphas[colorID], label=f'{pOpt[2]:.2f}')
+                if j == 2:
+                    plt.fill_between(xFit, lower, upper, color=plotColors[colorID], alpha=0.2)
+            except (RuntimeError, ValueError) as e:
+                plt.scatter(contrasts, response, color=plotColors[colorID], alpha=plotAlphas[colorID])
+            colorID += 1
 
-plt.show()
+    plt.xscale('symlog', linthresh=0.1)
+    plt.xlabel('Contrast (%)')
+    plt.ylabel('Spikes/s')
+    plt.title(f'Contrast Response Function, unit {unit}')
+    plt.legend()
+    sns.despine(offset=5)
+
+    plt.show()
 
 plt.savefig(f'{unit}.pdf')
 plt.close('all')

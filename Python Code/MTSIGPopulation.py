@@ -22,18 +22,21 @@ from scipy.optimize import OptimizeWarning
 import warnings
 
 # # non-curated file List Akshan (C50 at center and peri for pref unmatched)
-# fileList = ['Akshan_240603', 'Akshan_240606', 'Akshan_240610', 'Akshan_240701',
-#             'Akshan_240903', 'Akshan_240903_2', 'Akshan_240905', 'Akshan_240906',
-#             'Akshan_240909', 'Akshan_240911', 'Akshan_240913']
-# unitList = ['240603_167', '240606_176', '240610_169', '240701_1', '240903_3',
-#             '240903_8_2', '240905_4', '240906_25', '240909_10', '240911_17',
-#             '240913_1', '240913_27', '240913_36', '240913_47', '240913_48']
+fileList = ['Akshan_240603', 'Akshan_240606', 'Akshan_240610', 'Akshan_240701',
+            'Akshan_240903', 'Akshan_240903_2', 'Akshan_240905', 'Akshan_240906',
+            'Akshan_240909', 'Akshan_240911', 'Akshan_240913', 'Akshan_240916',
+            'Akshan_240917', 'Akshan_240922', 'Akshan_240924']
+unitList = ['240603_167', '240606_176', '240610_169', '240701_1', '240903_3',
+            '240903_8_2', '240905_4', '240906_25', '240909_10', '240911_17',
+            '240913_1', '240913_27', '240913_36', '240913_47', '240913_48',
+            '240916_7', '240917_44', '240922_6', '240924_22', '240924_35',
+            '240924_21']
 
 # # curated file List Akshan (C50 at center and peri for pref unmatched)
-fileList = ['Akshan_240603', 'Akshan_240606', 'Akshan_240610', 'Akshan_240903_2',
-            'Akshan_240905', 'Akshan_240906', 'Akshan_240913']
-unitList = ['240603_167', '240606_176', '240610_169', '240903_8_2', '240905_4',
-            '240906_25', '240913_27', '240913_48', '240913_36']
+# fileList = ['Akshan_240603', 'Akshan_240606', 'Akshan_240610', 'Akshan_240903_2',
+#             'Akshan_240905', 'Akshan_240906', 'Akshan_240913']
+# unitList = ['240603_167', '240606_176', '240610_169', '240903_8_2', '240905_4',
+#             '240906_25', '240913_27', '240913_48', '240913_36']
 
 
 rMaxPerChange = []
@@ -299,11 +302,14 @@ for filler in range(1):
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
     ax[0].plot(xFit, yFit, color='green', label=f'c50={pOpt[2]:.2f}, rMax={pOpt[1]:.2f}')
+    print(pOpt)
 
     # plot pref peri
     initialGuess = [prefPeriMean[0], max(prefPeriMean), np.median(contrasts), 2.0]
+    # pOpt, pCov = curve_fit(contrastFn, contrasts, prefPeriMean, bounds=([prefPeriMean[0], 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
     pOpt, pCov = curve_fit(contrastFn, contrasts, prefPeriMean,
-                           bounds=([prefPeriMean[0], 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]))
+                           bounds=([prefPeriMean[0], 0.8812, 0, 0], [np.inf, 0.8812+0.001, np.inf, np.inf]))
+    print(pOpt)
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
     ax[0].plot(xFit, yFit, color='green', alpha=0.5, label=f'c50={pOpt[2]:.2f}, rMax={pOpt[1]:.2f}')
@@ -460,34 +466,141 @@ plt.show()
 
 #### WORK STATION BELOW
 
-
-def weightedNormMTSIG(C, L, w, sigma, condition):
-    """
-    weighted normalization to fit single gabor presentation of a stimulus at different contrasts
-    at two different locations (center vs periphery), will return the L term, weight (w) and sigma
-    """
-
-    if condition:
-        return (C * L * w) / ((C * w) + sigma)
-    else:
-        return (C * L) / (C + sigma)
-
-
-resp = np.concatenate((prefCenterMean, prefPeriMean), axis=0)
-cont = np.concatenate((contrasts, contrasts), axis=0)
-conditionArray = np.concatenate((np.full(7, False), np.full(7, True)), axis=0)
-
-popt, pcov = curve_fit(weightedNormMTSIG, cont, resp)
+# Define the conditional model
+def weightedNormMTSIG(C_terms, Lp, Lnp, w, sigma, b, condition, conditionPorNP):
+    result = np.zeros_like(C_terms)  # Initialize result array of same shape as C_terms
+    for i, C in enumerate(C_terms):
+        if conditionPorNP[i]:
+            if condition[i]:  # Check condition for each C term
+                result[i] = (C * Lp * w**1) / ((C * w) + sigma) + b
+            else:
+                result[i] = (C * Lp) / (C + sigma) + b
+        else:
+            if condition[i]:  # Check condition for each C term
+                result[i] = (C * Lnp * w**1) / ((C * w) + sigma) + b
+            else:
+                result[i] = (C * Lnp) / (C + sigma) + b
+    return result
 
 
+# Example of the fitting procedure using curve_fit
+def fit_data(C_terms, y_data, condition, conditionPorNP):
+    # Define the objective function for curve fitting
+    def objective(C_terms, Lp, Lnp, w, sigma, b):
+        return weightedNormMTSIG(C_terms, Lp, Lnp, w, sigma, b, condition, conditionPorNP)
 
+    # Initial guess for L, w, and sigma
+    initial_guess = [1, .5, 0.5, 0.05, resp[0]]
+
+    # Perform the curve fitting
+    popt, pcov = curve_fit(objective, C_terms, y_data, p0=initial_guess)
+
+    return popt, pcov
+
+
+resp = np.concatenate((prefCenterMean, prefPeriMean, nonprefCenterMean, nonprefPeriMean), axis=0)
+cont = np.concatenate((contrasts, contrasts, contrasts, contrasts), axis=0)
+conditionArray = np.concatenate((np.full(7, False), np.full(7, True),
+                                 np.full(7, False), np.full(7, True)),
+                                axis=0)
+condition2Array = np.concatenate((np.full(14, True), np.full(14, False)), axis=0)
+
+popt, pcov = fit_data(cont, resp, conditionArray, condition2Array)
+yPred = weightedNormMTSIG(cont, *popt, conditionArray, condition2Array)
+print(r2_score(resp, yPred))
+
+
+# plotting
+xFit = np.logspace(-1, 2, 100)
+
+# pref center
+yFit = weightedNormMTSIG(xFit, *popt, np.full(100, False), np.full(100, True))
+plt.plot(xFit, yFit, color='green', linestyle='dashed')
+# yFit = weightedNormMTSIG(cont[:7], *popt, conditionArray[:7])
+# plt.plot(cont[:7], yFit, color='green', linestyle='dashed')
+plt.scatter(contrasts, prefCenterMean, color='green')
+
+y_min, y_max = resp[0], np.max(yFit)
+y_halfway = (y_min + y_max) / 2
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
+x_halfway = xFit[closest_index]
+# plt.axhline(y=y_halfway, color='g')
+# plt.axvline(x=x_halfway, color='g', label=f'c50 = {x_halfway:.2f}')
+# plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g')
+# plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', label=f'c50 = {x_halfway:.2f}')
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='g')
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='g', label=f'c50 = {x_halfway:.2f}')
+
+# pref peri
+yFit = weightedNormMTSIG(xFit, *popt, np.full(100, True), np.full(100, True))
+plt.plot(xFit, yFit, color='green', alpha=0.5, linestyle='dashed')
+# yFit = weightedNormMTSIG(cont[7:], *popt, conditionArray[7:])
+# plt.plot(cont[7:], yFit, color='green', alpha=0.5, linestyle='dashed')
+plt.scatter(contrasts, prefPeriMean, color='green', alpha=0.5)
+
+y_min, y_max = resp[0], np.max(yFit)
+y_halfway = (y_min + y_max) / 2
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
+x_halfway = xFit[closest_index]
+# plt.axhline(y=y_halfway, color='g', alpha=0.5, linestyle='-')
+# plt.axvline(x=x_halfway, color='g', alpha=0.5, linestyle='-', label=f'c50 = {x_halfway:.2f}')
+# plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g', alpha=0.5)
+# plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='g', alpha=0.5)
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+
+# nonpref center
+yFit = weightedNormMTSIG(xFit, *popt, np.full(100, False), np.full(100, False))
+plt.plot(xFit, yFit, color='red', linestyle='dashed')
+# yFit = weightedNormMTSIG(cont[:7], *popt, conditionArray[:7])
+# plt.plot(cont[:7], yFit, color='green', linestyle='dashed')
+plt.scatter(contrasts, nonprefCenterMean, color='red')
+
+y_min, y_max = resp[0], np.max(yFit)
+y_halfway = (y_min + y_max) / 2
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
+x_halfway = xFit[closest_index]
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='r')
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='r', label=f'c50 = {x_halfway:.2f}')
+
+# nonpref peri
+yFit = weightedNormMTSIG(xFit, *popt, np.full(100, True), np.full(100, False))
+plt.plot(xFit, yFit, color='red', alpha=0.5, linestyle='dashed')
+# yFit = weightedNormMTSIG(cont[7:], *popt, conditionArray[7:])
+# plt.plot(cont[7:], yFit, color='green', alpha=0.5, linestyle='dashed')
+plt.scatter(contrasts, nonprefPeriMean, color='red', alpha=0.5)
+
+y_min, y_max = resp[0], np.max(yFit)
+y_halfway = (y_min + y_max) / 2
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
+x_halfway = xFit[closest_index]
+# plt.axhline(y=y_halfway, color='g', alpha=0.5, linestyle='-')
+# plt.axvline(x=x_halfway, color='g', alpha=0.5, linestyle='-', label=f'c50 = {x_halfway:.2f}')
+# plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g', alpha=0.5)
+# plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='r', alpha=0.5)
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='r', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+
+plt.xscale('symlog', linthresh=0.1)
+plt.xlim(left=0)
+plt.ylim(bottom=0)
+plt.legend(loc='lower right')
+plt.show()
+
+
+
+###### WORKING VERSION
 
 # Define the conditional model
 def weightedNormMTSIG(C_terms, L, w, sigma, b, condition):
     result = np.zeros_like(C_terms)  # Initialize result array of same shape as C_terms
     for i, C in enumerate(C_terms):
         if condition[i]:  # Check condition for each C term
-            result[i] = (C * L * w**2) / ((C * w) + sigma) + b
+            result[i] = (C * L * w**1) / ((C * w) + sigma) + b
         else:
             result[i] = (C * L) / (C + sigma) + b
     return result
@@ -500,7 +613,7 @@ def fit_data(C_terms, y_data, condition):
         return weightedNormMTSIG(C_terms, L, w, sigma, b, condition)
 
     # Initial guess for L, w, and sigma
-    initial_guess = [1.0, 0.5, 0.05, resp[0]]
+    initial_guess = [.5, 0.5, 0.05, resp[0]]
 
     # Perform the curve fitting
     popt, pcov = curve_fit(objective, C_terms, y_data, p0=initial_guess)
@@ -508,7 +621,7 @@ def fit_data(C_terms, y_data, condition):
     return popt, pcov
 
 
-resp = np.concatenate((prefCenterMean, prefPeriMean), axis=0)
+resp = np.concatenate((nonprefCenterMean, nonprefPeriMean), axis=0)
 cont = np.concatenate((contrasts, contrasts), axis=0)
 conditionArray = np.concatenate((np.full(7, False), np.full(7, True)), axis=0)
 
@@ -526,12 +639,15 @@ plt.plot(contrasts, prefCenterMean, color='green')
 
 y_min, y_max = resp[0], np.max(yFit)
 y_halfway = (y_min + y_max) / 2
-closest_index = np.argmin(np.abs(yFit - y_halfway))
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
 x_halfway = xFit[closest_index]
 # plt.axhline(y=y_halfway, color='g')
 # plt.axvline(x=x_halfway, color='g', label=f'c50 = {x_halfway:.2f}')
-plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g')
-plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', label=f'c50 = {x_halfway:.2f}')
+# plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g')
+# plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', label=f'c50 = {x_halfway:.2f}')
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='g')
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='g', label=f'c50 = {x_halfway:.2f}')
 
 
 yFit = weightedNormMTSIG(xFit, *popt, np.full(100, True))
@@ -542,19 +658,22 @@ plt.plot(contrasts, prefPeriMean, color='green', alpha=0.5)
 
 y_min, y_max = resp[0], np.max(yFit)
 y_halfway = (y_min + y_max) / 2
-# Step 3: Find the xFit value corresponding to the yFit value closest to y_halfway
-closest_index = np.argmin(np.abs(yFit - y_halfway))
+# closest_index = np.argmin(np.abs(yFit - y_halfway))
+closest_index = np.argmin(np.abs(yFit - 0.5))
 x_halfway = xFit[closest_index]
 # plt.axhline(y=y_halfway, color='g', alpha=0.5, linestyle='-')
 # plt.axvline(x=x_halfway, color='g', alpha=0.5, linestyle='-', label=f'c50 = {x_halfway:.2f}')
-plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g', alpha=0.5)
-plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+# plt.plot([xFit[0], x_halfway], [y_halfway, y_halfway], color='g', alpha=0.5)
+# plt.plot([x_halfway, x_halfway], [0, y_halfway], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
+plt.plot([xFit[0], x_halfway], [0.5, 0.5], color='g', alpha=0.5)
+plt.plot([x_halfway, x_halfway], [0, 0.5], color='g', alpha=0.5, label=f'c50 = {x_halfway:.2f}')
 
 # plt.xscale('symlog', linthresh=0.1)
 plt.xlim(left=0)
 plt.ylim(bottom=0)
 plt.legend(loc='lower right')
 plt.show()
+
 
 
 

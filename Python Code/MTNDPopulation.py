@@ -51,7 +51,6 @@ unitList = ['230620_58', '230626_131', '230627_147', '230627_141', '230627_106',
             '240705_74', '240705_162', '240709_53', '240709_108']
 
 
-
 # population arrays
 prefNormalized = []
 nonprefNormalized = []
@@ -420,13 +419,6 @@ for filler in range(1):
     ax1.set_ylim([0, 1])
     ax1.set_title('transect')
 
-    # RF weight (from fitted Gaussian)
-    halfTransX = np.arange(0, 5)
-    respHalfGauss = gauss(halfTransX, *params)
-    # drivenRespHalfGauss = respHalfGauss - params[0]
-    drivenRespHalfGauss = respHalfGauss
-    weights = drivenRespHalfGauss / drivenRespHalfGauss[0]
-
     # normalization with distance PN/NP
     x = np.arange(0, numSteps + 1)
     xNorm = np.arange(1, numSteps + 1)
@@ -438,6 +430,16 @@ for filler in range(1):
     pnSEM = np.std(pnNormalized, axis=0) / np.sqrt(numUnits)
     npMean = np.mean(npNormalized, axis=0)
     npSEM = np.std(npNormalized, axis=0) / np.sqrt(numUnits)
+
+    # # RF weight (from fitted Gaussian)
+    # halfTransX = np.arange(0, 5)
+    # respHalfGauss = gauss(halfTransX, *params)
+    # # drivenRespHalfGauss = respHalfGauss - params[0]
+    # drivenRespHalfGauss = respHalfGauss
+    # weights = drivenRespHalfGauss / drivenRespHalfGauss[0]
+
+    # weight from raw responses
+    weights = prefMean / prefMean[0]
 
     # rf weighted average
     # RF weight is by max response of pref stimulus in transect
@@ -492,13 +494,6 @@ for filler in range(1):
     # npCentPred = (((nonprefMean[0] * (nonprefMean[0] / np.max(transectMean))) + (prefMean[1:] * (prefMean[1:]/np.max(transectMean)))) / (
     #               nonprefMean[0] / np.max(transectMean) + prefMean[1:] / np.max(transectMean))) + (meanSpon/2)
 
-
-    # pCentPred = (((prefMean[0] * weights[0]) + (nonprefMean[1:] * weights[1:])) / (
-    #             weights[0] + weights[1:])) + meanSpon
-    #
-    # npCentPred = (((nonprefMean[0] * weights[0]) + (prefMean[1:] * weights[1:])) / (
-    #              weights[0] + weights[1:])) + meanSpon
-
     # # RF weight is applied to numerator as well (USE THIS) : Raw Rate
     # pCentPred = ((prefMean[0] * weights[0]) + (nonprefMean[1:] * weights[1:]) + meanSpon) / (
     #             weights[0] + weights[1:])
@@ -513,11 +508,17 @@ for filler in range(1):
     # npCentPred = ((nonprefMean[0] * weights[0]) + (prefMean[1:] * weights[1:]) + (meanSpon * (weights[0] + weights[1:] + 0.07))) / (
     #              weights[0] + weights[1:] + 0.07)
 
-    pCentPred = (((prefMean[0]) + (nonprefMean[1:])) / (
-                weights[0] + weights[1:]))
+    # pCentPred = (((prefMean[0]) + (nonprefMean[1:])) / (
+    #             weights[0] + weights[1:]))
+    #
+    # npCentPred = (((nonprefMean[0]) + (prefMean[1:])) / (
+    #              weights[0] + weights[1:]))
 
-    npCentPred = (((nonprefMean[0]) + (prefMean[1:])) / (
-                 weights[0] + weights[1:]))
+    pCentPred = (((prefMean[0]) + (nonprefMean[0] * (weights[1:]**2))) / (
+                weights[0] + weights[1:]) + 0.08)
+
+    npCentPred = (((nonprefMean[0]) + (prefMean[0] * (weights[1:]**2))) / (
+                 weights[0] + weights[1:]) + 0.08)
 
     # # simple average
     # pCentPred = ((prefMean[0] + nonprefMean[1:])**exp) / 2
@@ -637,9 +638,7 @@ for filler in range(1):
     # ax4.set_ylim(bottom=0)
     # ax4.set_title('NMI, Ni and Maunsell, 2017')
 
-
     # NMI vs normalized separation
-
     normSep = offsetDegSepNormPop[:, 5:].reshape(numUnits*numSteps)
     pn = pnNMIPop.reshape(numUnits*numSteps)
     nonp = npNMIPop.reshape(numUnits*numSteps)
@@ -800,6 +799,9 @@ for filler in range(1):
     binMeanNonprefResp = np.array([np.mean(i) for i in equalBinsNonprefResp])
     binSEMNonpreResp = np.array([np.std(i) for i in equalBinsNonprefResp]) / np.sqrt(n)
 
+    # bin weights
+    binWeights = binMeanPrefResp / binMeanPrefResp[0]
+
     # pn/np/pp/nn response
     sep = offsetDegSepNormPop[:, 5:].reshape(numUnits*numSteps)
     pnResp = pnNormalized.reshape(numUnits*numSteps)
@@ -829,10 +831,15 @@ for filler in range(1):
     binSEMNNResp = np.array([np.std(i) for i in equalBinsNNResp]) / np.sqrt(n)
 
     # # pn/np pred (RF Weight)
-    pnPred = (binMeanPrefResp[0] + (binMeanNonprefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
-        (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
-    npPred = (binMeanNonprefResp[0] + (binMeanPrefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
-        (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
+    pnPred = (binMeanPrefResp[0] + binMeanNonprefResp[1:]) / (
+              binWeights[0] + binWeights[1:])
+    npPred = (binMeanNonprefResp[0] + binMeanPrefResp[1:]) / (
+              binWeights[0] + binWeights[1:])
+
+    # pnPred = (binMeanPrefResp[0] + (binMeanNonprefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
+    #     (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
+    # npPred = (binMeanNonprefResp[0] + (binMeanPrefResp[1:] * (binMeanPrefResp[1:] / np.max(transFitResp)))) / (
+    #     (binMeanPrefResp[0] + binMeanPrefResp[1:]) / np.max(transFitResp))
 
     # pnPred = ((gauss(0, *transParams) + binMeanNonprefResp[1:])**exp) / (
     #         (gauss(0, *transParams) + gauss(binMeanSep, *transParams)) / np.max(transFitResp))

@@ -33,6 +33,13 @@ from pymatreader import read_mat
 from binsreg import *
 from scipy.stats import f_oneway
 import glob
+import matplotlib as mpl
+import matplotlib.lines as mlines
+from scipy.stats import wilcoxon
+
+
+# fig saving params
+mpl.rcParams['pdf.fonttype'] = 42
 
 
 def loadMatFile73(NHP, date, fileName):
@@ -178,7 +185,19 @@ def contrastFn(c, r0, rMax, c50, n):
     and n is the exponent that describes the slope of the function
     """
 
-    return r0 + (rMax * (c ** n) / (c ** n + c50 ** n))
+    return r0 + ((rMax * (c ** n)) / ((c ** n) + (c50 ** n)))
+
+
+def contrastFnNoBaseline(c, rMax, c50, n):
+    """
+    equation for fitting contrast response functions (Naka-Rushton)
+    rMax is maximum response, c50 is the semi-saturation constant
+    and n is the exponent that describes the slope of the function
+    without a baseline, since responses start at 0 (baseline substracted
+    and normalized to 1)
+    """
+
+    return (rMax * (c ** n)) / ((c ** n) + (c50 ** n))
 
 
 def confidenceIntervalCRF(popt, pcov, x, confidence=0.95):

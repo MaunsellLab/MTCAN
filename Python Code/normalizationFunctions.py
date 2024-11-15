@@ -141,6 +141,63 @@ def fixedValsForRFWeightFewerParams(pResp, nResp, pnResp, npResp, ppResp, nnResp
     return np.array(responses), np.array(fixedVals)
 
 
+# Updated response model for element-wise operation
+def fullRFWeightedNorm(contrast_center, contrast_periphery, location, stim_type_center,
+                       stim_type_periphery, Lp, Lnp, W1, W2, W3, W4, sigma):
+    """
+    RF weighted norm fit for full stimulus set, fitting all 26 conditions at once (excluding baseline and mapping)
+    """
+
+    # Determine weight based on peripheral location
+    if location == -1:  # No peripheral stimulus
+        W_periphery = 0
+    else:
+        W_periphery = [W1, W2, W3, W4][int(location)]  # Choose weight based on location
+
+    # Center stimulus response
+    if stim_type_center == 1:  # Preferred
+        L_center = Lp
+    elif stim_type_center == 0:  # Non-preferred
+        L_center = Lnp
+    else:  # No center stimulus
+        L_center = 0
+
+    # Peripheral stimulus response
+    if stim_type_periphery == 1:  # Preferred
+        L_periphery = Lp
+    elif stim_type_periphery == 0:  # Non-preferred
+        L_periphery = Lnp
+    else:  # No periphery stimulus
+        L_periphery = 0
+
+    # Equation for the response R
+    numerator = (contrast_center * L_center) + (contrast_periphery * L_periphery * W_periphery)
+    denominator = contrast_center + (W_periphery * contrast_periphery) + sigma
+
+    return numerator / denominator
+
+
+# Wrapper function to pass all data element-wise to curve_fit
+def model_wrapper(data, Lp, Lnp, W1, W2, W3, W4, sigma):
+    contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery = data
+    # Apply the response model element-wise
+    return [fullRFWeightedNorm(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, W1, W2, W3, W4, sigma)
+            for c_center, c_periph, loc, stim_c, stim_p in
+            zip(contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery)]
+
+
+# Define the function to calculate predicted responses using the fitted parameters
+def apply_fitted_model(contrast_center, contrast_periphery, location, stim_type_center,
+                       stim_type_periphery, Lp, Lnp, W1, W2, W3, W4, sigma):
+    # Same logic as in response_model, but handles arrays
+    predicted_responses = []
+    for c_center, c_periph, loc, stim_c, stim_p in zip(contrast_center, contrast_periphery, location,
+                                                       stim_type_center, stim_type_periphery):
+        # Call the response model with the fitted parameters for each data point
+        pred = fullRFWeightedNorm(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, W1, W2, W3, W4, sigma)
+        predicted_responses.append(pred)
+    return predicted_responses
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # for MTNC plug-in
@@ -279,6 +336,24 @@ def bramNormMTNC(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
     denom = ((al0 * c0[:, 0]) + (al1 * c1[:, 0]) + sig)
 
     return num/denom + base
+
+
+def rfWeightedNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, w, sig):
+    """
+    RF weighted normalization for smaller stimulus set (condensed)
+    """
+
+    c0, c1, l0, l1 = fixed
+    loc0 = np.array([L0_0, L0_1])
+    loc1 = np.array([L1_0, L1_1])
+
+
+    # generic norm
+    num = ((c0 * (loc0 ** 2) * l0).sum(-1) + (c1 * (loc1 ** 2) * l1).sum(-1))
+    denom = ((1 * c0[:, 0]) + ((w ** 2) * c1[:, 0])) + (sig ** 2)
+
+    return num / denom
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 

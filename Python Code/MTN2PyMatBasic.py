@@ -12,7 +12,6 @@ import pandas as pd
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
 
-# # for loop to run through all files
 # fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
 #             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
 #             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
@@ -20,17 +19,23 @@ import pandas as pd
 
 ########################################### AKSHAN ###########################################
 
-# for loop to run through all files
-# fileList = ['Akshan_240826']
+# good sessions: 240927, 240930, 241016, 241017, 241023, 241025
+# okay sessions: 240826, 241002 (13 blocks), 241021 (17 blocks)
+# bad sessions: 240827, 240828
+
+# fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930, 'Akshan_241002',
+#             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
+#             'Akshan_241025']
 
 
 ########################################### Both ###########################################
-# for loop to run through all files
+# # for loop to run through all files
 fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126', 'Akshan_240826']
-
+            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+            'Akshan_241023', 'Akshan_241025']
 
 t0 = time.time()
 totUnits = []
@@ -208,7 +213,10 @@ for fileIterator in fileList:
                                                         'loc1 Contrast'])
 
     # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
-    blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
+    if 'blockStatus' in allTrials[corrTrials[-1]]:
+        blocksDone = allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone']
+    else:
+        blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
     highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
                                  min(stimIndexDF['loc0 Contrast'].unique())
     zeroDir = 0
@@ -325,7 +333,8 @@ for fileIterator in fileList:
         params = gaussFit(x, y)
         yPred = gauss(x, *params)
         r2 = r2_score(y, yPred)
-        if r2 > 0.90:
+        # if r2 > 0.90:   # working version
+        if r2 > 0.60:
             filterUnits.append(unit)
             totFilterR2.append(r2)
         unitGaussMean[unitCount] = params[2] % 360
@@ -374,6 +383,7 @@ for fileIterator in fileList:
         n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
         pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
         pairDistance.append(pairDistOnElectrode * 50)
+        # if pairDistOnElectrode >= 5: ### working version
         if pairDistOnElectrode >= 5:
             distCombs.append(i)
 
@@ -538,6 +548,7 @@ for fileIterator in fileList:
             stimMatCond = stimMat[sli, :]
             stimMatCond = stimMatCond[:, sli]
 
+            # (working version has initial guess for alpha = 0.2)
             # Generic Normalization (L1+L2)/(1+al2+sig) w.o scalar
             guess0 = np.concatenate((bCondensed[2, :-1],
                                      bCondensed[:-1, 2],
@@ -569,8 +580,12 @@ for fileIterator in fileList:
             #                         bounds=((0, 0, 0, 0, 0),
             #                                 (np.inf, np.inf, np.inf, np.inf,
             #                                  6)))
+
+            ## working version
+            # pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+            #                         p0=guess0, maxfev=10000000)
             pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-                                    p0=guess0, maxfev=10000000)
+                                    maxfev=10000000)
 
             y_pred = genNormCondensed(fixedVals, *pOpt)
             r2 = r2_score(resp.squeeze(), y_pred)
@@ -684,7 +699,8 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        for pairCount, pair in enumerate(distCombs):
+        for pairCount, pair in enumerate(distCombs):   ### working version
+        # for pairCount, pair in enumerate(filterCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 

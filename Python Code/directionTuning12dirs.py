@@ -14,7 +14,7 @@ import matplotlib.patheffects as path_effects
 # Start Here:
 # Load relevant file here with pyMat reader
 monkeyName = 'Akshan'
-seshDate = '240924'
+seshDate = '240909'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -27,6 +27,10 @@ os.chdir('Direction Tuning/')
 correctTrials = correctTrialsGRF(allTrials)
 units = activeUnits('spikeData', allTrials)
 unitsChannel = unitsInfo(units, correctTrials, allTrials)
+
+###### for Akshan_241111
+correctTrials.remove(14)
+######
 
 # change stimDesc field to be a list of dictionaries
 for corrTrial in correctTrials:
@@ -42,6 +46,7 @@ histPrePostMS = 100
 sponWindowMS = 100
 allTuningMat = np.zeros((len(units), numDir))
 allSEMMat = np.zeros((len(units), numDir))
+unitsDirTuningGaussFitR2Score = []
 # numBlocks = header['mappingBlockStatus']['data']['blockLimit']
 if 'mappingBlockStatus' in allTrials[-1]:
     numBlocks = allTrials[-1]['mappingBlockStatus']['data']['blocksDone']
@@ -134,6 +139,11 @@ for uCount, unit in enumerate(units):
     fitMean = params[2] - 360  # fitted mean
     fitVar = params[3] ** 2  # fitted var
 
+    # r2 score
+    pred = gauss(nX, *params)
+    r2 = r2_score(nY, pred)
+    unitsDirTuningGaussFitR2Score.append(r2)
+
     # Figure
     date = header['date']
     totalSpikes = np.sum(spikeCountMat)
@@ -216,6 +226,8 @@ for uCount, unit in enumerate(units):
     plt.close('all')
     continue
 
+
 plt.close('all')
 np.save('unitsDirTuningMat', allTuningMat)
 np.save('unitsDirTuningSEM', allSEMMat)
+np.save('unitsDirTuningFitR2Score', unitsDirTuningGaussFitR2Score)

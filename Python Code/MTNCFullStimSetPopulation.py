@@ -9,21 +9,39 @@ import numpy as np
 import pandas as pd
 from scipy.stats import f
 
-######################## MEETZ ########################
+############################################ MEETZ #####################################################################
 # good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123, 230126
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
 
-# for loop to run through all good files
-fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
-            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
-            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126']
+# # for loop to run through all good files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126']
 
 # for loop to run through all good files
 # fileList = ['Meetz_221010']
 
-######################## AKSHAN ########################
+########################################### AKSHAN #####################################################################
+
+# good sessions: 240927, 240930, 241016, 241017, 241023, 241025
+# okay sessions: 240826, 241002 (13 blocks), 241021 (17 blocks)
+# bad sessions: 240827, 240828
+
+# fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930, 'Akshan_241002',
+#             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
+#             'Akshan_241025']
+
+
+########################################### Both #######################################################################
+# # for loop to run through all files
+fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+            'Akshan_241023', 'Akshan_241025']
 
 
 t0 = time.time()
@@ -212,7 +230,10 @@ for file in fileList:
                                                         'loc1 Contrast'])
 
     # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
-    blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
+    if 'blockStatus' in allTrials[corrTrials[-1]]:
+        blocksDone = allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone']
+    else:
+        blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
     highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
                                  min(stimIndexDF['loc0 Contrast'].unique())
     zeroDir = 0

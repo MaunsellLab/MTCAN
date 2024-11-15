@@ -23,11 +23,11 @@ import pandas as pd
 # fileList = ['Meetz_221010']
 
 ######################## AKSHAN ########################
-# good sessions:
-# okay sessions: 240826
+# good sessions: 240927, 241016
+# okay sessions: 240826, 241002 (13 blocks)
 # bad sessions: 240827, 240828
 
-fileList = ['Akshan_240828']
+fileList = ['Akshan_241025']
 
 
 t0 = time.time()
@@ -206,7 +206,10 @@ for file in fileList:
                                                         'loc1 Contrast'])
 
     # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
-    blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
+    if 'blockStatus' in allTrials[corrTrials[-1]]:
+        blocksDone = allTrials[corrTrials[-1]]['blockStatus']['data']['blocksDone']
+    else:
+        blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone']
     highContrast, zeroContrast = max(stimIndexDF['loc0 Contrast'].unique()), \
                                  min(stimIndexDF['loc0 Contrast'].unique())
     zeroDir = 0
@@ -785,11 +788,4 @@ for file in fileList:
 
         plt.savefig(f'{unit}EMS2PartsuperPlot.pdf')
         plt.close('all')
-
-
-
-
-
-
-
 

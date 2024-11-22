@@ -248,10 +248,10 @@ for filler in range(1):
     ax2.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='red',
                  color='red', markersize=7)
     ax2.plot(xNorm, ppMean, color='black', label='P0 P1', linewidth=1.5)
-    ax2.errorbar(xNorm, ppMean, yerr=pnSEM, fmt='o', ecolor='black',
+    ax2.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
                  color='black', markersize=7)
     ax2.plot(xNorm, nnMean, color='grey', label='N0 N1', linewidth=1.5)
-    ax2.errorbar(xNorm, nnMean, yerr=npSEM, fmt='o', ecolor='grey',
+    ax2.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
                  color='grey', markersize=7)
     ax2.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
     ax2.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=50)

@@ -13,8 +13,8 @@ import matplotlib.patheffects as path_effects
 
 # Start Here:
 # Load relevant file here with pyMat reader
-monkeyName = 'Akshan'
-seshDate = '240909'
+monkeyName = 'Meetz'
+seshDate = '241115'
 fileName = f'{monkeyName}_{seshDate}_GRF2_Spikes.mat'
 allTrials, header = loadMatFilePyMat(monkeyName, seshDate, fileName)
 
@@ -28,8 +28,9 @@ correctTrials = correctTrialsGRF(allTrials)
 units = activeUnits('spikeData', allTrials)
 unitsChannel = unitsInfo(units, correctTrials, allTrials)
 
-###### for Akshan_241111
-correctTrials.remove(14)
+###### for Akshan_241111 (14)
+correctTrials.remove(16)
+correctTrials.remove(18)
 ######
 
 # change stimDesc field to be a list of dictionaries

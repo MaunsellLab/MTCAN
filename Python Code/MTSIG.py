@@ -25,7 +25,7 @@ import warnings
 #             'Akshan_240917', 'Akshan_240922', 'Akshan_240924', 'Akshan_241029',
 #             'Akshan_241104']
 
-fileList = ['Akshan_240909']
+fileList = ['Meetz_241115']
 
 plotSingleDay = 0
 if len(fileList) == 1:
@@ -934,3 +934,77 @@ potentialGoodUnits = np.array(potentialGoodUnits)
 
 potentialGoodUnits[np.where(max_ratios < 1000)[0]]
 potentialGoodUnits[np.where(max_ratios < 50)[0]]
+
+
+### Simulation of c50 estimation as a function of Rmax (different neuron rates)
+# Naka-Rushton function without baseline
+def naka_rushton(C, Rmax, c50, gamma=2):
+    return (Rmax * C**gamma) / (C**gamma + c50**gamma)
+
+# Simulate spike counts using Poisson process
+def simulate_spikes(contrasts, Rmax, c50, gamma, num_trials=100):
+    mean_rates = naka_rushton(contrasts, Rmax, c50, gamma)
+    spike_counts = np.random.poisson(mean_rates[:, None], (len(contrasts), num_trials))
+    return spike_counts
+
+# Fit the Naka-Rushton function to mean spike rates
+def fit_naka_rushton(contrasts, mean_rates):
+    initial_guess = [np.max(mean_rates), 0.5]
+    try:
+        popt, _ = curve_fit(
+            lambda C, Rmax, c50: naka_rushton(C, Rmax, c50),
+            contrasts,
+            mean_rates,
+            p0=initial_guess,
+            maxfev=10000  # Increase max function evaluations
+        )
+        return popt[1]  # Return only the estimated c50
+    except RuntimeError:
+        return np.nan  # Return NaN if the fitting fails
+
+# Parameters
+contrasts = np.logspace(np.log10(0.03), np.log10(1.0), 6)  # 6 contrasts from ~3% to 100%
+true_c50 = 0.3  # True c50
+gamma = 2       # Slope parameter
+num_trials = 100  # Number of trials per contrast
+Rmax_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100]  # Specific Rmax values to simulate
+Rmax_values = np.logspace(0, 1.5, 20)
+num_simulations = 5000  # Number of repetitions for each Rmax
+
+# Store results
+results = {}
+
+for Rmax in Rmax_values:
+    c50_estimates = []
+    for _ in range(num_simulations):
+        # Simulate spike counts
+        spike_counts = simulate_spikes(contrasts, Rmax, true_c50, gamma, num_trials)
+        # Calculate mean rates across trials
+        mean_rates = np.mean(spike_counts, axis=1)
+        # Fit the Naka-Rushton function and get estimated c50
+        estimated_c50 = fit_naka_rushton(contrasts, mean_rates)
+        c50_estimates.append(estimated_c50)
+    # Filter out NaN values
+    valid_c50_estimates = [c for c in c50_estimates if not np.isnan(c)]
+    # Compute mean and SEM of estimated c50
+    c50_mean = np.mean(valid_c50_estimates)
+    c50_sem = np.std(valid_c50_estimates) / np.sqrt(len(valid_c50_estimates))
+    results[Rmax] = (c50_mean, c50_sem)
+
+# Plot results
+fig, ax = plt.subplots(figsize=(8, 6))
+Rmax_log = np.log10(Rmax_values)
+means = [results[Rmax][0] for Rmax in Rmax_values]
+sems = [results[Rmax][1] for Rmax in Rmax_values]
+
+ax.errorbar(Rmax_log, means, yerr=sems, fmt='o', label='Estimated c50 ± SEM')
+ax.axhline(y=true_c50, color='r', linestyle='--', label='True c50')
+ax.set_xticks(Rmax_log)
+ax.set_xticklabels([f"{Rmax:.1f}" for Rmax in Rmax_values])
+ax.set_xlabel('Rmax (Hz, log scale)')
+ax.set_ylabel('Estimated c50')
+ax.set_title('Estimated c50 for Different Rmax Values')
+ax.legend()
+ax.grid(True)
+plt.show()
+

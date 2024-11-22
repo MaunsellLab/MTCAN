@@ -36,6 +36,8 @@ import glob
 import matplotlib as mpl
 import matplotlib.lines as mlines
 from scipy.stats import wilcoxon
+from scipy.stats import ttest_ind
+from matplotlib import pyplot as plt, ticker as mticker
 
 
 # fig saving params

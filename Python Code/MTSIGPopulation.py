@@ -783,7 +783,8 @@ data_pairs = [
 ]
 # Bonferroni correction for 4 comparisons
 alpha = 0.05
-alpha_adjusted = alpha / len(data_pairs)
+# alpha_adjusted = alpha / len(data_pairs)
+alpha_adjusted = alpha / 2
 
 # Conduct Mann-Whitney U tests for each pair
 for data1, data2, comparison_name in data_pairs:

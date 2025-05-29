@@ -260,6 +260,7 @@ def apply_fitted_model(contrast_center, contrast_periphery, location, stim_type_
     return predicted_responses
 
 
+
 ########################################################################################################################
 
 ############ Evaluate RF weighted normalization model with baseline vs RF weighted heuristic model #####################

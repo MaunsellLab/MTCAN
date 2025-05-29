@@ -486,31 +486,31 @@ for filler in range(1):
 
 
 # normalization fit.
-def weightedNormMTSIG(C_terms, Lp, Lnp, W, s1, s2, b, condition, conditionPorNP):
+def weightedNormMTSIG(C_terms, Lp, Lnp, W, sigma, b, condition, conditionPorNP):
     result = np.zeros_like(C_terms)  # Initialize result array of same shape as C_terms
     for i, C in enumerate(C_terms):
         if conditionPorNP[i]:
             if condition[i]:
-                result[i] = ((C * Lp * W) / ((C * W) + s2)) + b
+                result[i] = ((C * Lp * W) / ((C * W) + (1 * sigma))) + b
             else:
-                result[i] = ((C * Lp) / (C + s1)) + b
+                result[i] = ((C * Lp) / (C + sigma)) + b
         else:
             if condition[i]:
-                result[i] = ((C * Lnp * W) / ((C * W) + s2)) + b
+                result[i] = ((C * Lnp * W) / ((C * W) + (1 * sigma))) + b
             else:
-                result[i] = ((C * Lnp) / (C + s1)) + b
+                result[i] = ((C * Lnp) / (C + sigma)) + b
     return result
 
 
 def fit_data(C_terms, y_data, condition, conditionPorNP):
     # Define the objective function for curve fitting
-    def objective(C_terms, Lp, Lnp, W, s1, s2, b):
-        return weightedNormMTSIG(C_terms, Lp, Lnp, W, s1, s2, b, condition, conditionPorNP)
+    def objective(C_terms, Lp, Lnp, W, sigma, b):
+        return weightedNormMTSIG(C_terms, Lp, Lnp, W, sigma, b, condition, conditionPorNP)
 
     # Initial guess for L, w, and sigma
-    initial_guess = [100, 50, 0.5, 0.06, 0.09, y_data[0]]
-    bou = [[0, 0, 0, 0, 0, 0],
-           [np.inf, np.inf, np.inf, np.inf, np. inf, np.inf]]
+    initial_guess = [100, 50, 0.5, 0.07, y_data[0]]
+    bou = [[0, 0, 0, 0, 0],
+           [np.inf, np.inf, np.inf, np.inf, np.inf]]
 
     # Perform the curve fitting
     popt, pcov = curve_fit(objective, C_terms, y_data, p0=initial_guess, maxfev=100000,
@@ -604,6 +604,50 @@ for filler in range(1):
 
     # nonpref peri
     yFit = weightedNormMTSIG(xFit, *popt, np.full(100, True), np.full(100, False))
+    plt.plot(xFit, yFit, color='red', alpha=0.5, linestyle='dashed')
+    # yFit = weightedNormMTSIG(cont[7:], *popt, conditionArray[7:])
+    # plt.plot(cont[7:], yFit, color='green', alpha=0.5, linestyle='dashed')
+    plt.scatter(contrasts, nonprefPeriMean*100, color='red', alpha=0.5)
+
+    plt.xscale('symlog', linthresh=0.1)
+    plt.xlim(left=0)
+    plt.ylim(bottom=0)
+    plt.legend(loc='lower right')
+    plt.show()
+
+
+# plot population RF weighted normalization (heuristic)
+for filler in range(1):
+    popt, pcov = fit_dataWeightedNormHeuristic(cont, resp, conditionArray, condition2Array)
+    yPred = weightedNormHeuristicMTSIG(cont, *popt, conditionArray, condition2Array)
+    print(r2_score(resp, yPred))
+
+    # plotting
+    xFit = np.logspace(-1, 2, 100)
+
+    # pref center
+    yFit = weightedNormHeuristicMTSIG(xFit, *popt, np.full(100, False), np.full(100, True))
+    plt.plot(xFit, yFit, color='green', linestyle='dashed')
+    # yFit = weightedNormMTSIG(cont[:7], *popt, conditionArray[:7])
+    # plt.plot(cont[:7], yFit, color='green', linestyle='dashed')
+    plt.scatter(contrasts, prefCenterMean*100, color='green')
+
+    # pref peri
+    yFit = weightedNormHeuristicMTSIG(xFit, *popt, np.full(100, True), np.full(100, True))
+    plt.plot(xFit, yFit, color='green', alpha=0.5, linestyle='dashed')
+    # yFit = weightedNormMTSIG(cont[7:], *popt, conditionArray[7:])
+    # plt.plot(cont[7:], yFit, color='green', alpha=0.5, linestyle='dashed')
+    plt.scatter(contrasts, prefPeriMean*100, color='green', alpha=0.5)
+
+    # nonpref center
+    yFit = weightedNormHeuristicMTSIG(xFit, *popt, np.full(100, False), np.full(100, False))
+    plt.plot(xFit, yFit, color='red', linestyle='dashed')
+    # yFit = weightedNormMTSIG(cont[:7], *popt, conditionArray[:7])
+    # plt.plot(cont[:7], yFit, color='green', linestyle='dashed')
+    plt.scatter(contrasts, nonprefCenterMean*100, color='red')
+
+    # nonpref peri
+    yFit = weightedNormHeuristicMTSIG(xFit, *popt, np.full(100, True), np.full(100, False))
     plt.plot(xFit, yFit, color='red', alpha=0.5, linestyle='dashed')
     # yFit = weightedNormMTSIG(cont[7:], *popt, conditionArray[7:])
     # plt.plot(cont[7:], yFit, color='green', alpha=0.5, linestyle='dashed')

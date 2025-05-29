@@ -391,6 +391,83 @@ stim_type_periphery = np.array([-1, 1, 1, 1, 1,
                                 1, 1, 1, 1,
                                 0, 0, 0, 0])
 
+# individual cell (230627_71)
+for filler in range(1):
+    i = np.where(masterGoodUnits == '230627_71')[0][0]
+    resp = np.concatenate((prefNormalized[i], nonprefNormalized[i], pnNormalized[i],
+                           npNormalized[i], ppNormalized[i], nnNormalized[i]), axis=0)
+    initial_guess = [1.0, 0.5, 0.10]  # Lp, Lnp, W1, W2, W3, W4, sigma
+
+    popt, pcov = curve_fit(model_wrapperClassicHeegerNorm, (contrast_center, contrast_periphery,
+                                                            stim_type_center, stim_type_periphery),
+                           resp, p0=initial_guess)
+
+    y_pred1 = apply_fitted_modelClassicHeeger(contrast_center, contrast_periphery,
+                                              stim_type_center, stim_type_periphery, *popt)
+    print(r2_score(resp, y_pred1))
+
+    pnFitPred = [fullClassicHeegerNorm(1, 1, 1, 0, *popt) for j in range(4)]
+    npFitPred = [fullClassicHeegerNorm(1, 1, 0, 1, *popt) for j in range(4)]
+    ppFitPred = [fullClassicHeegerNorm(1, 1, 1, 1, *popt) for j in range(4)]
+    nnFitPred = [fullClassicHeegerNorm(1, 1, 0, 0, *popt) for j in range(4)]
+
+    pCenterSinglePred = np.array(fullClassicHeegerNorm(1, 0, 1, -1, *popt))
+    pCenterSinglePred = pCenterSinglePred[np.newaxis]
+    pPeriSinglePred = np.array([fullClassicHeegerNorm(0, 1, -1, 1, *popt) for j in range(4)])
+    pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+    npCenterSinglePred = np.array(fullClassicHeegerNorm(1, 0, 0, -1, *popt))
+    npCenterSinglePred = npCenterSinglePred[np.newaxis]
+    npPeriSinglePred = np.array([fullClassicHeegerNorm(0, 1, -1, 0, *popt) for j in range(4)])
+    npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+    predResp = np.concatenate((pSingleFitPred, npSingleFitPred, pnFitPred,
+                               npFitPred, ppFitPred, nnFitPred), axis=0)
+
+    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    mSize = 70
+    x = np.arange(0, numSteps + 1)
+
+    ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
+    ax1.scatter(x, prefNormalized[i], s=mSize,
+                facecolor='white', edgecolor='black')
+    ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
+    ax1.scatter(x, nonprefNormalized[i], color='grey', s=mSize,
+                facecolor='white', edgecolor='gray')
+    ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
+    ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
+    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    ax1.set_ylim([0, 1.6])
+    y_ticks = ax1.get_yticks()
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_tick_labels = [
+        '0' if tick == 0 else
+        f'{round(normVal[i][0])}' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    ax1.set_xticks([0, 1, 2, 3, 4])
+    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(2)
+    ax1.spines['left'].set_linewidth(2)
+    ax1.set_xlim([-0.5, 4.5])
+    ax1.tick_params(axis='both', width=2, length=8)
+    ax1.tick_params(axis='both', width=2, length=8)
+
+    plt.show()
+
+
+# population
 resp = np.concatenate((prefMean, nonprefMean, pnMean, npMean, ppMean, nnMean), axis=0)
 initial_guess = [1.0, 0.5, 0.10]  # Lp, Lnp, sigma
 popt, pcov = curve_fit(model_wrapperClassicHeegerNorm, (contrast_center, contrast_periphery,
@@ -417,46 +494,67 @@ npPeriSinglePred = np.array([fullClassicHeegerNorm(0, 1, -1, 0, *popt) for j in 
 npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
 
 # plotting
-fig, ax2 = plt.subplots()
-x = np.arange(0, numSteps + 1)
-ax2.plot(x, prefMean, color='black', label='PO')
-ax2.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
-             color='black', markersize=7)
-ax2.plot(x, nonprefMean, color='grey', label='NO')
-ax2.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
-             color='grey', markersize=7)
-ax2.plot(xNorm, pnMean, color='green', label='P0 N1')
-ax2.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
-             color='green', markersize=7)
-ax2.plot(xNorm, npMean, color='red', label='N0 P1')
-ax2.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='red',
-             color='red', markersize=7)
-ax2.plot(xNorm, ppMean, color='black', label='P0 P1')
-ax2.errorbar(xNorm, ppMean, yerr=pnSEM, fmt='o', ecolor='black',
-             color='black', markersize=7)
-ax2.plot(xNorm, nnMean, color='grey', label='N0 N1')
-ax2.errorbar(xNorm, nnMean, yerr=npSEM, fmt='o', ecolor='grey',
-             color='grey', markersize=7)
-ax2.plot(xNorm, pnFitPred, color='green', linestyle='--')
-ax2.scatter(xNorm, pnFitPred, facecolors='none', edgecolors='g', s=50)
-ax2.plot(xNorm, npFitPred, color='red', linestyle='--')
-ax2.scatter(xNorm, npFitPred, facecolors='none', edgecolors='r', s=50)
-ax2.plot(xNorm, ppFitPred, color='black', linestyle=':', alpha=0.8)
-ax2.scatter(xNorm, ppFitPred, facecolors='none', edgecolors='black', s=50)
-ax2.plot(xNorm, nnFitPred, color='grey', linestyle=':', alpha=0.8)
-ax2.scatter(xNorm, nnFitPred, facecolors='none', edgecolors='gray', s=50)
-ax2.plot(x, pSingleFitPred, color='black', linestyle='--')
-ax2.scatter(x, pSingleFitPred, facecolors='none', edgecolors='black', s=50)
-ax2.plot(x, npSingleFitPred, color='grey', linestyle='--')
-ax2.scatter(x, npSingleFitPred, facecolors='none', edgecolors='gray', s=50)
-ax2.set_xlabel('Receptive Field Offset', fontsize=15)
-ax2.set_ylabel('Normalized Response Rate', fontsize=15)
-ax2.set_ylim([0, 1.50])
-ax2.axhline(y=meanSpon, linestyle='--', color='blue', alpha=0.8)
-ax2.fill_between(x=x, y1=meanSpon + semSpon, y2=meanSpon - semSpon,
-                 color='blue', alpha=0.2)
-ax2.set_title('Normalization vs Distance PN/NP')
-plt.show()
+for filler in range(1):
+    fig, ax2 = plt.subplots(figsize=(7, 7), layout='constrained')
+    x = np.arange(0, numSteps + 1)
+    ax2.plot(x, prefMean, color='black', label='PO', linewidth=1.5)
+    ax2.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
+                 markerfacecolor='none', markeredgecolor='black', markersize=7)
+    ax2.plot(x, nonprefMean, color='grey', label='NO', linewidth=1.5)
+    ax2.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
+                 markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    ax2.plot(xNorm, pnMean, color='green', label='P0 N1', linewidth=1.5)
+    ax2.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
+                 color='green', markersize=7)
+    # ax2.plot(xNorm, npMean, color='magenta', label='N0 P1', linewidth=1.5)
+    # ax2.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='magenta',
+    #              color='magenta', markersize=7)
+    # ax2.plot(xNorm, ppMean, color='black', label='P0 P1', linewidth=1.5)
+    # ax2.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
+    #              color='black', markersize=7)
+    # ax2.plot(xNorm, nnMean, color='grey', label='N0 N1', linewidth=1.5)
+    # ax2.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
+    #              color='grey', markersize=7)
+    ax2.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    ax2.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=50)
+    # ax2.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax2.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=50)
+    # ax2.plot(xNorm, ppFitPred, color='black', linestyle='--', alpha=0.8,
+    #          linewidth=1.5)
+    # ax2.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=50)
+    # ax2.plot(xNorm, nnFitPred, color='grey', linestyle='--', alpha=0.8,
+    #          linewidth=1.5)
+    # ax2.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=50)
+    ax2.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    ax2.scatter(x, pSingleFitPred, facecolors='none', edgecolors='black', s=50)
+    ax2.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    ax2.scatter(x, npSingleFitPred, facecolors='none', edgecolors='gray', s=50)
+    ax2.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    ax2.set_ylabel('Normalized Response Rate', fontsize=25, **hfont)
+    ax2.set_ylim([0, 1.50])
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_ticks = ax2.get_yticks()
+    y_tick_labels = [
+        '0' if tick == 0 else
+        '1' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax2.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    ax2.set_xticks([0, 1, 2, 3, 4])
+    ax2.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_linewidth(2)
+    ax2.spines['left'].set_linewidth(2)
+    ax2.set_xlim([-0.5, 4.5])
+    ax2.tick_params(axis='both', width=2, length=8)
+
+    # plt.show()
+    # Save the figure to the specified path
+    filePath = f'/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Python Figures/populationClassicHeeger.pdf'
+    fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    plt.close('all')
 
 # bar plots for PN
 for filler in range(1):
@@ -576,9 +674,6 @@ for filler in range(1):
 
 
 # scatter of real vs predicted responses at position 1 and 4
-
-
-
 plt.scatter([1, 4], [prefMean[1], prefMean[3]], color='black')
 plt.scatter([1, 4], pSingleFitPred[:2], facecolors='none', edgecolors='black')
 plt.scatter([1, 4], [nonprefMean[1], nonprefMean[3]], color='gray')

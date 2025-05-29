@@ -221,6 +221,9 @@ allBlocksDone = []
 masterGoodUnits = []
 totUnits = []
 corrLists = [[] for _ in range(4)]
+popGaborSD = []
+popGaborOffsetDeg = []
+
 
 for file in fileList:
     # Load relevant file here with pyMat reader
@@ -305,6 +308,8 @@ for file in fileList:
     eccentricity = np.sqrt(offsetAziEle[0][0]**2 + offsetAziEle[0][1]**2)
     rfGaborSigma = allTrials[0]['rfGabor']['data']['sigmaDeg'] / eccentricity
     offsetDegSepNorm = (offsetDegSep[np.argsort(offsetDegSep)]) / eccentricity
+    popGaborSD.append(allTrials[0]['rfGabor']['data']['sigmaDeg'])
+    popGaborOffsetDeg.append(offsetDegSep)
 
     # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
     if 'prefDirDeg' in header['blockStatus']['data']:
@@ -540,6 +545,8 @@ for file in fileList:
             offsetDegSepNormPop.append(offsetDegSepNorm)
             rfGaborSigmaPop.append(rfGaborSigma)
 
+
+
             # add preferred response at center, null at center, pref at first offset (including transect)
             # responses across all blocks from all valid neurons, to look at adaptation of response.
             p0Indx = stimCountIndex[2, 0]
@@ -584,7 +591,9 @@ for file in fileList:
                 indx = (i - 19) // 2
                 corrLists[indx].append(pairStimCorr)
 
-
+    if file == 'Meetz_230719':
+        count = np.where(units == 147)[0][0]
+        exampleUnitHist = spikeHists[count] * 1000 / blocksDone
 
     # to open another file in the loop
     os.chdir('../../Python Code')
@@ -754,6 +763,58 @@ stim_type_periphery = np.array([-1, 1, 1, 1, 1,
                                 1, 1, 1, 1,
                                 0, 0, 0, 0])
 
+
+############################################## Example Unit Histogram Figure 2A ########################################
+exampleUnitHist = exampleUnitHist - exampleUnitHist[0]
+# example unit 230719_147, defined in the main fileList for loop
+
+# figure
+fig, axs = plt.subplots(1, 2, figsize=(14, 6), layout='constrained')
+yMax = 0
+smoothValue = 5
+
+# P center, N center
+pIndx = stimCountIndex[2, 0]
+nIndx = stimCountIndex[1, 0]
+pHist = exampleUnitHist[pIndx]
+nHist = exampleUnitHist[nIndx]
+gaussSmoothP = gaussian_filter1d(pHist, smoothValue)
+gaussSmoothN = gaussian_filter1d(nHist, smoothValue)
+if np.max([gaussSmoothP, gaussSmoothN]) > yMax:
+    yMax = np.max([gaussSmoothP, gaussSmoothN])
+
+# PN paired: p, pn loc 1, pn loc 4
+for axCount, i in enumerate([1, 2]):
+    nOffIndx = stimCountIndex[0, i * 2 - 1]
+    pnIndx = stimCountIndex[2, i * 2 - 1]
+    nOffHist = exampleUnitHist[nOffIndx]
+    pnHist = exampleUnitHist[pnIndx]
+    gaussSmoothNOff = gaussian_filter1d(nOffHist, smoothValue)
+    gaussSmoothPN = gaussian_filter1d(pnHist, smoothValue)
+    gaussSmoothPNPred = (gaussSmoothP + gaussSmoothNOff) / 2
+    if np.max([gaussSmoothNOff, gaussSmoothPN]) > yMax:
+        yMax = np.max([gaussSmoothNOff, gaussSmoothPN])
+    axs[axCount].plot(gaussSmoothP, label='P0', color='black')
+    axs[axCount].plot(gaussSmoothNOff, label='N Offset', color='grey')
+    axs[axCount].plot(gaussSmoothPN, label='PN', color='green')
+    axs[axCount].plot(gaussSmoothPNPred, label='PN Pred', color='green', linestyle='--')
+    axs[axCount].set_xticks([0, histPrePostMS, histPrePostMS + trueStimDurMS,
+                             2 * histPrePostMS + trueStimDurMS])
+    axs[axCount].set_xticklabels([-histPrePostMS, 0, 0 + trueStimDurMS,
+                                  trueStimDurMS + histPrePostMS], fontsize=20)
+    axs[axCount].axvspan(histPrePostMS, histPrePostMS + trueStimDurMS,
+               color='grey', alpha=0.2)
+    axs[axCount].set_xlabel('Time (ms)', fontsize=25)
+    axs[axCount].set_ylabel('Firing Rate (spikes/s)', fontsize=25)
+    axs[axCount].set_title(f'P Center, N Offset {i}')
+    axs[axCount].legend(fontsize=5)
+
+for ax in axs:
+    ax.set_ylim([0, yMax * 1.1])
+
+plt.show()
+
+
 ################################################## Bar Plot of Simple Normalization ####################################
 
 # bar plot for individual neurons (PN): Figure 2a
@@ -825,8 +886,51 @@ for filler in range(1):
     # plt.close('all')
 
 
+################################################## Fig 2c: simple average of representative unit #######################
+i = np.where(masterGoodUnits == '230719_147')[0][0]
+
+fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+
+mSize = 70
+x = np.arange(0, numSteps + 1)
+pnFitPred = (prefNormalized[i][0] + nonprefNormalized[i][1:]) / 2
+
+ax1.scatter(x, prefNormalized[i], s=mSize,
+            facecolor='white', edgecolor='black')
+ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
+ax1.scatter(x, nonprefNormalized[i], s=mSize,
+            facecolor='white', edgecolor='grey')
+ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
+ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
+ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
+ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+ax1.set_ylim([0, 1.6])
+y_ticks = ax1.get_yticks()
+# Create a list of y-tick labels with only 0 and 1.0 labeled
+y_tick_labels = [
+    '0' if tick == 0 else
+    f'{round(normVal[i][0])}' if tick == 1.0 else
+    ''  # blank for other ticks
+    for tick in y_ticks
+]
+ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+ax1.set_xticks([0, 1, 2, 3, 4])
+ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+ax1.spines['top'].set_visible(False)
+ax1.spines['right'].set_visible(False)
+ax1.spines['bottom'].set_linewidth(2)
+ax1.spines['left'].set_linewidth(2)
+ax1.set_xlim([-0.5, 4.5])
+ax1.tick_params(axis='both', width=2, length=8)
+
+plt.show()
+
+
 ###################################### Classic Heeger Normalization Weighted Numerator #################################
-# individual neurons fit: Figure 2b
+# individual neurons fit: Figure 2d
 fullClassicNormPred = []
 measuredResp = []
 r2ScoresClassicNormFull = []
@@ -868,75 +972,75 @@ for i in range(len(prefNormalized)):
         fullClassicNormPred.append(predResp[j])
         measuredResp.append(resp[j])
 
-    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
-    popt_str = (f"Lp = {popt[0]:.2f}\n"
-                f"Lnp = {popt[1]:.2f}\n"
-                f"W1 = {popt[2]:.2f}\n"
-                f"W2 = {popt[3]:.2f}\n"
-                f"W3 = {popt[4]:.2f}\n"
-                f"W4 = {popt[5]:.2f}\n"
-                f"sigma = {popt[6]:.2f}\n"
-                f"r2={r2:.3f}")
-    mSize = 70
-    x = np.arange(0, numSteps + 1)
-
-    ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
-    ax1.scatter(x, prefNormalized[i], s=mSize,
-                facecolor='white', edgecolor='black')
-    ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
-    ax1.scatter(x, nonprefNormalized[i], color='grey', s=mSize,
-                facecolor='white', edgecolor='gray')
-    ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
-    ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
-    ax1.plot(xNorm, npNormalized[i], color='magenta', label='N0 P1', linewidth=1.5)
-    ax1.scatter(xNorm, npNormalized[i], color='magenta', s=mSize)
-    ax1.plot(xNorm, ppNormalized[i], color='black', label='P0 P1',
-             linewidth=1.5)
-    ax1.scatter(xNorm, ppNormalized[i], color='black', s=mSize)
-    ax1.plot(xNorm, nnNormalized[i], color='grey', label='N0 N1',
-             linewidth=1.5)
-    ax1.scatter(xNorm, nnNormalized[i], color='grey', s=mSize)
-    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
-    ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
-    ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
-    ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
-    ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
-    ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
-    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
-    ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
-    ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
-    ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
-    ax1.set_ylim([0, 1.6])
-    ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
-             bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
-             transform=ax1.transAxes)
-    y_ticks = ax1.get_yticks()
-    # Create a list of y-tick labels with only 0 and 1.0 labeled
-    y_tick_labels = [
-        '0' if tick == 0 else
-        f'{round(normVal[i][0])}' if tick == 1.0 else
-        ''  # blank for other ticks
-        for tick in y_ticks
-    ]
-    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
-    ax1.set_xticks([0, 1, 2, 3, 4])
-    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_linewidth(2)
-    ax1.spines['left'].set_linewidth(2)
-    ax1.set_xlim([-0.5, 4.5])
-    ax1.tick_params(axis='both', width=2, length=8)
-    ax1.tick_params(axis='both', width=2, length=8)
-
-    # Save the figure to the specified path
-    filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_weightedHeeger.pdf'
-    fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
-    plt.close('all')
+    # fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    # popt_str = (f"Lp = {popt[0]:.2f}\n"
+    #             f"Lnp = {popt[1]:.2f}\n"
+    #             f"W1 = {popt[2]:.2f}\n"
+    #             f"W2 = {popt[3]:.2f}\n"
+    #             f"W3 = {popt[4]:.2f}\n"
+    #             f"W4 = {popt[5]:.2f}\n"
+    #             f"sigma = {popt[6]:.2f}\n"
+    #             f"r2={r2:.3f}")
+    # mSize = 70
+    # x = np.arange(0, numSteps + 1)
+    #
+    # ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
+    # ax1.scatter(x, prefNormalized[i], s=mSize,
+    #             facecolor='white', edgecolor='black')
+    # ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
+    # ax1.scatter(x, nonprefNormalized[i], color='grey', s=mSize,
+    #             facecolor='white', edgecolor='gray')
+    # ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
+    # ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
+    # ax1.plot(xNorm, npNormalized[i], color='magenta', label='N0 P1', linewidth=1.5)
+    # ax1.scatter(xNorm, npNormalized[i], color='magenta', s=mSize)
+    # ax1.plot(xNorm, ppNormalized[i], color='black', label='P0 P1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, ppNormalized[i], color='black', s=mSize)
+    # ax1.plot(xNorm, nnNormalized[i], color='grey', label='N0 N1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, nnNormalized[i], color='grey', s=mSize)
+    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
+    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
+    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
+    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    # ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    # ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    # ax1.set_ylim([0, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    # y_ticks = ax1.get_yticks()
+    # # Create a list of y-tick labels with only 0 and 1.0 labeled
+    # y_tick_labels = [
+    #     '0' if tick == 0 else
+    #     f'{round(normVal[i][0])}' if tick == 1.0 else
+    #     ''  # blank for other ticks
+    #     for tick in y_ticks
+    # ]
+    # ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    # ax1.set_xticks([0, 1, 2, 3, 4])
+    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    # ax1.spines['top'].set_visible(False)
+    # ax1.spines['right'].set_visible(False)
+    # ax1.spines['bottom'].set_linewidth(2)
+    # ax1.spines['left'].set_linewidth(2)
+    # ax1.set_xlim([-0.5, 4.5])
+    # ax1.tick_params(axis='both', width=2, length=8)
+    # ax1.tick_params(axis='both', width=2, length=8)
+    #
+    # # Save the figure to the specified path
+    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_weightedHeeger.pdf'
+    # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    # plt.close('all')
 
 # population fits
 resp = np.concatenate((prefMean, nonprefMean, pnMean, npMean, ppMean, nnMean), axis=0)
@@ -972,23 +1076,29 @@ for filler in range(1):
     fig, ax2 = plt.subplots(figsize=(7, 7), layout='constrained')
 
     ax2.plot(x, prefMean, color='black', label='PO', linewidth=1.5)
-    ax2.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
-                 markerfacecolor='none', markeredgecolor='black', markersize=7)
+    # ax2.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
+    #              markerfacecolor='none', markeredgecolor='black', markersize=7)
+    ax2.errorbar(x, prefMean, yerr=0, fmt='o', ecolor='black', markerfacecolor='none', markeredgecolor='black', markersize=7)
     ax2.plot(x, nonprefMean, color='grey', label='NO', linewidth=1.5)
-    ax2.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
-                 markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    # ax2.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
+    #              markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    ax2.errorbar(x, nonprefMean, yerr=0, fmt='o', ecolor='grey', markerfacecolor='none', markeredgecolor='grey', markersize=7)
     ax2.plot(xNorm, pnMean, color='green', label='P0 N1', linewidth=1.5)
-    ax2.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
-                 color='green', markersize=7)
+    # ax2.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
+    #              color='green', markersize=7)
+    ax2.errorbar(xNorm, pnMean, yerr=0, fmt='o', ecolor='green', color='green', markersize=7)
     ax2.plot(xNorm, npMean, color='magenta', label='N0 P1', linewidth=1.5)
-    ax2.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='magenta',
-                 color='magenta', markersize=7)
+    # ax2.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='magenta',
+    #              color='magenta', markersize=7)
+    ax2.errorbar(xNorm, npMean, yerr=0, fmt='o', ecolor='magenta', color='magenta', markersize=7)
     ax2.plot(xNorm, ppMean, color='black', label='P0 P1', linewidth=1.5)
-    ax2.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
-                 color='black', markersize=7)
+    # ax2.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
+    #              color='black', markersize=7)
+    ax2.errorbar(xNorm, ppMean, yerr=0, fmt='o', ecolor='black', color='black', markersize=7)
     ax2.plot(xNorm, nnMean, color='grey', label='N0 N1', linewidth=1.5)
-    ax2.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
-                 color='grey', markersize=7)
+    # ax2.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
+    #              color='grey', markersize=7)
+    ax2.errorbar(xNorm, nnMean, yerr=0, fmt='o', ecolor='grey', color='grey', markersize=7)
     ax2.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
     ax2.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=50)
     ax2.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
@@ -1032,7 +1142,7 @@ for filler in range(1):
 
 ########################################### Receptive Field Weighted Normalization #####################################
 
-# individual neurons fit: Figure 2c
+# individual neurons fit: Figure 2e
 fullRFWeightPred = []
 measuredResp = []
 r2ScoresRFWeightFull = []
@@ -1078,74 +1188,74 @@ for i in range(len(prefNormalized)):
     modelPredictedVariance.append(np.var(predResp))
     fitSigmaVals.append(popt[6])
 
-    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
-    popt_str = (f"Lp = {popt[0]:.2f}\n"
-                f"Lnp = {popt[1]:.2f}\n"
-                f"W1 = {popt[2]:.2f}\n"
-                f"W2 = {popt[3]:.2f}\n"
-                f"W3 = {popt[4]:.2f}\n"
-                f"W4 = {popt[5]:.2f}\n"
-                f"sigma = {popt[6]:.2f}\n"
-                f"r2={r2:.3f}")
-    mSize = 70
-    x = np.arange(0, numSteps + 1)
-
-    ax1.scatter(x, prefNormalized[i], s=mSize,
-                facecolor='white', edgecolor='black')
-    ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
-    ax1.scatter(x, nonprefNormalized[i], s=mSize,
-                facecolor='white', edgecolor='grey')
-    ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
-    ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
-    ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
-    ax1.plot(xNorm, npNormalized[i], color='magenta', label='N0 P1', linewidth=1.5)
-    ax1.scatter(xNorm, npNormalized[i], color='magenta', s=mSize)
-    ax1.plot(xNorm, ppNormalized[i], color='black', label='P0 P1',
-             linewidth=1.5)
-    ax1.scatter(xNorm, ppNormalized[i], color='black', s=mSize)
-    ax1.plot(xNorm, nnNormalized[i], color='grey', label='N0 N1',
-             linewidth=1.5)
-    ax1.scatter(xNorm, nnNormalized[i], color='grey', s=mSize)
-    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
-    ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
-    ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
-    ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
-    ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
-    ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
-    ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
-    ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
-    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
-    ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
-    ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
-    ax1.set_ylim([0, 1.6])
-    ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
-             bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
-             transform=ax1.transAxes)
-    y_ticks = ax1.get_yticks()
-    # Create a list of y-tick labels with only 0 and 1.0 labeled
-    y_tick_labels = [
-        '0' if tick == 0 else
-        f'{round(normVal[i][0])}' if tick == 1.0 else
-        ''  # blank for other ticks
-        for tick in y_ticks
-    ]
-    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
-    ax1.set_xticks([0, 1, 2, 3, 4])
-    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_linewidth(2)
-    ax1.spines['left'].set_linewidth(2)
-    ax1.set_xlim([-0.5, 4.5])
-    ax1.tick_params(axis='both', width=2, length=8)
-
-    # Save as a PDF with tight bounding box and high DPI
-    filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}.pdf'
-    fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
-    plt.close('all')
+    # fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    # popt_str = (f"Lp = {popt[0]:.2f}\n"
+    #             f"Lnp = {popt[1]:.2f}\n"
+    #             f"W1 = {popt[2]:.2f}\n"
+    #             f"W2 = {popt[3]:.2f}\n"
+    #             f"W3 = {popt[4]:.2f}\n"
+    #             f"W4 = {popt[5]:.2f}\n"
+    #             f"sigma = {popt[6]:.2f}\n"
+    #             f"r2={r2:.3f}")
+    # mSize = 70
+    # x = np.arange(0, numSteps + 1)
+    #
+    # ax1.scatter(x, prefNormalized[i], s=mSize,
+    #             facecolor='white', edgecolor='black')
+    # ax1.plot(x, prefNormalized[i], color='black', label='PO', linewidth=1.5)
+    # ax1.scatter(x, nonprefNormalized[i], s=mSize,
+    #             facecolor='white', edgecolor='grey')
+    # ax1.plot(x, nonprefNormalized[i], color='grey', label='NO', linewidth=1.5)
+    # ax1.plot(xNorm, pnNormalized[i], color='green', label='P0 N1', linewidth=1.5)
+    # ax1.scatter(xNorm, pnNormalized[i], color='green', s=mSize)
+    # ax1.plot(xNorm, npNormalized[i], color='magenta', label='N0 P1', linewidth=1.5)
+    # ax1.scatter(xNorm, npNormalized[i], color='magenta', s=mSize)
+    # ax1.plot(xNorm, ppNormalized[i], color='black', label='P0 P1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, ppNormalized[i], color='black', s=mSize)
+    # ax1.plot(xNorm, nnNormalized[i], color='grey', label='N0 N1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, nnNormalized[i], color='grey', s=mSize)
+    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
+    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
+    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
+    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    # ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    # ax1.set_ylim([0, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    # y_ticks = ax1.get_yticks()
+    # # Create a list of y-tick labels with only 0 and 1.0 labeled
+    # y_tick_labels = [
+    #     '0' if tick == 0 else
+    #     f'{round(normVal[i][0])}' if tick == 1.0 else
+    #     ''  # blank for other ticks
+    #     for tick in y_ticks
+    # ]
+    # ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    # ax1.set_xticks([0, 1, 2, 3, 4])
+    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    # ax1.spines['top'].set_visible(False)
+    # ax1.spines['right'].set_visible(False)
+    # ax1.spines['bottom'].set_linewidth(2)
+    # ax1.spines['left'].set_linewidth(2)
+    # ax1.set_xlim([-0.5, 4.5])
+    # ax1.tick_params(axis='both', width=2, length=8)
+    #
+    # # Save as a PDF with tight bounding box and high DPI
+    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}.pdf'
+    # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    # plt.close('all')
 
 # population fits: Figure 3b
 resp = np.concatenate((prefMean, nonprefMean, pnMean, npMean, ppMean, nnMean), axis=0)
@@ -1188,23 +1298,29 @@ for filler in range(1):
                 f"W4 = {popt[5]:.2f}\n"
                 f"sigma = {popt[6]:.2f}")
     ax1.plot(x, prefMean, color='black', label='PO', linewidth=1.5)
-    ax1.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
-                 markerfacecolor='none', markeredgecolor='black', markersize=7)
+    # ax1.errorbar(x, prefMean, yerr=prefSEM, fmt='o', ecolor='black',
+    #              markerfacecolor='none', markeredgecolor='black', markersize=7)
+    ax1.errorbar(x, prefMean, yerr=0, fmt='o', ecolor='black', markerfacecolor='none', markeredgecolor='black', markersize=7)
     ax1.plot(x, nonprefMean, color='gray', label='NO', linewidth=1.5)
-    ax1.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
-                 markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    # ax1.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
+    #              markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    ax1.errorbar(x, nonprefMean, yerr=0, fmt='o', ecolor='grey', markerfacecolor='none', markeredgecolor='grey', markersize=7)
     ax1.plot(xNorm, pnMean, color='green', label='P0 N1', linewidth=1.5)
-    ax1.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
-                 color='green', markersize=7)
+    # ax1.errorbar(xNorm, pnMean, yerr=pnSEM, fmt='o', ecolor='green',
+    #              color='green', markersize=7)
+    ax1.errorbar(xNorm, pnMean, yerr=0, fmt='o', ecolor='green', color='green', markersize=7)
     ax1.plot(xNorm, npMean, color='magenta', label='N0 P1', linewidth=1.5)
-    ax1.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='magenta',
-                 color='magenta', markersize=7)
+    # ax1.errorbar(xNorm, npMean, yerr=npSEM, fmt='o', ecolor='magenta',
+    #              color='magenta', markersize=7)
+    ax1.errorbar(xNorm, npMean, yerr=0, fmt='o', ecolor='magenta', color='magenta', markersize=7)
     ax1.plot(xNorm, ppMean, color='black', label='P0 P1', linewidth=1.5)
-    ax1.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
-                 color='black', markersize=7)
+    # ax1.errorbar(xNorm, ppMean, yerr=ppSEM, fmt='o', ecolor='black',
+    #              color='black', markersize=7)
+    ax1.errorbar(xNorm, ppMean, yerr=0, fmt='o', ecolor='black', color='black', markersize=7)
     ax1.plot(xNorm, nnMean, color='grey', label='N0 N1', linewidth=1.5)
-    ax1.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
-                 color='grey', markersize=7)
+    # ax1.errorbar(xNorm, nnMean, yerr=nnSEM, fmt='o', ecolor='grey',
+    #              color='grey', markersize=7)
+    ax1.errorbar(xNorm, nnMean, yerr=0, fmt='o', ecolor='grey', color='grey', markersize=7)
     ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
     ax1.scatter(xNorm, pnFitPred, facecolors='g', edgecolors='g', s=50)
     ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
@@ -1223,9 +1339,9 @@ for filler in range(1):
     ax1.set_ylabel('Normalized Response Rate', fontsize=25, **hfont)
     ax1.set_ylim([0, 1.5])
     # Add a textbox with the popt values to the plot
-    ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
-             bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
-             transform=ax1.transAxes)
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
     y_ticks = ax1.get_yticks()
     # Create a list of y-tick labels with only 0 and 1.0 labeled
     y_tick_labels = [
@@ -1293,6 +1409,154 @@ for filler in range(1):
     # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
     # plt.close('all')
 
+
+####################### measured responses vs intensity weighted average or contrast weighted average ##################
+##################################### and then observable variance from RF weighted model ##############################
+
+# Initialize storage for all pair types
+from sklearn.metrics import r2_score
+from scipy.stats import wilcoxon
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+allMeasured = []
+allRFWeightedPred = []
+allContrastWeightedPred = []
+
+for i in range(len(prefNormalized)):
+    # Fit model and get predictions (as you've already done)
+    resp = np.concatenate((prefNormalized[i], nonprefNormalized[i], pnNormalized[i],
+                           npNormalized[i], ppNormalized[i], nnNormalized[i]), axis=0)
+    initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10]
+    popt, pcov = curve_fit(model_wrapper, (contrast_center, contrast_periphery, locations,
+                                           stim_type_center, stim_type_periphery), resp, p0=initial_guess)
+
+    # Predicted single-stim responses
+    pCenter = fullRFWeightedNorm(1, 0, -1, 1, -1, *popt)
+    pPeri = [fullRFWeightedNorm(0, 1, j, -1, 1, *popt) for j in range(4)]
+    npCenter = fullRFWeightedNorm(1, 0, -1, 0, -1, *popt)
+    npPeri = [fullRFWeightedNorm(0, 1, j, -1, 0, *popt) for j in range(4)]
+
+    # Paired responses
+    pnFitPred = [fullRFWeightedNorm(1, 1, j, 1, 0, *popt) for j in range(4)]
+    npFitPred = [fullRFWeightedNorm(1, 1, j, 0, 1, *popt) for j in range(4)]
+    ppFitPred = [fullRFWeightedNorm(1, 1, j, 1, 1, *popt) for j in range(4)]
+    nnFitPred = [fullRFWeightedNorm(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+    # Compare each condition
+    for j in range(2):
+        # PN condition: pref center, non-pref periphery
+        allMeasured.append(pnNormalized[i][j])
+        allRFWeightedPred.append(pnFitPred[j])
+        allContrastWeightedPred.append(0.5 * (prefNormalized[i][0] + nonprefNormalized[i][j]))
+
+        # NP condition: non-pref center, pref periphery
+        allMeasured.append(npNormalized[i][j])
+        allRFWeightedPred.append(npFitPred[j])
+        allContrastWeightedPred.append(0.5 * (nonprefNormalized[i][0] + prefNormalized[i][j]))
+
+        # # PP condition: pref center, pref periphery
+        # allMeasured.append(ppNormalized[i][j])
+        # allRFWeightedPred.append(ppFitPred[j])
+        # allContrastWeightedPred.append(0.5 * (prefNormalized[i][0] + prefNormalized[i][j]))
+        #
+        # # NN condition: non-pref center, non-pref periphery
+        # allMeasured.append(nnNormalized[i][j])
+        # allRFWeightedPred.append(nnFitPred[j])
+        # allContrastWeightedPred.append(0.5 * (nonprefNormalized[i][0] + nonprefNormalized[i][j]))
+
+# Convert to arrays
+measured = np.array(allMeasured)
+rf_pred = np.array(allRFWeightedPred)
+contrast_pred = np.array(allContrastWeightedPred)
+
+# R² scores
+r2_rf = r2_score(measured, rf_pred)
+r2_contrast = r2_score(measured, contrast_pred)
+print(f"RF-weighted R²: {r2_rf:.3f}")
+print(f"Contrast-weighted R²: {r2_contrast:.3f}")
+print(f"ΔR² (RF - Contrast): {r2_rf - r2_contrast:.3f}")
+
+# Error comparison
+rf_error = np.abs(measured - rf_pred)
+contrast_error = np.abs(measured - contrast_pred)
+
+stat, pval = wilcoxon(rf_error, contrast_error)
+print(f"Wilcoxon signed-rank test p = {pval:.4g}")
+
+# Assume measured, rf_pred, contrast_pred are already defined
+total_var = np.var(measured)
+
+resid_var_rf = np.var(measured - rf_pred)
+resid_var_contrast = np.var(measured - contrast_pred)
+
+explained_var_rf = 1 - resid_var_rf / total_var
+explained_var_contrast = 1 - resid_var_contrast / total_var
+
+gain_in_explained_var = explained_var_rf - explained_var_contrast
+
+print(f"Explained Variance (RF-weighted): {explained_var_rf:.3f}")
+print(f"Explained Variance (Contrast-weighted): {explained_var_contrast:.3f}")
+print(f"Gain in Explained Variance: {gain_in_explained_var:.3f}")
+
+# Set up the figure
+plt.figure(figsize=(8, 6))
+sns.set(style="whitegrid")
+
+# Jitter for visualization
+jitter = 0.1 * np.random.randn(len(rf_error))
+
+# Plot individual residuals
+plt.scatter(np.zeros_like(rf_error) + jitter, rf_error, color='royalblue', alpha=0.6, label='RF-weighted model')
+plt.scatter(np.ones_like(contrast_error) + jitter, contrast_error, color='darkorange', alpha=0.6, label='Contrast-avg model')
+
+# Plot means with error bars
+means = [np.mean(rf_error), np.mean(contrast_error)]
+sems = [np.std(rf_error)/np.sqrt(len(rf_error)), np.std(contrast_error)/np.sqrt(len(contrast_error))]
+plt.errorbar([0, 1], means, yerr=sems, fmt='o', color='black', capsize=5)
+
+# Beautify plot
+plt.xticks([0, 1], ['RF-weighted model', 'Contrast-avg model'])
+plt.ylabel('Absolute Residual (|Measured - Predicted|)')
+plt.title('Residuals Comparison: RF-weighted vs. Contrast-weighted')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+### variance of RF weight vs variance of simple average for normalization
+# PN, NP
+pnNMI = ((prefNormalized[:, 0] + nonprefNormalized[:, 1]) - pnNormalized[:, 0]) / (
+        (prefNormalized[:, 0] + nonprefNormalized[:, 1]) + pnNormalized[:, 0])
+
+npNMI = ((nonprefNormalized[:, 0] + prefNormalized[:, 1]) - npNormalized[:, 0]) / (
+        (nonprefNormalized[:, 0] + prefNormalized[:, 1]) + npNormalized[:, 0])
+
+pnNMI2 = ((prefNormalized[:, 0] + nonprefNormalized[:, 2]) - pnNormalized[:, 1]) / (
+        (prefNormalized[:, 0] + nonprefNormalized[:, 2]) + pnNormalized[:, 1])
+
+npNMI2 = ((nonprefNormalized[:, 0] + prefNormalized[:, 2]) - npNormalized[:, 1]) / (
+        (nonprefNormalized[:, 0] + prefNormalized[:, 2]) + npNormalized[:, 1])
+
+pnNMI3 = ((prefNormalized[:, 0] + nonprefNormalized[:, 3]) - pnNormalized[:, 2]) / (
+        (prefNormalized[:, 0] + nonprefNormalized[:, 3]) + pnNormalized[:, 2])
+
+npNMI3 = ((nonprefNormalized[:, 0] + prefNormalized[:, 3]) - npNormalized[:, 2]) / (
+        (nonprefNormalized[:, 0] + prefNormalized[:, 3]) + npNormalized[:, 2])
+
+pnNMI4 = ((prefNormalized[:, 0] + nonprefNormalized[:, 4]) - pnNormalized[:, 3]) / (
+        (prefNormalized[:, 0] + nonprefNormalized[:, 4]) + pnNormalized[:, 3])
+
+npNMI4 = ((nonprefNormalized[:, 0] + prefNormalized[:, 4]) - npNormalized[:, 3]) / (
+        (nonprefNormalized[:, 0] + prefNormalized[:, 4]) + npNormalized[:, 3])
+
+
+plt.hist(np.concatenate((pnNMI4, npNMI4), axis=0), bins=20)
+plt.xlim(-0.2, 0.8)
+plt.show()
+
+# population
 
 # bar plots for figures
 for filler in range(1):
@@ -1502,7 +1766,7 @@ for filler in range(1):
     plt.show()
 
 
-##################### Evaluate Weighted Normalization vs Weighted Normalization Heuristic Model ########################
+############# Evaluate Weighted Normalization vs Weighted Normalization Heuristic Model with baseline ##################
 
 # known variables
 contrast_center = [1, 0, 0, 0, 0,
@@ -1817,7 +2081,7 @@ for i in range(len(individualSpikeCountMat)):
 
 
 ########################################################################################################################
-
+###################################################### Extra Code ######################################################
 ########################################################################################################################
 # population plots
 prefNormalized = np.array(prefNormalized)
@@ -2380,8 +2644,8 @@ data4 = nnNMIPop[:, 0]
 
 plt.hist(data1, bins=20, alpha=1, label='pnNMIPop', color='blue')
 plt.hist(data2, bins=20, alpha=1, label='npNMIPop', color='blue')
-plt.hist(data3, bins=20, alpha=1, label='pnNMIPop', color='blue')
-plt.hist(data4, bins=20, alpha=1, label='npNMIPop', color='blue')
+plt.hist(data3, bins=20, alpha=1, label='ppNMIPop', color='blue')
+plt.hist(data4, bins=20, alpha=1, label='nnNMIPop', color='blue')
 plt.title('Distribution of Data Points at first offset')
 plt.xlabel('Value')
 plt.ylabel('Frequency')

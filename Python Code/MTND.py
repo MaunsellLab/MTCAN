@@ -93,9 +93,8 @@ p0 = time.time()
 #             '240611_62', '240611_67', '240611_80', '240611_131', '240611_132', '240611_135',
 #             '240611_136', '240611_140', '240611_145', '240611_151', '240613_138', '240703_91']
 
-fileList = ['240610']
-unitList = ['240610_92']
-
+fileList = ['230627']
+unitList = ['230627_71']
 
 prefNormalized = []
 nonprefNormalized = []
@@ -133,7 +132,7 @@ allBlocksDone = []
 
 for file in fileList:
     # Load relevant file here with pyMat reader
-    monkeyName = 'Akshan'  # 'Meetz'
+    monkeyName = 'Meetz'  # 'Akshan'
     seshDate = file
     withinSesh = 1
     if withinSesh == 1:

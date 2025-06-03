@@ -319,7 +319,6 @@ for file in fileList:
         prefDir = header['mapSetting']['data']['directionDeg'][0]
         nonPrefDir = (prefDir + 180) % 360
     blocksDone = allTrials[corrTrials[-2]]['blockStatus']['data']['blocksDone'][0]
-    allBlocksDone.append(blocksDone)
     numOffsets = header['blockStatus']['data']['numOffsets'][0]
     numSteps = int((numOffsets - 1) / 2)
     spikeCountMat = np.zeros((len(units), blocksDone+1, numSteps*7+3))
@@ -544,6 +543,7 @@ for file in fileList:
             nnNMIPop.append(nnNMI)
             offsetDegSepNormPop.append(offsetDegSepNorm)
             rfGaborSigmaPop.append(rfGaborSigma)
+            allBlocksDone.append(blocksDone)
 
 
 
@@ -632,6 +632,7 @@ npNormalizedWithBase = npNormalized / normVal
 ppNormalizedWithBase = ppNormalized / normVal
 nnNormalizedWithBase = nnNormalized / normVal
 sponNormalizedToPrefCenter = sponNormalized[:, np.newaxis] / normVal
+normValBase = np.copy(normVal)
 
 # normalize each response matrix by subtracting baseline
 # and then normalizing the pref center response
@@ -763,10 +764,81 @@ stim_type_periphery = np.array([-1, 1, 1, 1, 1,
                                 1, 1, 1, 1,
                                 0, 0, 0, 0])
 
+# known variables for fitting model that includes the baseline/spontaneous term
+contrast_centerSpon = [1, 0, 0, 0, 0,
+                       1, 0, 0, 0, 0,
+                       1, 1, 1, 1,
+                       1, 1, 1, 1,
+                       1, 1, 1, 1,
+                       1, 1, 1, 1,
+                       0]  # First response has contrast in the center, second in periphery
+contrast_peripherySpon = [0, 1, 1, 1, 1,
+                          0, 1, 1, 1, 1,
+                          1, 1, 1, 1,
+                          1, 1, 1, 1,
+                          1, 1, 1, 1,
+                          1, 1, 1, 1,
+                          0]  # First has no periphery, second has periphery with contrast
+locationsSpon = np.array([-1, 0, 1, 2, 3,
+                          -1, 0, 1, 2, 3,
+                          0, 1, 2, 3,
+                          0, 1, 2, 3,
+                          0, 1, 2, 3,
+                          0, 1, 2, 3,
+                          -1])  # First has no peripheral stimulus, second is at location 1
+stim_type_centerSpon = np.array([1, -1, -1, -1, -1,
+                                 0, -1, -1, -1, -1,
+                                 1, 1, 1, 1,
+                                 0, 0, 0, 0,
+                                 1, 1, 1, 1,
+                                 0, 0, 0, 0,
+                                 1])
+stim_type_peripherySpon = np.array([-1, 1, 1, 1, 1,
+                                    -1, 0, 0, 0, 0,
+                                    0, 0, 0, 0,
+                                    1, 1, 1, 1,
+                                    1, 1, 1, 1,
+                                    0, 0, 0, 0,
+                                    1])
 
-############################################## Example Unit Histogram Figure 2A ########################################
-exampleUnitHist = exampleUnitHist - exampleUnitHist[0]
-# example unit 230719_147, defined in the main fileList for loop
+########################################################################################################################
+###################################################### Figure 1c #######################################################
+########################################################################################################################
+
+# fit gaussian to average responses
+params = gaussFit(transX, transectMean)
+xFull = np.linspace(transX[0], transX[-1], 1000)
+respFull = gauss(xFull, *params)
+
+# plot transect response
+fig, ax1 = plt.subplots(figsize=(8, 6), layout='constrained')
+ax1.plot(xFull, respFull, color='black', linestyle='--', label='Gauss Fit')
+ax1.plot(transX, transectMean, color='black', label='Pref')
+ax1.errorbar(transX, transectMean, yerr=transectSEM, fmt='o', ecolor='black',
+             color='black', markersize=7)
+ax1.plot(x, nonprefMean, color='grey', label='NO')
+ax1.errorbar(x, nonprefMean, yerr=nonprefSEM, fmt='o', ecolor='grey',
+             color='grey', markersize=7)
+
+# # individual neuron fits
+# for i in transectNormalized:
+#     ax1.plot(transX, i, color='purple', alpha=0.2)
+
+ax1.set_ylabel('Normalized Response', fontsize=25, **hfont)
+ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+ax1.set_ylim([0, 1.2])
+ax1.set_title('transect')
+
+plt.show()
+
+########################################################################################################################
+############################################## Example Unit Histogram Figure 2A/B ######################################
+########################################################################################################################
+
+# # example unit 230719_147, defined in the main fileList for loop
+
+# # remove spon rate
+# exampleUnitHist = exampleUnitHist - exampleUnitHist[0]
 
 # figure
 fig, axs = plt.subplots(1, 2, figsize=(14, 6), layout='constrained')
@@ -814,8 +886,9 @@ for ax in axs:
 
 plt.show()
 
-
+########################################################################################################################
 ################################################## Bar Plot of Simple Normalization ####################################
+########################################################################################################################
 
 # bar plot for individual neurons (PN): Figure 2a
 for filler in range(1):
@@ -886,7 +959,900 @@ for filler in range(1):
     # plt.close('all')
 
 
-################################################## Fig 2c: simple average of representative unit #######################
+########################################################################################################################
+################################# Fig 2c: simple average of representative unit with baseline ##########################
+########################################################################################################################
+
+# i = np.where(masterGoodUnits == '230627_71')[0][0]
+i = np.where(masterGoodUnits == '230719_147')[0][0]
+
+fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+
+mSize = 70
+x = np.arange(0, numSteps + 1)
+pnFitPred = (prefNormalizedWithBase[i][0] + nonprefNormalizedWithBase[i][1:]) / 2
+
+ax1.scatter(x, prefNormalizedWithBase[i], s=mSize,
+            facecolor='white', edgecolor='black')
+ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=1.5)
+ax1.scatter(x, nonprefNormalizedWithBase[i], s=mSize,
+            facecolor='white', edgecolor='grey')
+ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=1.5)
+ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=1.5)
+ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=mSize)
+ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+ax1.axhline(y=sponNormalizedToPrefCenter[i], color='blue')
+ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+ax1.set_ylim([0, 1.6])
+y_ticks = ax1.get_yticks()
+# Create a list of y-tick labels with only 0 and 1.0 labeled
+y_tick_labels = [
+    '0' if tick == 0 else
+    f'{round(normVal[i][0])}' if tick == 1.0 else
+    ''  # blank for other ticks
+    for tick in y_ticks
+]
+ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+ax1.set_xticks([0, 1, 2, 3, 4])
+ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+ax1.spines['top'].set_visible(False)
+ax1.spines['right'].set_visible(False)
+ax1.spines['bottom'].set_linewidth(2)
+ax1.spines['left'].set_linewidth(2)
+ax1.set_xlim([-0.5, 4.5])
+ax1.tick_params(axis='both', width=2, length=8)
+
+plt.show()
+
+
+########################################################################################################################
+####################################### RF Weighted Normalization with baseline ########################################
+########################################################################################################################
+
+# individual neurons
+r2ScoresRFWeightFullWithBase = []
+for i in range(len(prefNormalized)):
+
+    # population fits
+    resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i],
+                           pnNormalizedWithBase[i], npNormalizedWithBase[i],
+                           ppNormalizedWithBase[i], nnNormalizedWithBase[i],
+                           sponNormalizedToPrefCenter[i]), axis=0)
+    initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                     np.float(sponNormalizedToPrefCenter[i])]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
+
+    # weighted norm with baseline
+    popt, pcov = curve_fit(model_wrapperWithBase, (contrast_centerSpon,
+                                                   contrast_peripherySpon,
+                                                   locationsSpon,
+                                                   stim_type_centerSpon,
+                                                   stim_type_peripherySpon), resp,
+                           p0=initial_guess)
+    y_pred1 = apply_fitted_modelWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                         locationsSpon, stim_type_centerSpon,
+                                         stim_type_peripherySpon, *popt)
+    r2 = r2_score(resp, y_pred1)
+    r2ScoresRFWeightFullWithBase.append(r2)
+
+    # single presentation prediction
+    pCenterSinglePred = np.array(fullRFWeightedNormWithBase(1, 0, -1, 1, -1, *popt))
+    pCenterSinglePred = pCenterSinglePred[np.newaxis]
+    pPeriSinglePred = np.array([fullRFWeightedNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+    pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+    npCenterSinglePred = np.array(fullRFWeightedNormWithBase(1, 0, -1, 0, -1, *popt))
+    npCenterSinglePred = npCenterSinglePred[np.newaxis]
+    npPeriSinglePred = np.array([fullRFWeightedNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+    npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+    # paired presentation prediction
+    pnFitPred = [fullRFWeightedNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+    npFitPred = [fullRFWeightedNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+    ppFitPred = [fullRFWeightedNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+    nnFitPred = [fullRFWeightedNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+    predResp = np.concatenate((pSingleFitPred, npSingleFitPred, pnFitPred,
+                               npFitPred, ppFitPred, nnFitPred), axis=0)
+
+    # # figure
+    # fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    # popt_str = (f"Lp = {popt[0]:.2f}\n"
+    #             f"Lnp = {popt[1]:.2f}\n"
+    #             f"W1 = {popt[2]:.2f}\n"
+    #             f"W2 = {popt[3]:.2f}\n"
+    #             f"W3 = {popt[4]:.2f}\n"
+    #             f"W4 = {popt[5]:.2f}\n"
+    #             f"sigma = {popt[6]:.2f}\n"
+    #             f"spon = {popt[7]:.2f}\n"
+    #             f"r2= {r2:.3f}")
+    #
+    # mSize = 70
+    # x = np.arange(0, numSteps + 1)
+    #
+    # ax1.scatter(x, prefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='black')
+    # ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=1.5)
+    # ax1.scatter(x, nonprefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='grey')
+    # ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=1.5)
+    # ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=1.5)
+    # ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=mSize)
+    # ax1.plot(xNorm, npNormalizedWithBase[i], color='magenta', label='N0 P1', linewidth=1.5)
+    # ax1.scatter(xNorm, npNormalizedWithBase[i], color='magenta', s=mSize)
+    # ax1.plot(xNorm, ppNormalizedWithBase[i], color='black', label='P0 P1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, ppNormalizedWithBase[i], color='black', s=mSize)
+    # ax1.plot(xNorm, nnNormalizedWithBase[i], color='grey', label='N0 N1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, nnNormalizedWithBase[i], color='grey', s=mSize)
+    # ax1.axhline(y=sponNormalizedToPrefCenter[i], color='blue', alpha=1)
+    # ax1.axhline(y=y_pred1[-1], linestyle='--', color='blue', alpha=0.8)
+    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
+    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
+    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
+    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    # ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    # ax1.set_ylim([0, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    # y_ticks = ax1.get_yticks()
+    # # Create a list of y-tick labels with only 0 and 1.0 labeled
+    # y_tick_labels = [
+    #     '0' if tick == 0 else
+    #     f'{round(normValBase[i][0])}' if tick == 1.0 else
+    #     ''  # blank for other ticks
+    #     for tick in y_ticks]
+    #
+    # ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    # ax1.set_xticks([0, 1, 2, 3, 4])
+    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    # ax1.spines['top'].set_visible(False)
+    # ax1.spines['right'].set_visible(False)
+    # ax1.spines['bottom'].set_linewidth(2)
+    # ax1.spines['left'].set_linewidth(2)
+    # ax1.set_xlim([-0.5, 4.5])
+    # ax1.tick_params(axis='both', width=2, length=8)
+    #
+    # # Save as a PDF with tight bounding box and high DPI
+    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_RFWeightWithBase.pdf'
+    # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    # plt.close('all')
+
+r2ScoresRFWeightFullWithBase = np.array(r2ScoresRFWeightFullWithBase)
+np.median(r2ScoresRFWeightFullWithBase)
+
+# population
+resp = np.concatenate((prefMeanWithBase, nonprefMeanWithBase, pnMeanWithBase,
+                       npMeanWithBase, ppMeanWithBase, nnMeanWithBase,
+                       [np.mean(sponNormalizedToPrefCenter)]), axis=0)
+initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                 np.mean(sponNormalizedToPrefCenter)]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
+
+
+popt, pcov = curve_fit(model_wrapperWithBase, (contrast_centerSpon,
+                                               contrast_peripherySpon,
+                                               locationsSpon,
+                                               stim_type_centerSpon,
+                                               stim_type_peripherySpon),
+                       resp,
+                       p0=initial_guess)
+y_pred1 = apply_fitted_modelWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                     locationsSpon, stim_type_centerSpon,
+                                     stim_type_peripherySpon, *popt)
+r2 = r2_score(resp, y_pred1)
+print(r2)
+print(popt)
+
+pnFitPred = [fullRFWeightedNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+npFitPred = [fullRFWeightedNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+ppFitPred = [fullRFWeightedNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+nnFitPred = [fullRFWeightedNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+pCenterSinglePred = np.array(fullRFWeightedNormWithBase(1, 0, -1, 1, -1, *popt))
+pCenterSinglePred = pCenterSinglePred[np.newaxis]
+pPeriSinglePred = np.array([fullRFWeightedNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+npCenterSinglePred = np.array(fullRFWeightedNormWithBase(1, 0, -1, 0, -1, *popt))
+npCenterSinglePred = npCenterSinglePred[np.newaxis]
+npPeriSinglePred = np.array([fullRFWeightedNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+# RF weighted with baseline prediction figure
+for filler in range(1):
+    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    popt_str = (f"Lp = {popt[0]:.2f}\n"
+                f"Lnp = {popt[1]:.2f}\n"
+                f"W1 = {popt[2]:.2f}\n"
+                f"W2 = {popt[3]:.2f}\n"
+                f"W3 = {popt[4]:.2f}\n"
+                f"W4 = {popt[5]:.2f}\n"
+                f"sigma = {popt[6]:.2f}")
+    ax1.plot(x, prefMeanWithBase, color='black', label='PO', linewidth=1.5)
+    ax1.errorbar(x, prefMeanWithBase, yerr=prefWithBaseSEM, fmt='o', ecolor='black',
+                 markerfacecolor='none', markeredgecolor='black', markersize=7)
+    ax1.plot(x, nonprefMeanWithBase, color='gray', label='NO', linewidth=1.5)
+    ax1.errorbar(x, nonprefMeanWithBase, yerr=nonprefWithBaseSEM, fmt='o', ecolor='grey',
+                 markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    ax1.plot(xNorm, pnMeanWithBase, color='green', label='P0 N1', linewidth=1.5)
+    ax1.errorbar(xNorm, pnMeanWithBase, yerr=pnWithBaseSEM, fmt='o', ecolor='green',
+                 color='green', markersize=7)
+    ax1.plot(xNorm, npMeanWithBase, color='magenta', label='N0 P1', linewidth=1.5)
+    ax1.errorbar(xNorm, npMeanWithBase, yerr=npWithBaseSEM, fmt='o', ecolor='magenta',
+                 color='magenta', markersize=7)
+    ax1.plot(xNorm, ppMeanWithBase, color='black', label='P0 P1', linewidth=1.5)
+    ax1.errorbar(xNorm, ppMeanWithBase, yerr=ppWithBaseSEM, fmt='o', ecolor='black',
+                 color='black', markersize=7)
+    ax1.plot(xNorm, nnMeanWithBase, color='grey', label='N0 N1', linewidth=1.5)
+    ax1.errorbar(xNorm, nnMeanWithBase, yerr=nnWithBaseSEM, fmt='o', ecolor='grey',
+                 color='grey', markersize=7)
+    ax1.axhline(y=np.mean(sponNormalizedToPrefCenter), color='blue')
+    ax1.axhline(y=y_pred1[-1], linestyle='--', color='blue', alpha=0.8)
+    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    ax1.scatter(xNorm, pnFitPred, facecolors='g', edgecolors='g', s=50)
+    ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    ax1.scatter(xNorm, npFitPred, facecolors='m', edgecolors='m', s=50)
+    ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', alpha=0.8,
+             linewidth=1.5)
+    ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=50)
+    ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', alpha=0.8,
+             linewidth=1.5)
+    ax1.scatter(xNorm, nnFitPred, facecolors='grey', edgecolors='gray', s=50)
+    ax1.plot(x, pSingleFitPred, color='black', linestyle='--')
+    ax1.scatter(x, pSingleFitPred, facecolors='none', edgecolors='black', s=50)
+    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--')
+    ax1.scatter(x, npSingleFitPred, facecolors='none', edgecolors='gray', s=50)
+    ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    ax1.set_ylabel('Normalized Response Rate', fontsize=25, **hfont)
+    ax1.set_ylim([-0.05, 1.5])
+    # Add a textbox with the popt values to the plot
+    ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+             transform=ax1.transAxes)
+    y_ticks = ax1.get_yticks()
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_tick_labels = [
+        '0' if tick == 0 else
+        '1' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    ax1.set_xticks([0, 1, 2, 3, 4])
+    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(2)
+    ax1.spines['left'].set_linewidth(2)
+    ax1.set_xlim([-0.5, 4.5])
+    ax1.tick_params(axis='both', width=2, length=8)
+
+    plt.show()
+
+
+########################################################################################################################
+######################################## Classic Heeger with baseline ##################################################
+########################################################################################################################
+# individual neurons
+r2ScoresClassicHeegerWithBase = []
+for i in range(len(prefNormalized)):
+
+    resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i],
+                           pnNormalizedWithBase[i], npNormalizedWithBase[i],
+                           ppNormalizedWithBase[i], nnNormalizedWithBase[i],
+                           sponNormalizedToPrefCenter[i]), axis=0)
+    initial_guess = [1.0, 0.5, .10,
+                     np.float(sponNormalizedToPrefCenter[i])]  # Lp, Lnp, sigma, b
+
+    # classic norm with baseline
+    popt, pcov = curve_fit(model_wrapperClassicWithBase, (contrast_centerSpon,
+                                                          contrast_peripherySpon,
+                                                          locationsSpon,
+                                                          stim_type_centerSpon,
+                                                          stim_type_peripherySpon), resp,
+                           p0=initial_guess)
+    y_pred1 = apply_fitted_modelClassicWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                                locationsSpon, stim_type_centerSpon,
+                                                stim_type_peripherySpon, *popt)
+    r2 = r2_score(resp, y_pred1)
+    r2ScoresClassicHeegerWithBase.append(r2)
+
+    # single presentation prediction
+    pCenterSinglePred = np.array(fullClassicNormWithBase(1, 0, -1, 1, -1, *popt))
+    pCenterSinglePred = pCenterSinglePred[np.newaxis]
+    pPeriSinglePred = np.array([fullClassicNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+    pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+    npCenterSinglePred = np.array(fullClassicNormWithBase(1, 0, -1, 0, -1, *popt))
+    npCenterSinglePred = npCenterSinglePred[np.newaxis]
+    npPeriSinglePred = np.array([fullClassicNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+    npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+    # paired presentation prediction
+    pnFitPred = [fullClassicNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+    npFitPred = [fullClassicNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+    ppFitPred = [fullClassicNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+    nnFitPred = [fullClassicNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+    predResp = np.concatenate((pSingleFitPred, npSingleFitPred, pnFitPred,
+                               npFitPred, ppFitPred, nnFitPred), axis=0)
+
+    # # figure
+    # fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    # popt_str = (f"Lp = {popt[0]:.2f}\n"
+    #             f"Lnp = {popt[1]:.2f}\n"
+    #             f"sigma = {popt[2]:.2f}\n"
+    #             f"spon = {popt[3]:.2f}\n"
+    #             f"r2= {r2:.3f}")
+    #
+    # mSize = 70
+    # x = np.arange(0, numSteps + 1)
+    #
+    # ax1.scatter(x, prefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='black')
+    # ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=1.5)
+    # ax1.scatter(x, nonprefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='grey')
+    # ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=1.5)
+    # ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=1.5)
+    # ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=mSize)
+    # ax1.plot(xNorm, npNormalizedWithBase[i], color='magenta', label='N0 P1', linewidth=1.5)
+    # ax1.scatter(xNorm, npNormalizedWithBase[i], color='magenta', s=mSize)
+    # ax1.plot(xNorm, ppNormalizedWithBase[i], color='black', label='P0 P1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, ppNormalizedWithBase[i], color='black', s=mSize)
+    # ax1.plot(xNorm, nnNormalizedWithBase[i], color='grey', label='N0 N1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, nnNormalizedWithBase[i], color='grey', s=mSize)
+    # ax1.axhline(y=sponNormalizedToPrefCenter[i], color='blue', alpha=1)
+    # ax1.axhline(y=y_pred1[-1], linestyle='--', color='blue', alpha=0.8)
+    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
+    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
+    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
+    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    # ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    # ax1.set_ylim([0, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    # y_ticks = ax1.get_yticks()
+    # # Create a list of y-tick labels with only 0 and 1.0 labeled
+    # y_tick_labels = [
+    #     '0' if tick == 0 else
+    #     f'{round(normValBase[i][0])}' if tick == 1.0 else
+    #     ''  # blank for other ticks
+    #     for tick in y_ticks]
+    #
+    # ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    # ax1.set_xticks([0, 1, 2, 3, 4])
+    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    # ax1.spines['top'].set_visible(False)
+    # ax1.spines['right'].set_visible(False)
+    # ax1.spines['bottom'].set_linewidth(2)
+    # ax1.spines['left'].set_linewidth(2)
+    # ax1.set_xlim([-0.5, 4.5])
+    # ax1.tick_params(axis='both', width=2, length=8)
+    #
+    # # Save as a PDF with tight bounding box and high DPI
+    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_classicHeegerWithBase.pdf'
+    # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    # plt.close('all')
+
+r2ScoresClassicHeegerWithBase = np.array(r2ScoresClassicHeegerWithBase)
+np.median(r2ScoresClassicHeegerWithBase)
+
+# population
+resp = np.concatenate((prefMeanWithBase, nonprefMeanWithBase, pnMeanWithBase,
+                       npMeanWithBase, ppMeanWithBase, nnMeanWithBase,
+                       [np.mean(sponNormalizedToPrefCenter)]), axis=0)
+initial_guess = [1.0, 0.5, 0.10,
+                 np.mean(sponNormalizedToPrefCenter)]  # Lp, Lnp, sigma, b
+
+
+popt, pcov = curve_fit(model_wrapperClassicWithBase, (contrast_centerSpon,
+                                                      contrast_peripherySpon,
+                                                      locationsSpon,
+                                                      stim_type_centerSpon,
+                                                      stim_type_peripherySpon),
+                       resp,
+                       p0=initial_guess)
+y_pred1 = apply_fitted_modelClassicWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                            locationsSpon, stim_type_centerSpon,
+                                            stim_type_peripherySpon, *popt)
+r2 = r2_score(resp, y_pred1)
+print(r2)
+print(popt)
+
+pnFitPred = [fullClassicNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+npFitPred = [fullClassicNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+ppFitPred = [fullClassicNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+nnFitPred = [fullClassicNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+pCenterSinglePred = np.array(fullClassicNormWithBase(1, 0, -1, 1, -1, *popt))
+pCenterSinglePred = pCenterSinglePred[np.newaxis]
+pPeriSinglePred = np.array([fullClassicNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+npCenterSinglePred = np.array(fullClassicNormWithBase(1, 0, -1, 0, -1, *popt))
+npCenterSinglePred = npCenterSinglePred[np.newaxis]
+npPeriSinglePred = np.array([fullClassicNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+
+########################################################################################################################
+####################################### Weighted Heeger with baseline ##################################################
+######################################### weight in numerator only #####################################################
+########################################################################################################################
+
+# individual neurons
+r2ScoresWeightedHeegerWithBase = []
+for i in range(len(prefNormalized)):
+
+    resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i],
+                           pnNormalizedWithBase[i], npNormalizedWithBase[i],
+                           ppNormalizedWithBase[i], nnNormalizedWithBase[i],
+                           sponNormalizedToPrefCenter[i]), axis=0)
+    initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                     np.float(sponNormalizedToPrefCenter[i])]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
+
+    # weighted norm (numerator only) with baseline
+    popt, pcov = curve_fit(model_wrapperWeightedHeegerWithBase, (contrast_centerSpon,
+                                                                 contrast_peripherySpon,
+                                                                 locationsSpon,
+                                                                 stim_type_centerSpon,
+                                                                 stim_type_peripherySpon), resp,
+                           p0=initial_guess)
+    y_pred1 = apply_fitted_modelWeightedHeegerWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                                       locationsSpon, stim_type_centerSpon,
+                                                       stim_type_peripherySpon, *popt)
+    r2 = r2_score(resp, y_pred1)
+    r2ScoresWeightedHeegerWithBase.append(r2)
+
+    # single presentation prediction
+    pCenterSinglePred = np.array(weightedHeegerNormWithBase(1, 0, -1, 1, -1, *popt))
+    pCenterSinglePred = pCenterSinglePred[np.newaxis]
+    pPeriSinglePred = np.array([weightedHeegerNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+    pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+    npCenterSinglePred = np.array(weightedHeegerNormWithBase(1, 0, -1, 0, -1, *popt))
+    npCenterSinglePred = npCenterSinglePred[np.newaxis]
+    npPeriSinglePred = np.array([weightedHeegerNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+    npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+    # paired presentation prediction
+    pnFitPred = [weightedHeegerNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+    npFitPred = [weightedHeegerNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+    ppFitPred = [weightedHeegerNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+    nnFitPred = [weightedHeegerNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+    predResp = np.concatenate((pSingleFitPred, npSingleFitPred, pnFitPred,
+                               npFitPred, ppFitPred, nnFitPred), axis=0)
+
+    # # figure
+    # fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    # popt_str = (f"Lp = {popt[0]:.2f}\n"
+    #             f"Lnp = {popt[1]:.2f}\n"
+    #             f"W1 = {popt[2]:.2f}\n"
+    #             f"W2 = {popt[3]:.2f}\n"
+    #             f"W3 = {popt[4]:.2f}\n"
+    #             f"W4 = {popt[5]:.2f}\n"
+    #             f"sigma = {popt[6]:.2f}\n"
+    #             f"spon = {popt[7]:.2f}\n"
+    #             f"r2= {r2:.3f}")
+    #
+    # mSize = 70
+    # x = np.arange(0, numSteps + 1)
+    #
+    # ax1.scatter(x, prefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='black')
+    # ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=1.5)
+    # ax1.scatter(x, nonprefNormalizedWithBase[i], s=mSize,
+    #             facecolor='white', edgecolor='grey')
+    # ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=1.5)
+    # ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=1.5)
+    # ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=mSize)
+    # ax1.plot(xNorm, npNormalizedWithBase[i], color='magenta', label='N0 P1', linewidth=1.5)
+    # ax1.scatter(xNorm, npNormalizedWithBase[i], color='magenta', s=mSize)
+    # ax1.plot(xNorm, ppNormalizedWithBase[i], color='black', label='P0 P1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, ppNormalizedWithBase[i], color='black', s=mSize)
+    # ax1.plot(xNorm, nnNormalizedWithBase[i], color='grey', label='N0 N1',
+    #          linewidth=1.5)
+    # ax1.scatter(xNorm, nnNormalizedWithBase[i], color='grey', s=mSize)
+    # ax1.axhline(y=sponNormalizedToPrefCenter[i], color='blue', alpha=1)
+    # ax1.axhline(y=y_pred1[-1], linestyle='--', color='blue', alpha=0.8)
+    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=mSize)
+    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=mSize)
+    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=mSize)
+    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=mSize)
+    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=mSize)
+    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=1.5)
+    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=mSize)
+    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=1.5)
+    # ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    # ax1.set_ylabel('Response Rate (spikes/s)', fontsize=25, **hfont)
+    # ax1.set_ylim([0, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    # y_ticks = ax1.get_yticks()
+    # # Create a list of y-tick labels with only 0 and 1.0 labeled
+    # y_tick_labels = [
+    #     '0' if tick == 0 else
+    #     f'{round(normValBase[i][0])}' if tick == 1.0 else
+    #     ''  # blank for other ticks
+    #     for tick in y_ticks]
+    #
+    # ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    # ax1.set_xticks([0, 1, 2, 3, 4])
+    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    # ax1.spines['top'].set_visible(False)
+    # ax1.spines['right'].set_visible(False)
+    # ax1.spines['bottom'].set_linewidth(2)
+    # ax1.spines['left'].set_linewidth(2)
+    # ax1.set_xlim([-0.5, 4.5])
+    # ax1.tick_params(axis='both', width=2, length=8)
+    #
+    # # Save as a PDF with tight bounding box and high DPI
+    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_WeightedHeegerWithBase.pdf'
+    # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
+    # plt.close('all')
+
+r2ScoresWeightedHeegerWithBase = np.array(r2ScoresWeightedHeegerWithBase)
+np.median(r2ScoresWeightedHeegerWithBase)
+
+# population
+resp = np.concatenate((prefMeanWithBase, nonprefMeanWithBase, pnMeanWithBase,
+                       npMeanWithBase, ppMeanWithBase, nnMeanWithBase,
+                       [np.mean(sponNormalizedToPrefCenter)]), axis=0)
+initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                 np.mean(sponNormalizedToPrefCenter)]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
+
+
+popt, pcov = curve_fit(model_wrapperWeightedHeegerWithBase, (contrast_centerSpon,
+                                                             contrast_peripherySpon,
+                                                             locationsSpon,
+                                                             stim_type_centerSpon,
+                                                             stim_type_peripherySpon),
+                       resp,
+                       p0=initial_guess)
+y_pred1 = apply_fitted_modelWeightedHeegerWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                                   locationsSpon, stim_type_centerSpon,
+                                                   stim_type_peripherySpon, *popt)
+r2 = r2_score(resp, y_pred1)
+print(r2)
+print(popt)
+
+pnFitPred = [weightedHeegerNormWithBase(1, 1, j, 1, 0, *popt) for j in range(4)]
+npFitPred = [weightedHeegerNormWithBase(1, 1, j, 0, 1, *popt) for j in range(4)]
+ppFitPred = [weightedHeegerNormWithBase(1, 1, j, 1, 1, *popt) for j in range(4)]
+nnFitPred = [weightedHeegerNormWithBase(1, 1, j, 0, 0, *popt) for j in range(4)]
+
+pCenterSinglePred = np.array(weightedHeegerNormWithBase(1, 0, -1, 1, -1, *popt))
+pCenterSinglePred = pCenterSinglePred[np.newaxis]
+pPeriSinglePred = np.array([weightedHeegerNormWithBase(0, 1, j, -1, 1, *popt) for j in range(4)])
+pSingleFitPred = np.concatenate((pCenterSinglePred, pPeriSinglePred), axis=0)
+
+npCenterSinglePred = np.array(weightedHeegerNormWithBase(1, 0, -1, 0, -1, *popt))
+npCenterSinglePred = npCenterSinglePred[np.newaxis]
+npPeriSinglePred = np.array([weightedHeegerNormWithBase(0, 1, j, -1, 0, *popt) for j in range(4)])
+npSingleFitPred = np.concatenate((npCenterSinglePred, npPeriSinglePred), axis=0)
+
+# weighted heeger with baseline prediction figure
+for filler in range(1):
+    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    popt_str = (f"Lp = {popt[0]:.2f}\n"
+                f"Lnp = {popt[1]:.2f}\n"
+                f"W1 = {popt[2]:.2f}\n"
+                f"W2 = {popt[3]:.2f}\n"
+                f"W3 = {popt[4]:.2f}\n"
+                f"W4 = {popt[5]:.2f}\n"
+                f"sigma = {popt[6]:.2f}")
+    ax1.plot(x, prefMeanWithBase, color='black', label='PO', linewidth=1.5)
+    ax1.errorbar(x, prefMeanWithBase, yerr=prefWithBaseSEM, fmt='o', ecolor='black',
+                 markerfacecolor='none', markeredgecolor='black', markersize=7)
+    ax1.plot(x, nonprefMeanWithBase, color='gray', label='NO', linewidth=1.5)
+    ax1.errorbar(x, nonprefMeanWithBase, yerr=nonprefWithBaseSEM, fmt='o', ecolor='grey',
+                 markerfacecolor='none', markeredgecolor='grey', markersize=7)
+    ax1.plot(xNorm, pnMeanWithBase, color='green', label='P0 N1', linewidth=1.5)
+    ax1.errorbar(xNorm, pnMeanWithBase, yerr=pnWithBaseSEM, fmt='o', ecolor='green',
+                 color='green', markersize=7)
+    ax1.plot(xNorm, npMeanWithBase, color='magenta', label='N0 P1', linewidth=1.5)
+    ax1.errorbar(xNorm, npMeanWithBase, yerr=npWithBaseSEM, fmt='o', ecolor='magenta',
+                 color='magenta', markersize=7)
+    ax1.plot(xNorm, ppMeanWithBase, color='black', label='P0 P1', linewidth=1.5)
+    ax1.errorbar(xNorm, ppMeanWithBase, yerr=ppWithBaseSEM, fmt='o', ecolor='black',
+                 color='black', markersize=7)
+    ax1.plot(xNorm, nnMeanWithBase, color='grey', label='N0 N1', linewidth=1.5)
+    ax1.errorbar(xNorm, nnMeanWithBase, yerr=nnWithBaseSEM, fmt='o', ecolor='grey',
+                 color='grey', markersize=7)
+    ax1.axhline(y=np.mean(sponNormalizedToPrefCenter), color='blue')
+    ax1.axhline(y=y_pred1[-1], linestyle='--', color='blue', alpha=0.8)
+    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=1.5)
+    ax1.scatter(xNorm, pnFitPred, facecolors='g', edgecolors='g', s=50)
+    ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=1.5)
+    ax1.scatter(xNorm, npFitPred, facecolors='m', edgecolors='m', s=50)
+    ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', alpha=0.8,
+             linewidth=1.5)
+    ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=50)
+    ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', alpha=0.8,
+             linewidth=1.5)
+    ax1.scatter(xNorm, nnFitPred, facecolors='grey', edgecolors='gray', s=50)
+    ax1.plot(x, pSingleFitPred, color='black', linestyle='--')
+    ax1.scatter(x, pSingleFitPred, facecolors='none', edgecolors='black', s=50)
+    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--')
+    ax1.scatter(x, npSingleFitPred, facecolors='none', edgecolors='gray', s=50)
+    ax1.set_xlabel('Receptive Field Location', fontsize=25, **hfont)
+    ax1.set_ylabel('Normalized Response Rate', fontsize=25, **hfont)
+    ax1.set_ylim([-0.05, 1.5])
+    # Add a textbox with the popt values to the plot
+    ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+             transform=ax1.transAxes)
+    y_ticks = ax1.get_yticks()
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_tick_labels = [
+        '0' if tick == 0 else
+        '1' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+    ax1.set_xticks([0, 1, 2, 3, 4])
+    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=20)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(2)
+    ax1.spines['left'].set_linewidth(2)
+    ax1.set_xlim([-0.5, 4.5])
+    ax1.tick_params(axis='both', width=2, length=8)
+
+    plt.show()
+
+
+########################################################################################################################
+###################################################### Work Space 2 ####################################################
+################################################# Explainable Variance #################################################
+################################# In this version I simulate the raw rates with the baseline ###########################
+########################################################################################################################
+explainable_variances = []
+goodI = []
+for i in range(len(prefNormalized)):
+    # Skip if any entry is zero-dimensional or empty
+    if (prefNormalized[i].ndim == 0 or nonprefNormalized[i].ndim == 0 or
+        pnNormalized[i].ndim == 0 or npNormalized[i].ndim == 0 or
+        ppNormalized[i].ndim == 0 or nnNormalized[i].ndim == 0):
+        continue
+
+    # Convert normalized rates to raw rates
+    raw_spon = sponNormalizedToPrefCenter[i] * normVal[i]
+    # add spon rate back in
+    raw_pref = (prefNormalized[i] * normVal[i]) + raw_spon
+    raw_nonpref = (nonprefNormalized[i] * normVal[i]) + raw_spon
+    raw_pn = (pnNormalized[i] * normVal[i]) + raw_spon
+    raw_np = (npNormalized[i] * normVal[i]) + raw_spon
+    raw_pp = (ppNormalized[i] * normVal[i]) + raw_spon
+    raw_nn = (nnNormalized[i] * normVal[i]) + raw_spon
+
+    # Concatenate into a single response vector
+    raw_resp = np.concatenate((raw_pref, raw_nonpref, raw_pn, raw_np, raw_pp, raw_nn, raw_spon), axis=0)
+
+    # # Fit model to raw responses
+    # initial_guess = [1.0 * float(normVal[i]), 0.5 * float(normVal[i]),
+    #                  1.0, 0.75, 0.50, 0.10, 0.10, raw_spon]
+    initial_guess = [raw_pref[0], raw_nonpref[0], 1.0, 0.75, 0.50, 0.10, 0.10,
+                     np.float(raw_spon)]
+
+    try:
+        popt, _ = curve_fit(model_wrapperWithBase,
+                            (contrast_centerSpon, contrast_peripherySpon, locationsSpon,
+                             stim_type_centerSpon, stim_type_peripherySpon),
+                            raw_resp, p0=initial_guess)
+    except RuntimeError:
+        continue  # Skip neuron if fit fails
+
+    # Predicted rates in spikes/s
+    predicted_rates = np.array(apply_fitted_modelWithBase(contrast_centerSpon,
+                                                          contrast_peripherySpon,
+                                                          locationsSpon,
+                                                          stim_type_centerSpon,
+                                                          stim_type_peripherySpon,
+                                                          *popt))
+
+    # Simulate trials using Poisson spike counts (convert to spikes per 250 ms)
+    n_repeats = allBlocksDone[i]
+    rate_per_trial = predicted_rates * 0.25
+
+    # Ensure all λ values are valid for Poisson
+    rate_per_trial = np.nan_to_num(rate_per_trial, nan=0.0, posinf=0.0, neginf=0.0)
+    rate_per_trial[rate_per_trial < 0] = 0.0
+
+    simulated_trials = np.random.poisson(rate_per_trial[:, None], size=(len(rate_per_trial), n_repeats))
+
+    # Average simulated responses
+    simulated_means = simulated_trials.mean(axis=1)
+
+    # # # Convert back to spikes/s
+    simulated_means = simulated_means / 0.25
+
+    # Refit model to simulated averages
+    try:
+        popt_sim, _ = curve_fit(model_wrapperWithBase,
+                                (contrast_centerSpon, contrast_peripherySpon, locationsSpon,
+                                 stim_type_centerSpon, stim_type_peripherySpon),
+                                simulated_means, p0=initial_guess)
+    except RuntimeError:
+        continue
+
+    refit_preds = np.array(apply_fitted_modelWithBase(contrast_centerSpon, contrast_peripherySpon,
+                                                      locationsSpon, stim_type_centerSpon,
+                                                      stim_type_peripherySpon, *popt_sim))
+
+    # Compute explainable variance (R²)
+    ss_resid = np.sum((simulated_means - refit_preds) ** 2)
+    ss_total = np.sum((simulated_means - np.mean(simulated_means)) ** 2)
+    R2 = 1 - (ss_resid / ss_total)
+    explainable_variances.append(R2)
+    goodI.append(i)
+
+explainable_variances = np.array(explainable_variances)
+# Population-level explainable variance
+population_explainable_variance = np.median(explainable_variances)
+print("Population-level explainable variance:", population_explainable_variance)
+
+# Scatter plot
+plt.figure(figsize=(5, 5))
+plt.scatter(explainable_variances, r2ScoresRFWeightFullWithBase[goodI], color='blue', alpha=0.7)
+
+minVal = 0.7
+maxVal = 1.03
+# Axis limits
+plt.xlim(minVal, maxVal)
+plt.ylim(minVal, maxVal)
+
+# Unity line
+plt.plot([minVal, maxVal], [minVal, maxVal], 'k--')
+
+# Labels and title
+plt.xlabel("Explainable variance (R² from simulated data)")
+plt.ylabel("Model fit R² (original data)")
+plt.title("Explainable variance vs. Original model R²")
+plt.gca().set_aspect('equal', adjustable='box')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Compute ratio
+ratio = r2ScoresRFWeightFullWithBase / explainable_variances
+
+# Plot using matplotlib
+plt.figure(figsize=(8, 5))
+plt.hist(ratio, bins=20, color="royalblue", edgecolor="black")
+plt.axvline(1.0, color='red', linestyle='--', linewidth=2, label='Unity (1.0)')
+plt.xlabel("Model R² / Explainable Variance", fontsize=12)
+plt.ylabel("Count", fontsize=12)
+plt.title("Distribution of Model R² as a Fraction of Explainable Variance", fontsize=14)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+########################################################################################################################
+############# Evaluate Weighted Normalization vs Weighted Normalization Heuristic Model with baseline ##################
+########################################################################################################################
+
+# individual neurons
+r2ScoresRFWeightHeuristic = []
+for i in range(len(prefNormalized)):
+
+    resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i],
+                           pnNormalizedWithBase[i], npNormalizedWithBase[i],
+                           ppNormalizedWithBase[i], nnNormalizedWithBase[i],
+                           sponNormalizedToPrefCenter[i]), axis=0)
+    initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                     np.float(sponNormalizedToPrefCenter[i])]
+
+    # classic norm with baseline
+    popt, pcov = curve_fit(model_wrapperHeuristic, (contrast_centerSpon,
+                                                    contrast_peripherySpon,
+                                                    locationsSpon,
+                                                    stim_type_centerSpon,
+                                                    stim_type_peripherySpon), resp,
+                           p0=initial_guess)
+    y_pred1 = apply_fitted_modelHeuristic(contrast_centerSpon, contrast_peripherySpon,
+                                          locationsSpon, stim_type_centerSpon,
+                                          stim_type_peripherySpon, *popt)
+    r2 = r2_score(resp, y_pred1)
+    r2ScoresRFWeightHeuristic.append(r2)
+
+r2ScoresRFWeightHeuristic = np.array(r2ScoresRFWeightHeuristic)
+np.median(r2ScoresRFWeightHeuristic)
+
+# population
+# weighted norm with baseline (heuristic model)
+resp = np.concatenate((prefMeanWithBase, nonprefMeanWithBase, pnMeanWithBase,
+                       npMeanWithBase, ppMeanWithBase, nnMeanWithBase,
+                       [np.mean(sponNormalizedToPrefCenter)]), axis=0)
+initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10,
+                 np.mean(sponNormalizedToPrefCenter)]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
+
+popt, pcov = curve_fit(model_wrapperHeuristic, (contrast_centerSpon, contrast_peripherySpon,
+                                                locationsSpon, stim_type_centerSpon,
+                                                stim_type_peripherySpon), resp,
+                       p0=initial_guess)
+y_pred1 = apply_fitted_modelHeuristic(contrast_centerSpon, contrast_peripherySpon,
+                                      locationsSpon, stim_type_centerSpon,
+                                      stim_type_peripherySpon, *popt)
+r2 = r2_score(resp, y_pred1)
+print(r2)
+print(popt)
+
+# scatter plot of individual neuron fit r2 scores for heuristic weighted vs rf weighted
+for filler in range(1):
+    fix, ax1 = plt.subplots()
+    ax1.scatter(r2ScoresRFWeightFullWithBase, r2ScoresRFWeightHeuristic)
+    ax1.set_xlabel('r2 Scores weighted normalization')
+    ax1.set_ylabel('r2 Scores heuristic weighted norm')
+
+    x_min, x_max = ax1.get_xlim()
+    y_min, y_max = ax1.get_ylim()
+    min_val = min(x_min, y_min)
+    max_val = max(x_max, y_max)
+    ax1.plot([min_val, max_val], [min_val, max_val], 'k--', label='Unity Line', zorder=0)
+
+    # Reset limits to ensure the unity line fits perfectly
+    ax1.set_xlim([min_val, max_val])
+    ax1.set_ylim([min_val, max_val])
+    stat, p_value = wilcoxon(r2ScoresRFWeightFullWithBase, r2ScoresRFWeightHeuristic, alternative='two-sided')
+    print(p_value)
+    plt.show()
+
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+
+########################################################################################################################
+####################################### The analyses below use models without the baseline term ########################
+########################################################################################################################
+
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+
+########################################################################################################################
+####################################### Fig 2c: simple average of representative unit without base #####################
+########################################################################################################################
+
+# i = np.where(masterGoodUnits == '230627_71')[0][0]
 i = np.where(masterGoodUnits == '230719_147')[0][0]
 
 fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
@@ -928,8 +1894,10 @@ ax1.tick_params(axis='both', width=2, length=8)
 
 plt.show()
 
-
+########################################################################################################################
 ###################################### Classic Heeger Normalization Weighted Numerator #################################
+########################################################################################################################
+
 # individual neurons fit: Figure 2d
 fullClassicNormPred = []
 measuredResp = []
@@ -1140,7 +2108,9 @@ for filler in range(1):
     # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
     # plt.close('all')
 
+########################################################################################################################
 ########################################### Receptive Field Weighted Normalization #####################################
+########################################################################################################################
 
 # individual neurons fit: Figure 2e
 fullRFWeightPred = []
@@ -1256,6 +2226,8 @@ for i in range(len(prefNormalized)):
     # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}.pdf'
     # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
     # plt.close('all')
+
+r2ScoresRFWeightFull = np.array(r2ScoresRFWeightFull)
 
 # population fits: Figure 3b
 resp = np.concatenate((prefMean, nonprefMean, pnMean, npMean, ppMean, nnMean), axis=0)
@@ -1409,9 +2381,10 @@ for filler in range(1):
     # fig.savefig(filePath, format="pdf", bbox_inches='tight', dpi=300)
     # plt.close('all')
 
-
+########################################################################################################################
 ####################### measured responses vs intensity weighted average or contrast weighted average ##################
 ##################################### and then observable variance from RF weighted model ##############################
+########################################################################################################################
 
 # Initialize storage for all pair types
 from sklearn.metrics import r2_score
@@ -1524,8 +2497,10 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-
+########################################################################################################################
 ### variance of RF weight vs variance of simple average for normalization
+########################################################################################################################
+
 # PN, NP
 pnNMI = ((prefNormalized[:, 0] + nonprefNormalized[:, 1]) - pnNormalized[:, 0]) / (
         (prefNormalized[:, 0] + nonprefNormalized[:, 1]) + pnNormalized[:, 0])
@@ -1766,7 +2741,9 @@ for filler in range(1):
     plt.show()
 
 
+########################################################################################################################
 ############# Evaluate Weighted Normalization vs Weighted Normalization Heuristic Model with baseline ##################
+########################################################################################################################
 
 # known variables
 contrast_center = [1, 0, 0, 0, 0,
@@ -1805,32 +2782,6 @@ stim_type_periphery = np.array([-1, 1, 1, 1, 1,
                                 0, 0, 0, 0,
                                 1])
 
-# individual neurons fit
-r2ScoresRFWeightBase = []
-r2ScoresRFWeightHeuristic = []
-for i in range(len(prefNormalizedWithBase)):
-    resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i], pnNormalizedWithBase[i],
-                           npNormalizedWithBase[i], ppNormalizedWithBase[i], nnNormalizedWithBase[i],
-                           [sponNormalizedToPrefCenter[i][0]]), axis=0)
-
-    initial_guess = [1.0, 0.5, 1.0, 0.75, 0.50, .10, 0.10, sponNormalizedToPrefCenter[i][0]]  # Lp, Lnp, W1, W2, W3, W4, sigma, b
-
-    popt, pcov = curve_fit(model_wrapperWithBase, (contrast_center, contrast_periphery, locations, stim_type_center,
-                                                   stim_type_periphery), resp, p0=initial_guess, maxfev=1000000)
-    y_pred1 = apply_fitted_modelWithBase(contrast_center, contrast_periphery, locations,
-                                         stim_type_center, stim_type_periphery, *popt)
-    r2 = r2_score(resp, y_pred1)
-    r2ScoresRFWeightBase.append(r2)
-
-    popt, pcov = curve_fit(model_wrapperHeuristic, (contrast_center, contrast_periphery, locations, stim_type_center,
-                                                    stim_type_periphery), resp, p0=initial_guess, maxfev=1000000)
-    y_pred1 = apply_fitted_modelHeuristic(contrast_center, contrast_periphery, locations,
-                                          stim_type_center, stim_type_periphery, *popt)
-    r2 = r2_score(resp, y_pred1)
-    r2ScoresRFWeightHeuristic.append(r2)
-
-r2ScoresRFWeightBase = np.array(r2ScoresRFWeightBase)
-r2ScoresRFWeightHeuristic = np.array(r2ScoresRFWeightHeuristic)
 
 # scatter plot of individual neuron fit r2 scores for heuristic weighted vs rf weighted
 for filler in range(1):
@@ -2066,19 +3017,122 @@ for filler in range(1):
     plt.show()
 
 
-###################################### explainable variance ## work in progress  #######################################
-popFractionExplained = []
-for i in range(len(individualSpikeCountMat)):
-    a = individualSpikeCountMat[i]
-    meanBaseline = np.mean(a[:, 0])
-    centralizedI = a - meanBaseline
-    normalizedI = centralizedI / np.mean(centralizedI[:, 18])
+########################################################################################################################
+###################################################### Work Space  #####################################################
+################################################# Explainable Variance #################################################
+########################################################################################################################
+explainable_variances = []
+goodI = []
 
-    # only take conditions with testing stimuli (count==0 is the no stim condition)
-    # condition 27-31 is the mapping stimuli
-    tempMat = normalizedI[:, 1:27]
-    tempMatMean = np.mean(tempMat, axis=0)
+for i in range(len(prefNormalized)):
+    # Skip if any entry is zero-dimensional or empty
+    if (prefNormalized[i].ndim == 0 or nonprefNormalized[i].ndim == 0 or
+        pnNormalized[i].ndim == 0 or npNormalized[i].ndim == 0 or
+        ppNormalized[i].ndim == 0 or nnNormalized[i].ndim == 0):
+        continue
 
+    # Convert normalized rates to raw rates
+    raw_pref = prefNormalized[i] * normVal[i]
+    raw_nonpref = nonprefNormalized[i] * normVal[i]
+    raw_pn = pnNormalized[i] * normVal[i]
+    raw_np = npNormalized[i] * normVal[i]
+    raw_pp = ppNormalized[i] * normVal[i]
+    raw_nn = nnNormalized[i] * normVal[i]
+
+    # Concatenate into a single response vector
+    raw_resp = np.concatenate((raw_pref, raw_nonpref, raw_pn, raw_np, raw_pp, raw_nn), axis=0)
+
+    # Fit model to raw responses
+    initial_guess = [1.0 * float(normVal[i]), 0.5 * float(normVal[i]),
+                     1.0, 0.75, 0.50, 0.10, 0.10]
+    try:
+        popt, _ = curve_fit(model_wrapper,
+                            (contrast_center, contrast_periphery, locations, stim_type_center, stim_type_periphery),
+                            raw_resp, p0=initial_guess)
+    except RuntimeError:
+        continue  # Skip neuron if fit fails
+
+    # Predicted rates in spikes/s
+    predicted_rates = np.array(apply_fitted_model(contrast_center, contrast_periphery, locations,
+                                                  stim_type_center, stim_type_periphery, *popt))
+
+    # Simulate trials using Poisson spike counts (convert to spikes per 250 ms)
+    n_repeats = allBlocksDone[i]
+    rate_per_trial = predicted_rates * 0.25
+
+    # Ensure all λ values are valid for Poisson
+    rate_per_trial = np.nan_to_num(rate_per_trial, nan=0.0, posinf=0.0, neginf=0.0)
+    rate_per_trial[rate_per_trial < 0] = 0.0
+
+    simulated_trials = np.random.poisson(rate_per_trial[:, None], size=(len(rate_per_trial), n_repeats))
+
+    # Average simulated responses
+    simulated_means = simulated_trials.mean(axis=1)
+
+    # # # Convert back to spikes/s
+    simulated_means = simulated_means / 0.25
+
+    # Refit model to simulated averages
+    try:
+        popt_sim, _ = curve_fit(model_wrapper,
+                                (contrast_center, contrast_periphery, locations, stim_type_center, stim_type_periphery),
+                                simulated_means, p0=initial_guess)
+    except RuntimeError:
+        continue
+
+    refit_preds = np.array(apply_fitted_model(contrast_center, contrast_periphery, locations,
+                                              stim_type_center, stim_type_periphery, *popt_sim))
+
+    # Compute explainable variance (R²)
+    ss_resid = np.sum((simulated_means - refit_preds) ** 2)
+    ss_total = np.sum((simulated_means - np.mean(simulated_means)) ** 2)
+    R2 = 1 - (ss_resid / ss_total)
+    explainable_variances.append(R2)
+    goodI.append(i)
+
+explainable_variances = np.array(explainable_variances)
+# Population-level explainable variance
+population_explainable_variance = np.median(explainable_variances)
+print("Population-level explainable variance:", population_explainable_variance)
+
+
+# Scatter plot
+plt.figure(figsize=(5, 5))
+plt.scatter(explainable_variances, r2ScoresRFWeightFull[goodI], color='blue', alpha=0.7)
+
+minVal = 0.7
+maxVal = 1
+# Axis limits
+plt.xlim(minVal, maxVal)
+plt.ylim(minVal, maxVal)
+
+# Unity line
+plt.plot([minVal, maxVal], [minVal, maxVal], 'k--')
+
+# Labels and title
+plt.xlabel("Explainable variance (R² from simulated data)")
+plt.ylabel("Model fit R² (original data)")
+plt.title("Explainable variance vs. Original model R²")
+plt.gca().set_aspect('equal', adjustable='box')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+
+# Compute ratio
+ratio = r2ScoresRFWeightFull / explainable_variances
+
+# Plot using matplotlib
+plt.figure(figsize=(8, 5))
+plt.hist(ratio, bins=20, color="royalblue", edgecolor="black")
+plt.axvline(1.0, color='red', linestyle='--', linewidth=2, label='Unity (1.0)')
+plt.xlabel("Model R² / Explainable Variance", fontsize=12)
+plt.ylabel("Count", fontsize=12)
+plt.title("Distribution of Model R² as a Fraction of Explainable Variance", fontsize=14)
+plt.legend()
+plt.tight_layout()
+plt.show()
 
 ########################################################################################################################
 ###################################################### Extra Code ######################################################

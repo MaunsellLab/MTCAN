@@ -267,9 +267,8 @@ def apply_fitted_model(contrast_center, contrast_periphery, location, stim_type_
 
 ########################################################################################################################
 
+
 ####################################### RF Weighted Normalization with Baseline ########################################
-
-
 def fullRFWeightedNormWithBase(contrast_center, contrast_periphery, location, stim_type_center,
                                stim_type_periphery, Lp, Lnp, W1, W2, W3, W4, sigma, b):
     """
@@ -323,6 +322,121 @@ def apply_fitted_modelWithBase(contrast_center, contrast_periphery, location, st
                                                        stim_type_center, stim_type_periphery):
         # Call the response model with the fitted parameters for each data point
         pred = fullRFWeightedNormWithBase(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, W1, W2, W3, W4, sigma, b)
+        predicted_responses.append(pred)
+    return predicted_responses
+
+
+####################################### Weighted Heeger with Baseline ##################################################
+########################################## weight in numerator only ####################################################
+
+def weightedHeegerNormWithBase(contrast_center, contrast_periphery, location, stim_type_center,
+                               stim_type_periphery, Lp, Lnp, W1, W2, W3, W4, sigma, b):
+    """
+    RF weighted norm fit for full stimulus set, fitting all 26 conditions at once (excluding baseline and mapping)
+    """
+
+    # Determine weight based on peripheral location
+    if location == -1:  # No peripheral stimulus
+        W_periphery = 0
+    else:
+        W_periphery = [W1, W2, W3, W4][int(location)]  # Choose weight based on location
+
+    # Center stimulus response
+    if stim_type_center == 1:  # Preferred
+        L_center = Lp
+    elif stim_type_center == 0:  # Non-preferred
+        L_center = Lnp
+    else:  # No center stimulus
+        L_center = 0
+
+    # Peripheral stimulus response
+    if stim_type_periphery == 1:  # Preferred
+        L_periphery = Lp
+    elif stim_type_periphery == 0:  # Non-preferred
+        L_periphery = Lnp
+    else:  # No periphery stimulus
+        L_periphery = 0
+
+    # Equation for the response R
+    numerator = (contrast_center * L_center) + (contrast_periphery * L_periphery * W_periphery)
+    denominator = contrast_center + contrast_periphery + sigma
+
+    return (numerator / denominator) + b
+
+
+# Wrapper function to pass all data element-wise to curve_fit
+def model_wrapperWeightedHeegerWithBase(data, Lp, Lnp, W1, W2, W3, W4, sigma, b):
+    contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery = data
+    # Apply the response model element-wise
+    return [weightedHeegerNormWithBase(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, W1, W2, W3, W4, sigma, b)
+            for c_center, c_periph, loc, stim_c, stim_p in
+            zip(contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery)]
+
+
+# Define the function to calculate predicted responses using the fitted parameters
+def apply_fitted_modelWeightedHeegerWithBase(contrast_center, contrast_periphery,
+                                             location, stim_type_center,
+                                             stim_type_periphery,
+                                             Lp, Lnp, W1, W2, W3, W4, sigma, b):
+    # Same logic as in response_model, but handles arrays
+    predicted_responses = []
+    for c_center, c_periph, loc, stim_c, stim_p in zip(contrast_center, contrast_periphery, location,
+                                                       stim_type_center, stim_type_periphery):
+        # Call the response model with the fitted parameters for each data point
+        pred = weightedHeegerNormWithBase(c_center, c_periph, loc, stim_c, stim_p,
+                                          Lp, Lnp, W1, W2, W3, W4, sigma, b)
+        predicted_responses.append(pred)
+    return predicted_responses
+
+
+####################################### Classic Normalization with Baseline ########################################
+def fullClassicNormWithBase(contrast_center, contrast_periphery, location, stim_type_center,
+                            stim_type_periphery, Lp, Lnp, sigma, b):
+    """
+    RF weighted norm fit for full stimulus set, fitting all 26 conditions at once (excluding baseline and mapping)
+    """
+
+    # Center stimulus response
+    if stim_type_center == 1:  # Preferred
+        L_center = Lp
+    elif stim_type_center == 0:  # Non-preferred
+        L_center = Lnp
+    else:  # No center stimulus
+        L_center = 0
+
+    # Peripheral stimulus response
+    if stim_type_periphery == 1:  # Preferred
+        L_periphery = Lp
+    elif stim_type_periphery == 0:  # Non-preferred
+        L_periphery = Lnp
+    else:  # No periphery stimulus
+        L_periphery = 0
+
+    # Equation for the response R
+    numerator = (contrast_center * L_center) + (contrast_periphery * L_periphery)
+    denominator = contrast_center + contrast_periphery + sigma
+
+    return (numerator / denominator) + b
+
+
+# Wrapper function to pass all data element-wise to curve_fit
+def model_wrapperClassicWithBase(data, Lp, Lnp, sigma, b):
+    contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery = data
+    # Apply the response model element-wise
+    return [fullClassicNormWithBase(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, sigma, b)
+            for c_center, c_periph, loc, stim_c, stim_p in
+            zip(contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery)]
+
+
+# Define the function to calculate predicted responses using the fitted parameters
+def apply_fitted_modelClassicWithBase(contrast_center, contrast_periphery, location, stim_type_center,
+                                      stim_type_periphery, Lp, Lnp, sigma, b):
+    # Same logic as in response_model, but handles arrays
+    predicted_responses = []
+    for c_center, c_periph, loc, stim_c, stim_p in zip(contrast_center, contrast_periphery, location,
+                                                       stim_type_center, stim_type_periphery):
+        # Call the response model with the fitted parameters for each data point
+        pred = fullClassicNormWithBase(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, sigma, b)
         predicted_responses.append(pred)
     return predicted_responses
 
@@ -385,12 +499,11 @@ def apply_fitted_modelHeuristic(contrast_center, contrast_periphery, location, s
     return predicted_responses
 
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # for MTNC plug-in # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# for MTNC plug-in
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
 def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict, rfweight):

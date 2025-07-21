@@ -8,25 +8,45 @@ import time
 import numpy as np
 import pandas as pd
 
-######################## MEETZ ########################
+################################################ MEETZ #################################################################
 # good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123, 230126
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
 
-# for loop to run through all good files
+# # # for loop to run through all good files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126']
+
+# # individual file
+# fileList = ['Meetz_221010']
+
+################################################ AKSHAN ################################################################
+
+# good sessions: 240927, 240930, 241016, 241017, 241023, 241025
+# okay sessions: 240826, 241002 (13 blocks), 241021 (17 blocks)
+# bad sessions: 240827, 240828
+
+# fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
+#             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
+#             'Akshan_241025']
+
+
+################################################# Both #################################################################
+# # # for loop to run through all files
 fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126']
+            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+            'Akshan_241023', 'Akshan_241025']
 
-# for loop to run through all good files
-# fileList = ['Meetz_221010']
-
-######################## AKSHAN ########################
-
+# fileList = ['Akshan_241023', 'Akshan_241025']
 
 t0 = time.time()
 totUnits = []
+totW1 = []
 totR2 = []
 totR2Bram = []
 totR2RFWeight = []
@@ -36,8 +56,6 @@ totFilterR2 = []
 totFilterCombs = []
 unitIdentifier = []
 unitsNormParams = []
-alphaLoc0PrefOnly = []
-alphaLoc1PrefOnly = []
 alphaLoc0Cond = []
 alphaLoc1Cond = []
 popTunCurve = []
@@ -315,31 +333,101 @@ for file in fileList:
         params = gaussFit(x, y)
         yPred = gauss(x, *params)
         r2 = r2_score(y, yPred)
-        if r2 > 0.90:
+        if r2 > 0.95:
             filterUnits.append(unit)
             totFilterR2.append(r2)
         unitGaussMean[unitCount] = params[2] % 360
         unitGaussSig[unitCount] = params[3]
         popPrefFR.append(params[1])
 
-    #population analysis for reduced stim set (how to fit normalziation equations)
+    ####################################################################################################################
+    ######################################## get units whose preferred response is #####################################
+    ############################### statistically reliable above baseline in both locations ############################
+    ####################################################################################################################
+    criterionPassedUnits = []
+    for unit in filterUnits:
+        unitCount = np.where(unit == units)[0][0]
+        # find direction tested that is closest to the pref dir
+        # and reindex around this so that it is in the middle of the grid
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+
+        nullDirIndex = np.where(dirArray == nullDir)[0][0]
+        reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+
+        # matrix of indices for b and bReIndexed
+        stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
+        prefLoc1Indx = int(stimMatReIndex[3, 6])
+        npLoc1Indx = int(stimMatReIndex[0, 6])
+        prefLoc0Indx = int(stimMatReIndex[6, 3])
+        npLoc0Indx = int(stimMatReIndex[6, 0])
+
+        sponSpikes = spikeCountMat[unitCount][:blocksDone, 48]
+        prefLoc0Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc0Indx]
+        npLoc0Spikes = spikeCountMat[unitCount, :blocksDone, npLoc0Indx]
+        prefLoc1Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc1Indx]
+        npLoc1Spikes = spikeCountMat[unitCount, :blocksDone, npLoc1Indx]
+
+        stat0, p_value0 = mannwhitneyu(prefLoc0Spikes, sponSpikes,
+                                       alternative='greater')
+        stat1, p_value1 = mannwhitneyu(prefLoc1Spikes, sponSpikes,
+                                       alternative='greater')
+        stat2, p_value2 = mannwhitneyu(prefLoc0Spikes, npLoc0Spikes,
+                                       alternative='greater')
+        stat3, p_value3 = mannwhitneyu(prefLoc1Spikes, npLoc1Spikes,
+                                       alternative='greater')
+        if p_value0 < 0.05 and p_value1 < 0.05 and p_value2 < 0.05 and p_value3 < 0.05:
+            criterionPassedUnits.append(unit)
+        # if p_value0 < 0.05 and p_value1 < 0.05:
+        #     criterionPassedUnits.append(unit)
+
+    ####################################################################################################################
+    ############################################# different combinations of units ######################################
+    ####################################################################################################################
+
+    # combinations of units that pass inclusion criteria
+    criterionPassedCombs = [i for i in combinations(criterionPassedUnits, 2)]
+    # combinations of units separated by more than 250ums
+    distCombs = []
+    # for i in combs:  #### working version
+    for i in criterionPassedCombs:
+        n1 = unitsChannel[np.where(units == i[0])[0][0]]
+        n2 = unitsChannel[np.where(units == i[1])[0][0]]
+        n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
+        n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
+        pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
+        pairDistance.append(pairDistOnElectrode * 50)
+        # if pairDistOnElectrode >= 5:  # working version
+        if pairDistOnElectrode >= 5:
+            distCombs.append(i)
+
+    # population analysis for reduced stim set (how to fit normalziation equations)
     # split the 6x6 matrix into all possible 2x2 matrices and run the normalization fit on
     # all the sub-matrices (technically 7x7 matrix with blank condition)
     rfWeightR2 = []
     bramR2 = []
+    # initialize lists for paired Gabors
+    pairPairedCorr = []
+    pairSelectivityIndex = []
+    pairNonPrefSuppIndex = []
+    # initialize lists for single Gabors
+    pairSingleCorr = []
+    pairSingleSelectivityIndex = []
+    pairSingleNonPrefSuppIndex = []
+
+    pairs_180_apart = [pair for pair in combinations(range(6), 2) if (abs(pair[0] - pair[1]) % 6 == 3)]
     subsampleMatrix = [i for i in combinations([0, 1, 2, 3, 4, 5], 2)]
     for subpair in subsampleMatrix:
-        unitPairedNormFit = []
-        unitPairedNormR2 = np.zeros(len(units))
+    # for subpair in pairs_180_apart:
+        skipSubpair = False
         unitNormFitEstimate = [[] for i in range(len(units))]
         sli = [subpair[0], subpair[1], 6]
         dir1 = dirArray[sli[0]]
         dir2 = dirArray[sli[1]]
         condArr = np.array([dir1, dir2, dir1, dir2])
 
-        for unitCount, unit in enumerate(filterUnits):
+        for unit in criterionPassedUnits:
 
-            # unitCount = np.where(units == unit)[0][0]
+            unitCount = np.where(unit == units)[0][0]
             prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
             nullDirIndex = np.where(dirArray == nullDir)[0][0]
             prefDirIndex = np.where(dirArray == prefDir)[0][0]
@@ -357,58 +445,206 @@ for file in fileList:
             stimMatCond = stimMat[sli, :]
             stimMatCond = stimMatCond[:, sli]
 
-            # Bram Normalization (L1+L2)/(1+al2+sig) w.o scalar
-            guess0 = np.concatenate((bCondensed[2, :-1],
-                                     bCondensed[:-1, 2],
-                                     [0.2]), axis=0)
-            resp = bCondensed.reshape(9)[:-1]
+            # rf weight normalization
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
                                                     stimIndexDict, dir1, dir2)
-            pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-                                    p0=guess0, maxfev=10000000)
+            resp = bCondensed.reshape(9)[:-1]
 
-            y_pred = genNormCondensed(fixedVals, *pOpt)
-            r2Bram = r2_score(resp.squeeze(), y_pred)
+            # parameters for fitting
+            resp_loc0 = np.mean([bCondensed[2, 0], bCondensed[2, 1]])
+            resp_loc1 = np.mean([bCondensed[0, 2], bCondensed[1, 2]])
+            eps = 1e-6
+            w1_guess = resp_loc1/(resp_loc0 + eps)  # epsilon to prevent guess from being division by 0
+            log_w1_guess = np.log(w1_guess)
+            # # with baseline
+            # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
+            #                          [log_w1_guess],
+            #                          [0.1], [bCondensed[2, 2]+eps]), axis=0)
+            # lb = [0, 0, np.log(0.01), 0, 0]
+            # ub = [np.inf, np.inf, np.log(100), np.inf, np.inf]
+            guess0 = np.concatenate((bCondensed[2, :-1]+eps,
+                                     [log_w1_guess],
+                                     [0.5]), axis=0)
+            lb = [0, 0, np.log(0.01), 0]
+            ub = [150, 150, np.log(100), np.inf]
 
-            # rf weight normalization
+            # pOpt, pCov = multi_start_curve_fit(rfWeightCondensed, fixedVals, resp.squeeze(),
+            #                                    n_starts=10, seed=42)
+            try:
+                # Fit model
+                pOpt, pCov = curve_fit(rfWeightCondensed, fixedVals, resp.squeeze(),
+                                       maxfev=10000000, p0=guess0, bounds=[lb, ub])
+
+                y_pred = rfWeightCondensed(fixedVals, *pOpt)
+                r2 = r2_score(resp.squeeze(), y_pred)
+
+                # w1 = np.exp(pOpt[2])  # Since you're fitting log(w1)
+                # if w1 < 0.001 or w1 > 20:
+                #     skipSubpair = True
+                #     break
+
+                # Append fit results
+                totR2.append(r2)
+                rfWeightR2.append(r2)
+                totR2RFWeight.append(r2)
+                totW1.append(np.exp(pOpt[2]))
+                unitNormFitEstimate[unitCount] = pOpt
+
+            except (RuntimeError, ValueError) as e:
+                print(f"Fit failed for unit {unit} in subpair {subpair}: {e}, session, {file}")
+                skipSubpair = True
+                break  # break out of unit loop
+
+        if skipSubpair:
+            continue  # skip rest of subpair loop,
+
+        for pairCount, pair in enumerate(distCombs):
+            n1 = np.where(units == pair[0])[0][0]
+            n2 = np.where(units == pair[1])[0][0]
+
+            # find predicted responses for the 3x3 matrix for each neuron:
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
                                                     stimIndexDict, dir1, dir2)
-            resp = bCondensed.reshape(9)
-            pOpt, pCov, = curve_fit(rfWeightCondensed, fixedVals, resp.squeeze(),
-                                    p0=guess0, maxfev=10000000)
+            # Neuron 1
+            y_predN1 = rfWeightCondensed(fixedVals, *unitNormFitEstimate[n1]).reshape(3, 3)
+            # Neuron 2
+            y_predN2 = rfWeightCondensed(fixedVals, *unitNormFitEstimate[n2]).reshape(3, 3)
 
-            y_pred = rfWeightCondensed(fixedVals, *pOpt)
-            r2 = r2_score(resp.squeeze(), y_pred)
+            # indices and correlations for paired Gabor stimuli
+            for count, i in enumerate(np.int_(stimMatCond[:2, :2].reshape(4))):
+                # correlation for that Gabor pair b/w 2 units excluding trials where
+                # spike counts exceeded 3 SD from mean
+                n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
+                n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
+                pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat,
+                                                                     method='shrinkage')
 
+                # Breakpoint logic: skip this count if correlation is not computable
+                if np.isnan(pairStimCorr):  # or abs(pairStimCorr) > 0.4:
+                    continue  # skip to next i in the loop
 
-            # bram trick to keep values > 0
-            pOpt = pOpt ** 2
+                # extract directions of the gabor pair
+                loc0Dir = stimIndexDict[i][0]['direction']
+                loc1Dir = stimIndexDict[i][1]['direction']
 
-            # Append fit parameters for condensed matrix
-            totR2.append(r2)
-            rfWeightR2.append(r2)
-            bramR2.append(r2Bram)
-            totR2Bram.append(r2Bram)
-            totR2RFWeight.append(r2)
-            # alphaLoc0Cond.append(pOpt[4])
-            # alphaLoc1Cond.append(pOpt[5])
-            unitPairedNormR2[unitCount] = r2
-            unitPairedNormFit.append(pOpt)
-            unitNormFitEstimate[unitCount] = pOpt
+                # extract row, col of paired condition
+                row = count // 2
+                col = count % 2
 
+                # bram selectivity
+                # n1 selectivity and suppression index
+                loc0Resp = y_predN1[2, col]
+                loc1Resp = y_predN1[row, 2]
+                w0 = 1
+                w1 = np.exp(unitNormFitEstimate[n1][2])
+                sig = unitNormFitEstimate[n1][3]
+                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
+
+                # n2 selectivity and suppression index
+                loc0Resp = y_predN2[2, col]
+                loc1Resp = y_predN2[row, 2]
+                w0 = 1
+                w1 = np.exp(unitNormFitEstimate[n2][2])
+                sig = unitNormFitEstimate[n2][3]
+                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
+
+                # pair selectivity and suppression index
+                pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
+                                   np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
+                pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
+
+                pairPairedCorr.append(pairStimCorr)
+                pairSelectivityIndex.append(pairSelectivity)
+                pairNonPrefSuppIndex.append(pairSuppression)
+
+                # loc 0 single Gabor corr, excluding trials where spike counts > 3 SD
+                stimIndex = np.int_(stimMatCond[2, :][np.where(condArr == loc0Dir)[0][0]])
+
+                n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
+                n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
+                singleStimLoc0Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat,
+                                                                           method='shrinkage')
+
+                pairSingleCorr.append(singleStimLoc0Corr)
+                pairSingleSelectivityIndex.append(pairSelectivity)
+                pairSingleNonPrefSuppIndex.append(pairSuppression)
+
+                # loc 1 single Gabor corr, excluding trials where spike counts > 3 SD
+                stimIndex = np.int_(stimMatCond[:, 2][np.where(condArr == loc1Dir)[0][0]])
+
+                n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
+                n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
+                singleStimLoc1Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat,
+                                                                           method='shrinkage')
+
+                pairSingleCorr.append(singleStimLoc1Corr)
+                pairSingleSelectivityIndex.append(pairSelectivity)
+                pairSingleNonPrefSuppIndex.append(pairSuppression)
+
+    pairPairedCorr = np.array(pairPairedCorr)
+    pairSelectivityIndex = np.array(pairSelectivityIndex)
+    pairNonPrefSuppIndex = np.array(pairNonPrefSuppIndex)
+
+    pairSingleCorr = np.array(pairSingleCorr)
+    pairSingleSelectivityIndex = np.array(pairSingleSelectivityIndex)
+    pairSingleNonPrefSuppIndex = np.array(pairSingleNonPrefSuppIndex)
+
+    # compile similarity scores and correlation matrix into one matrix
+    gaborPairCompiledArr = np.array([pairPairedCorr,
+                                     pairSelectivityIndex,
+                                     pairNonPrefSuppIndex])
+    gaborSingleCompiledArr = np.array([pairSingleCorr,
+                                       pairSingleSelectivityIndex,
+                                       pairSingleNonPrefSuppIndex])
+    np.save(f'../../condRFWSingleCorrMaster/pairCorrelationsAndIndices{seshDate}',
+            gaborSingleCompiledArr)
+    np.save(f'../../condRFWPairedCorrMaster/pairCorrelationsAndIndices{seshDate}',
+            gaborPairCompiledArr)
     os.chdir('../../../Python Code')
 
-# plotting Bram vs RF Weight R2
-plotData = [totR2Bram, totR2RFWeight]
+print(time.time()-t0)
 
-fig, axes = plt.subplots(1, 1, figsize=(4, 4))
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # plot # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+totW = np.array(totW1)
 
-# Plot the violin plots for genNorm arrays
-sns.boxplot(data=plotData, ax=axes)
-axes.set_title('Box Plot for bramNorm Arrays')
-axes.set_xlabel('Position')
-axes.set_ylabel('Values')
-axes.set_xticks([0, 1])
-axes.set_xticklabels(['Bram Norm', 'RF Weight Norm'])
-axes.set_ylim(0, 1.2)
-plt.show()
+# # plotting Bram vs RF Weight R2
+# plotData = [totR2Bram, totR2RFWeight]
+#
+# fig, axes = plt.subplots(1, 1, figsize=(4, 4))
+#
+# # Plot the violin plots for genNorm arrays
+# sns.boxplot(data=plotData, ax=axes)
+# axes.set_title('Box Plot for bramNorm Arrays')
+# axes.set_xlabel('Position')
+# axes.set_ylabel('Values')
+# axes.set_xticks([0, 1])
+# axes.set_xticklabels(['Bram Norm', 'RF Weight Norm'])
+# axes.set_ylim(0, 1.2)
+# plt.show()
+#
+
+# plt.hist(totW1, bins=50, range=(0, 1), edgecolor='black')
+# plt.xlabel('totW')
+# plt.ylabel('Frequency')
+# plt.title('Histogram of totW (x-range: 0 to 3)')
+# plt.grid(True)
+# plt.show()
+
+#### extra code
+# # Bram Normalization (L1+L2)/(1+al2+sig) w.o scalar
+# guess0 = np.concatenate((bCondensed[2, :-1],
+#                          bCondensed[:-1, 2],
+#                          [0.2]), axis=0)
+# resp = bCondensed.reshape(9)[:-1]
+# fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
+#                                         stimIndexDict, dir1, dir2)
+# pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+#                         maxfev=10000000)
+#
+# y_pred = genNormCondensed(fixedVals, *pOpt)
+# r2Bram = r2_score(resp.squeeze(), y_pred)
+#
+# bramR2.append(r2Bram)
+# totR2Bram.append(r2Bram)
+
+

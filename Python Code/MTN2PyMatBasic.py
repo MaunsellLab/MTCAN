@@ -23,19 +23,21 @@ import pandas as pd
 # okay sessions: 240826, 241002 (13 blocks), 241021 (17 blocks)
 # bad sessions: 240827, 240828
 
-# fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930, 'Akshan_241002',
+# fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
 #             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
 #             'Akshan_241025']
+fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
+            'Akshan_241016', 'Akshan_241017', 'Akshan_241021']
 
 
 ########################################### Both ###########################################
-# # for loop to run through all files
-fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
-            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
-            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
-            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
-            'Akshan_241023', 'Akshan_241025']
+# # # for loop to run through all files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+#             'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+#             'Akshan_241023', 'Akshan_241025']
 
 t0 = time.time()
 totUnits = []
@@ -227,7 +229,7 @@ for fileIterator in fileList:
     spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
     spikeCountLong = []
     onLatency = 50/1000  # time in MS for counting window latency after stim on
-    offLatency = 100/1000  # time in MS for counting window latency after stim off
+    offLatency = 50/1000  # time in MS for counting window latency after stim off
     histPrePostMS = 100  # 100ms window pre/post stimulus on/off
     spikeHists = np.zeros((len(units), 49, trueStimDurMS + (2*histPrePostMS+1)))
     stimIndexCount = np.zeros(49)
@@ -355,9 +357,47 @@ for fileIterator in fileList:
             highFRUnits.append(unit)
         else:
             lowFRUnits.append(unit)
-
     totUnits.append(len(units))
     totFilterUnits.append(len(filterUnits))
+
+    ####################################################################################################################
+    ######################################## get units whose preferred response is #####################################
+    ############################### statistically reliable above baseline in both locations ############################
+    ####################################################################################################################
+    criterionPassedUnits = []
+    for unitCount, unit in enumerate(units):
+        # find direction tested that is closest to the pref dir
+        # and reindex around this so that it is in the middle of the grid
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+
+        nullDirIndex = np.where(dirArray == nullDir)[0][0]
+        reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+
+        # matrix of indices for b and bReIndexed
+        stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
+        prefLoc1Indx = int(stimMatReIndex[3, 6])
+        npLoc1Indx = int(stimMatReIndex[0, 6])
+        prefLoc0Indx = int(stimMatReIndex[6, 3])
+        npLoc0Indx = int(stimMatReIndex[6, 0])
+
+        sponSpikes = spikeCountMat[unitCount][:blocksDone, 48]
+        prefLoc0Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc0Indx]
+        npLoc0Spikes = spikeCountMat[unitCount, :blocksDone, npLoc0Indx]
+        prefLoc1Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc1Indx]
+        npLoc1Spikes = spikeCountMat[unitCount, :blocksDone, npLoc1Indx]
+
+        stat0, p_value0 = mannwhitneyu(prefLoc0Spikes, sponSpikes,
+                                       alternative='greater')
+        stat1, p_value1 = mannwhitneyu(prefLoc1Spikes, sponSpikes,
+                                       alternative='greater')
+        stat2, p_value2 = mannwhitneyu(prefLoc0Spikes, npLoc0Spikes,
+                                       alternative='greater')
+        stat3, p_value3 = mannwhitneyu(prefLoc1Spikes, npLoc1Spikes,
+                                       alternative='greater')
+        if p_value0 < 0.05 and p_value1 < 0.05 and p_value2 < 0.05 and p_value3 < 0.05:
+            criterionPassedUnits.append(unit)
+
+    ####################################################################################################################
 
     # the different combinations of neuron pairs from total units
     combs = [i for i in combinations(units, 2)]
@@ -373,17 +413,19 @@ for fileIterator in fileList:
     tightCombs = [i for i in combinations(tightUnits, 2)]
     # combinations of units with wide tuning
     wideCombs = [i for i in combinations(wideUnits, 2)]
+    # combinations of units that pass inclusion criteria
+    criterionPassedCombs = [i for i in combinations(criterionPassedUnits, 2)]
     # combinations of units separated by more than 250ums
     distCombs = []
-    for i in combs:  #### working version
-    # for i in filterCombs:
+    # for i in combs:  #### working version
+    for i in criterionPassedCombs:
         n1 = unitsChannel[np.where(units == i[0])[0][0]]
         n2 = unitsChannel[np.where(units == i[1])[0][0]]
         n1ElectrodePos = np.where(electrodeArr == n1)[0][0]
         n2ElectrodePos = np.where(electrodeArr == n2)[0][0]
         pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
         pairDistance.append(pairDistOnElectrode * 50)
-        # if pairDistOnElectrode >= 5: ### working version
+        # if pairDistOnElectrode >= 5:  # working version
         if pairDistOnElectrode >= 5:
             distCombs.append(i)
 
@@ -699,8 +741,8 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        for pairCount, pair in enumerate(distCombs):   ### working version
-        # for pairCount, pair in enumerate(filterCombs):
+        # for pairCount, pair in enumerate(distCombs):   ### working version
+        for pairCount, pair in enumerate(criterionPassedCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 

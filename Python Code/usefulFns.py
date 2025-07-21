@@ -38,6 +38,8 @@ import matplotlib.lines as mlines
 from scipy.stats import wilcoxon
 from scipy.stats import ttest_ind
 from matplotlib import pyplot as plt, ticker as mticker
+from sklearn.covariance import LedoitWolf
+from scipy.optimize import minimize_scalar
 
 
 # fig saving params
@@ -1162,38 +1164,115 @@ def generateTwoCorrArrays(numSamples, corr):
     return x.flatten(), y.flatten()
 
 
-def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat):
+# # # old version
+# def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat):
+#     """
+#     this function will return the pearson's correlation coefficient
+#     between a pair of neuron's spike counts to a stimulus condition.
+#     will also return the covariance and SD (numerator/denominator of the
+#     correlation equation). This function will z-score the spike counts
+#     for each neuron and exclude trials that are larger than abs(3).
+#
+#     Inputs: n1SpikeMat/n2SpikeMat: the spike counts for each neuron (array)
+#     Outputs: pairCorr: pearson's correlation coeff (int)
+#              pairCov: covariance
+#
+#     """
+#
+#     skipTrials = []
+#     n1Zscore = stats.zscore(n1SpikeMat)
+#     n2Zscore = stats.zscore(n2SpikeMat)
+#     n1SkipTrials = np.where(abs(n1Zscore) >= 3)[0].tolist()
+#     n2SkipTrials = np.where(abs(n2Zscore) >= 3)[0].tolist()
+#     for x in n1SkipTrials:
+#         skipTrials.append(x)
+#     for x in n2SkipTrials:
+#         skipTrials.append(x)
+#     goodTrials = [x for x in range(len(n1SpikeMat)) if x not in skipTrials]
+#
+#     # z- scored
+#     # pairStimCorr = stats.pearsonr(n1Zscore[goodTrials],
+#     #                               n2Zscore[goodTrials])[0]
+#     # pairDCov = np.cov(n1Zscore[goodTrials],
+#     #                   n2Zscore[goodTrials], ddof=1)
+#     # pairDSD = (np.std(n1Zscore[goodTrials], ddof=1) *
+#     #            np.std(n2Zscore[goodTrials], ddof=1))
+#
+#     # compute on raw spike counts
+#     pairStimCorr = stats.pearsonr(n1SpikeMat[goodTrials],
+#                                   n2SpikeMat[goodTrials])[0]
+#     pairDCov = np.cov(n1SpikeMat[goodTrials],
+#                       n2SpikeMat[goodTrials], ddof=1)
+#     pairDSD = (np.std(n1SpikeMat[goodTrials], ddof=1) *
+#                np.std(n2SpikeMat[goodTrials], ddof=1))
+#
+#     return pairStimCorr, pairDCov, pairDSD
+
+
+def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='shrinkage'):
     """
-    this function will return the pearson's correlation coefficient
-    between a pair of neuron's spike counts to a stimulus condition.
-    will also return the covariance and SD (numerator/denominator of the
-    correlation equation). This function will z-score the spike counts
-    for each neuron and exclude trials that are larger than abs(3).
+    Compute correlation between neuron pairs after z-scoring and excluding ±3SD outliers.
 
-    Inputs: n1SpikeMat/n2SpikeMat: the spike counts for each neuron (array)
-    Outputs: pairCorr: pearson's correlation coeff (int)
-             pairCov: covariance
+    Parameters:
+        n1SpikeMat, n2SpikeMat : arrays of spike counts (1D)
+        method : 'shrinkage' (default) or 'pearson' or 'spearman'
 
+    Returns:
+        pairCorr : correlation coefficient (shrinkage or Pearson/Spearman)
+        pairCov  : covariance matrix
+        pairSD   : product of SDs (or NaN if invalid)
     """
 
-    skipTrials = []
-    n1Zscore = stats.zscore(n1SpikeMat)
-    n2Zscore = stats.zscore(n2SpikeMat)
-    n1SkipTrials = np.where(abs(n1Zscore) > 3)[0].tolist()
-    n2SkipTrials = np.where(abs(n2Zscore) > 3)[0].tolist()
-    for x in n1SkipTrials:
-        skipTrials.append(x)
-    for x in n2SkipTrials:
-        skipTrials.append(x)
-    goodTrials = [x for x in range(len(n1SpikeMat)) if x not in skipTrials]
-    pairStimCorr = stats.pearsonr(n1SpikeMat[goodTrials],
-                                  n2SpikeMat[goodTrials])[0]
-    pairDCov = np.cov(n1SpikeMat[goodTrials],
-                      n2SpikeMat[goodTrials], ddof=1)
-    pairDSD = (np.std(n1SpikeMat[goodTrials], ddof=1) *
-               np.std(n2SpikeMat[goodTrials], ddof=1))
+    try:
+        # Z-score
+        n1Z = stats.zscore(n1SpikeMat, nan_policy='omit')
+        n2Z = stats.zscore(n2SpikeMat, nan_policy='omit')
 
-    return pairStimCorr, pairDCov, pairDSD
+        # Find outlier trials
+        badTrials = np.unique(
+            np.concatenate([
+                np.where(np.abs(n1Z) >= 3)[0],
+                np.where(np.abs(n2Z) >= 3)[0],
+                np.where(~np.isfinite(n1Z))[0],
+                np.where(~np.isfinite(n2Z))[0]
+            ])
+        )
+
+        allTrials = np.arange(len(n1SpikeMat))
+        goodTrials = np.setdiff1d(allTrials, badTrials)
+
+        if len(goodTrials) < 4:
+            return np.nan, np.nan, np.nan
+
+        x = n1SpikeMat[goodTrials]
+        y = n2SpikeMat[goodTrials]
+
+        if method == 'shrinkage':
+            data = np.vstack([x, y]).T
+            lw = LedoitWolf().fit(data)
+            cov = lw.covariance_
+            corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+            sd_product = np.sqrt(cov[0, 0] * cov[1, 1])
+            return corr, cov, sd_product
+
+        elif method == 'pearson':
+            corr, _ = stats.pearsonr(x, y)
+            cov = np.cov(x, y, ddof=1)
+            sd_product = np.std(x, ddof=1) * np.std(y, ddof=1)
+            return corr, cov, sd_product
+
+        elif method == 'spearman':
+            corr, _ = stats.spearmanr(x, y)
+            cov = np.cov(x, y, ddof=1)
+            sd_product = np.std(x, ddof=1) * np.std(y, ddof=1)
+            return corr, cov, sd_product
+
+        else:
+            raise ValueError(f"Unknown method: {method}")
+
+    except Exception as e:
+        print(f"Correlation failed: {e}")
+        return np.nan, np.nan, np.nan
 
 
 def reIndexedRespMat(b, reIndex):
@@ -1268,6 +1347,79 @@ def getSelAndSuppIndx(loc0Resp, loc1Resp, al0, al1):
         nonPrefSupp = al0 / (al0 + al1)
 
     return selectivity, nonPrefSupp
+
+
+def multi_start_curve_fit(func, xdata, ydata, n_starts=10, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
+    best_loss = np.inf
+    best_params = None
+    best_cov = None
+
+    # Set bounds: all parameters must be ≥ 0
+    bounds = ([0, 0, 0, 0, 0], [np.inf] * 5)  # [L0, L1, w1, sig, b]
+
+    for _ in range(n_starts):
+        # Random initial values in reasonable ranges
+        init_guess = np.abs(np.random.rand(5))  # 5 free params: L0, L1, w1, sig, b
+
+        try:
+            popt, pcov = curve_fit(func, xdata, ydata, p0=init_guess,
+                                   bounds=bounds, maxfev=100000)
+            pred = func(xdata, *popt)
+            loss = np.sum((pred - ydata) ** 2)
+
+            if loss < best_loss:
+                best_loss = loss
+                best_params = popt
+                best_cov = pcov
+        except RuntimeError:
+            continue  # skip failed fits
+
+    if best_params is None:
+        raise RuntimeError("All curve_fit attempts failed.")
+
+    return best_params, best_cov
+
+
+def compute_im(stimIndex, trialSpikes, popt):
+    # default denominator
+    denom = trialSpikes - popt[7]
+
+    # center single stim
+    if stimIndex == 9:
+        return (popt[1] - trialSpikes) / denom
+    if stimIndex == 18:
+        return (popt[0] - trialSpikes) / denom
+
+    # determine pref / non-pref
+    is_pref = (stimIndex % 2 == 0)
+
+    # single stim in offset
+    if 1 <= stimIndex < 9:
+        group = ((stimIndex - 1) // 2) + 1
+        coeff = popt[1 + group]
+        return ((popt[0] if is_pref else popt[1]) - trialSpikes) * coeff / denom
+
+    # paired stim n in center
+    if 10 <= stimIndex < 18:
+        group = ((stimIndex - 10) // 2) + 1
+        coeff = popt[1 + group]
+        base = (popt[1] if is_pref else popt[0])
+        return (popt[1] - trialSpikes + coeff * (base - trialSpikes)) / denom
+
+    # paired stim p in center
+    if 19 <= stimIndex < 27:
+        group = ((stimIndex - 19) // 2) + 1
+        coeff = popt[1 + group]
+        base = (popt[0] if is_pref else popt[1])
+        return (popt[0] - trialSpikes + coeff * (base - trialSpikes)) / denom
+
+    if stimIndex == 0:
+        return 1
+
+    raise ValueError(f"stimIndex {stimIndex} is out of expected range")
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

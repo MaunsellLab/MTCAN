@@ -151,4 +151,3 @@ def bootstrap_c50(response_matrix, contrasts, n_bootstraps):
 
 
 
-

@@ -35,14 +35,16 @@ from scipy.stats import f
 
 
 ########################################### Both #######################################################################
-# # for loop to run through all files
-fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
-            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
-            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
-            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
-            'Akshan_241023', 'Akshan_241025']
+# # # for loop to run through all files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+#             'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+#             'Akshan_241023', 'Akshan_241025']
 
+# # for loop to run through all files
+fileList = ['Meetz_221010']
 
 t0 = time.time()
 totUnits = []
@@ -446,9 +448,10 @@ for file in fileList:
         prefIndex = np.where(dirArray == prefDir)[0][0]
         rfWeightLoc1 = b[prefIndex, 6] / b[6, prefIndex]
         resp = b.reshape(49)
-        fixedVals = fixedValsForRFWeightMTNC(stimMat.reshape(49), stimIndexDict, rfWeightLoc1)
-        # fixedVals = fixedValsForGenericNorm(stimMat.reshape(49), stimIndexDict)
-        guess0 = np.concatenate((b[6, :6], b[:6, 6], [0.1], [b[6, 6]]), axis=0)
+        # fixedVals = fixedValsForRFWeightMTNC(stimMat.reshape(49), stimIndexDict, rfWeightLoc1)
+        fixedVals = fixedValsForRFWeightMTNC(stimMat.reshape(49), stimIndexDict)
+        guess0 = np.concatenate((b[6, :6], [0.5], [0.1], [b[6, 6]]), axis=0)
+        # guess0 = np.concatenate((b[6, :6], b[:6, 6], [0.1], [b[6, 6]]), axis=0)
         # pOptRFWeight, pCov = curve_fit(rfWeightMTNC, fixedVals, resp.squeeze(), p0=guess0,
         #                        bounds=((0, 0, 0, 0, 0, 0,
         #                                 0, 0, 0, 0, 0, 0,
@@ -457,7 +460,7 @@ for file in fileList:
         #                                 np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
         #                                 0.1, np.inf)))
         pOptRFWeight, pCov = curve_fit(rfWeightMTNC, fixedVals, resp.squeeze(), p0=guess0,
-                               maxfev=10000000)
+                                       maxfev=10000000)
         y_pred = rfWeightMTNC(fixedVals, *pOptRFWeight)
         r2RFWeight = r2_score(resp.squeeze(), y_pred)
 

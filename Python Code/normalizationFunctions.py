@@ -260,7 +260,6 @@ def apply_fitted_model(contrast_center, contrast_periphery, location, stim_type_
     return predicted_responses
 
 
-
 ########################################################################################################################
 
 ############ Evaluate RF weighted normalization model with baseline vs RF weighted heuristic model #####################
@@ -269,6 +268,7 @@ def apply_fitted_model(contrast_center, contrast_periphery, location, stim_type_
 
 
 ####################################### RF Weighted Normalization with Baseline ########################################
+
 def fullRFWeightedNormWithBase(contrast_center, contrast_periphery, location, stim_type_center,
                                stim_type_periphery, Lp, Lnp, W1, W2, W3, W4, sigma, b):
     """
@@ -311,6 +311,12 @@ def model_wrapperWithBase(data, Lp, Lnp, W1, W2, W3, W4, sigma, b):
     return [fullRFWeightedNormWithBase(c_center, c_periph, loc, stim_c, stim_p, Lp, Lnp, W1, W2, W3, W4, sigma, b)
             for c_center, c_periph, loc, stim_c, stim_p in
             zip(contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery)]
+    # return np.array([
+    #     fullRFWeightedNormWithBase(c_center, c_periph, loc, stim_c, stim_p,
+    #                                Lp, Lnp, W1, W2, W3, W4, sigma, b)
+    #     for c_center, c_periph, loc, stim_c, stim_p in
+    #     zip(contrast_center, contrast_periphery, location, stim_type_center, stim_type_periphery)
+    # ])
 
 
 # Define the function to calculate predicted responses using the fitted parameters
@@ -499,6 +505,124 @@ def apply_fitted_modelHeuristic(contrast_center, contrast_periphery, location, s
     return predicted_responses
 
 
+########################################################################################################################
+######################################## fit reduced EMS vs reduced RF Weight ##########################################
+############################# reduced means only 2 pairs, center and one other location ################################
+########################################################################################################################
+def reducedEMSNormWithBase(contrast_center, contrast_periphery, stim_type_center,
+                           stim_type_periphery, Lp, Lnp, a0, a1, sigma, b):
+    """
+    RF weighted norm fit for full stimulus set, fitting all 26 conditions at once (excluding baseline and mapping)
+    """
+
+    # Center stimulus response
+    if stim_type_center == 1:  # Preferred
+        L_center = Lp
+    elif stim_type_center == 0:  # Non-preferred
+        L_center = Lnp
+    else:  # No center stimulus
+        L_center = 0
+
+    # Peripheral stimulus response
+    if stim_type_periphery == 1:  # Preferred
+        L_periphery = Lp
+    elif stim_type_periphery == 0:  # Non-preferred
+        L_periphery = Lnp
+    else:  # No periphery stimulus
+        L_periphery = 0
+
+    # location 0
+    loc0Num = contrast_center * L_center
+    loc0Denom = contrast_center + (contrast_periphery * a1) + sigma
+    loc0 = loc0Num/loc0Denom
+
+    # location 1
+    loc1Num = contrast_periphery * L_periphery
+    loc1Denom = contrast_periphery + (contrast_center * a0) + sigma
+    loc1 = loc1Num/loc1Denom
+
+    return loc0 + loc1 + b
+
+
+# Wrapper function to pass all data element-wise to curve_fit
+def model_wrapperReducedEMSWithBase(data, Lp, Lnp, a0, a1, sigma, b):
+    contrast_center, contrast_periphery, stim_type_center, stim_type_periphery = data
+    # Apply the response model element-wise
+    return [reducedEMSNormWithBase(c_center, c_periph, stim_c, stim_p,
+                                   Lp, Lnp, a0, a1, sigma, b)
+            for c_center, c_periph, stim_c, stim_p in
+            zip(contrast_center, contrast_periphery, stim_type_center, stim_type_periphery)]
+
+
+# Define the function to calculate predicted responses using the fitted parameters
+def apply_fitted_modelReducedEMSWithBase(contrast_center, contrast_periphery,
+                                         stim_type_center,
+                                         stim_type_periphery,
+                                         Lp, Lnp, a0, a1, sigma, b):
+    # Same logic as in response_model, but handles arrays
+    predicted_responses = []
+    for c_center, c_periph, stim_c, stim_p in zip(contrast_center, contrast_periphery,
+                                                  stim_type_center, stim_type_periphery):
+        # Call the response model with the fitted parameters for each data point
+        pred = reducedEMSNormWithBase(c_center, c_periph, stim_c, stim_p, Lp, Lnp, a0, a1, sigma, b)
+        predicted_responses.append(pred)
+    return predicted_responses
+
+
+def reducedRFWeightNormWithBase(contrast_center, contrast_periphery, stim_type_center,
+                                stim_type_periphery, Lp, Lnp, a0, a1, sigma, b):
+    """
+    RF weighted norm fit for full stimulus set, fitting all 26 conditions at once (excluding baseline and mapping)
+    """
+
+    # Center stimulus response
+    if stim_type_center == 1:  # Preferred
+        L_center = Lp
+    elif stim_type_center == 0:  # Non-preferred
+        L_center = Lnp
+    else:  # No center stimulus
+        L_center = 0
+
+    # Peripheral stimulus response
+    if stim_type_periphery == 1:  # Preferred
+        L_periphery = Lp
+    elif stim_type_periphery == 0:  # Non-preferred
+        L_periphery = Lnp
+    else:  # No periphery stimulus
+        L_periphery = 0
+
+    # Equation for the response R
+    numerator = (contrast_center * L_center * a0) + (contrast_periphery * L_periphery * a1)
+    denominator = (contrast_center * a0) + (contrast_periphery * a1) + sigma
+
+    return (numerator / denominator) + b
+
+
+# Wrapper function to pass all data element-wise to curve_fit
+def model_wrapperReducedRFWeightWithBase(data, Lp, Lnp, a0, a1, sigma, b):
+    contrast_center, contrast_periphery, stim_type_center, stim_type_periphery = data
+    # Apply the response model element-wise
+    return [reducedRFWeightNormWithBase(c_center, c_periph, stim_c, stim_p,
+                                        Lp, Lnp, a0, a1, sigma, b)
+            for c_center, c_periph, stim_c, stim_p in
+            zip(contrast_center, contrast_periphery, stim_type_center, stim_type_periphery)]
+
+
+# Define the function to calculate predicted responses using the fitted parameters
+def apply_fitted_modelReducedRFWeightWithBase(contrast_center, contrast_periphery,
+                                              stim_type_center,
+                                              stim_type_periphery,
+                                              Lp, Lnp, a0, a1, sigma, b):
+    # Same logic as in response_model, but handles arrays
+    predicted_responses = []
+    for c_center, c_periph, stim_c, stim_p in zip(contrast_center, contrast_periphery,
+                                                  stim_type_center, stim_type_periphery):
+        # Call the response model with the fitted parameters for each data point
+        pred = reducedRFWeightNormWithBase(c_center, c_periph, stim_c, stim_p, Lp, Lnp, a0, a1, sigma, b)
+        predicted_responses.append(pred)
+    return predicted_responses
+
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # # # # # # # # # # # # # # # # # # # # # # for MTNC plug-in # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -506,7 +630,8 @@ def apply_fitted_modelHeuristic(contrast_center, contrast_periphery, location, s
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict, rfweight):
+# def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict, rfweight):
+def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict):
     """
     function will create the fixed values for running the
     RF weighted normalization curve_fit, where the weight is a fixed value
@@ -546,41 +671,63 @@ def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict, rfweight):
             l0s.append(l0_oh)
             l1s.append(l1_oh)
 
-    rfw = np.repeat(rfweight, 294).reshape(49, 6)
+    # rfw = np.repeat(rfweight, 294).reshape(49, 6)
 
-    return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s), np.array(rfw)
+    # return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s), np.array(rfw)
+    return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s)
 
 
-def rfWeightCondensed(fixed, L0_0, L0_1, L1_0, L1_1, sig):
+def rfWeightCondensed(fixed, L0, L1, log_w1, sig):
     """
-    generic normalization condensed
+    RF weight normalization condensed: w is log weighted
     """
 
-    c0, c1, l0, l1, weight = fixed
-    L0 = np.array([L0_0, L0_1])
-    L1 = np.array([L1_0, L1_1])
+    # Convert log_w1 to w1
+    w1 = np.exp(log_w1)
+
+    c0, c1, l0, l1 = fixed
+    L0_array = np.array([L0, L1])
+    L1_array = np.array([L0, L1])
 
     # generic norm
-    num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
-    denom = (c0[:, 0] + (c1[:, 0] *(L1_0 / L0_0)) + sig)
+    num = ((c0 * (L0_array ** 1) * l0).sum(-1) +
+           ((c1 * (L1_array ** 1) * l1).sum(-1) * w1))
+    denom = (c0[:, 0] + (c1[:, 0] * w1) + sig)
 
-    return num / denom
+    return (num/denom)
 
 
-def rfWeightMTNC(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
-                 L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, sig, base):
+# def rfWeightMTNC(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,
+#                  L1_0, L1_60, L1_120, L1_180, L1_240, L1_300, sig, base):
+#     """
+#     this function applies the RF weighted normalization equation.
+#     It gives each location its own L0-L6 value
+#     """
+#
+#     c0, c1, l0, l1, weight = fixed
+#     L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
+#     L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
+#
+#     # generic norm
+#     num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
+#     denom = c0[:, 0] + (c1[:, 0] * weight[:, 0]) + sig
+#
+#     return (num/denom) + base
+
+
+def rfWeightMTNC(fixed, L0, L60, L120, L180, L240, L300, w1, sig, base):
     """
     this function applies the RF weighted normalization equation.
     It gives each location its own L0-L6 value
     """
 
-    c0, c1, l0, l1, weight = fixed
-    L0 = np.array([L0_0, L0_60, L0_120, L0_180, L0_240, L0_300])
-    L1 = np.array([L1_0, L1_60, L1_120, L1_180, L1_240, L1_300])
+    c0, c1, l0, l1 = fixed
+    L0_array = np.array([L0, L60, L120, L180, L240, L300])
+    L1_array = np.array([L0, L60, L120, L180, L240, L300])
 
     # generic norm
-    num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
-    denom = c0[:, 0] + (c1[:, 0] * weight[:, 0]) + sig
+    num = ((c0 * L0_array * l0).sum(-1) + ((c1 * L1_array * l1).sum(-1)) * w1)
+    denom = c0[:, 0] + (c1[:, 0] * w1) + sig
 
     return (num/denom) + base
 

@@ -39,13 +39,13 @@ unitList = ['240610_92', '240701_5', '240903_3', '240904_8', '240906_25',
             '241115_2', '241115_3', '241115_15', '241115_18', '241115_32',
             '241115_34']
 
-
 prefCenterPopResp = []
 prefPeriPopResp = []
 nonprefCenterPopResp = []
 nonprefPeriPopResp = []
 popBlocksDone = []
 popUnitCluster = []
+popGaborSD = []
 
 for file in fileList:
 
@@ -113,6 +113,9 @@ for file in fileList:
         print('stimulus frame duration not consistent for mapping stimuli')
     else:
         trueStimDurMS = np.int32(np.around(1000 / frameRateHz * stimDurFrame[0]))
+
+    # RF Gabor SD
+    popGaborSD.append(allTrials[0]['rfGabor']['data']['sigmaDeg'])
 
     # initialize lists/arrays/dataframes for counting spikeCounts and for analysis
     if 'blockStatus' in allTrials[corrTrials[-1]]:
@@ -258,6 +261,9 @@ nonprefCenterSEM = stats.sem(nonprefCenterPopResp, axis=0)
 nonprefPeriSEM = stats.sem(nonprefPeriPopResp, axis=0)
 
 hfont = {'fontname': 'Arial'}
+lineWidth = 1
+fontSize = 8
+mSize = 4
 
 # contrastFN params = r0, rMax, c50, n)
 
@@ -368,7 +374,7 @@ for filler in range(1):
 
 # combined plot of pref/non pref at center and peri
 for filler in range(1):
-    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+    fig, ax1 = plt.subplots(figsize=(3, 3))
 
     # plot pref center
     x_min = ax1.get_xlim()[0]
@@ -377,15 +383,15 @@ for filler in range(1):
                                    [np.inf, np.inf, np.inf, np.inf]))
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
-    ax1.plot(xFit, yFit, color='black', label=f'c50={pOpt[2]:.2f}')
+    ax1.plot(xFit, yFit, color='black', label=f'c50={pOpt[2]:.2f}', linewidth=lineWidth)
 
     # Add truncated lines for pref curve
     c50_pref = pOpt[2]
     rMax_pref = pOpt[1]
-    half_response_pref = (0.5 * (rMax_pref - pOpt[0])) + pOpt[0]
+    half_response_pref = (0.5 * (rMax_pref - pOpt[0])) + (2*pOpt[0])
     # ax1.plot([c50_pref, c50_pref], [0, half_response_pref],
     #          color='black', linestyle=':')
-    ax1.scatter(c50_pref, half_response_pref, marker="x", color='black')
+    ax1.scatter(c50_pref, half_response_pref, marker="x", color='black', s=mSize**2)
 
     # plot nonpref Center
     pOpt, pCov = curve_fit(contrastFn, contrasts, nonprefCenterMean,
@@ -393,15 +399,15 @@ for filler in range(1):
                                    [np.inf, np.inf, np.inf, np.inf]))
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
-    ax1.plot(xFit, yFit, color='black', label=f'c50={pOpt[2]:.2f}')
+    ax1.plot(xFit, yFit, color='black', label=f'c50={pOpt[2]:.2f}', linewidth=lineWidth)
 
     # Add truncated lines for non-pref curve
     c50_nonpref = pOpt[2]
     rMax_nonpref = pOpt[1]
-    half_response_nonpref = (0.5 * (rMax_nonpref - pOpt[0])) + pOpt[0]
+    half_response_nonpref = (0.5 * (rMax_nonpref - pOpt[0])) + (2*pOpt[0])
     # ax1.plot([c50_nonpref, c50_nonpref], [0, half_response_nonpref],
     #          color='black', linestyle=':')
-    ax1.scatter(c50_nonpref, half_response_nonpref, marker="x", color='black')
+    ax1.scatter(c50_nonpref, half_response_nonpref, marker="x", color='black', s=mSize**2)
 
     # plot pref peri
     pOpt, pCov = curve_fit(contrastFn, contrasts, prefPeriMean,
@@ -410,15 +416,16 @@ for filler in range(1):
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
     ax1.plot(xFit, yFit, color='gray', linestyle='--',
-             label=f'c50={pOpt[2]:.2f}')
+             label=f'c50={pOpt[2]:.2f}', linewidth=lineWidth)
 
     # Add truncated lines for pref curve
     c50_pref = pOpt[2]
     rMax_pref = pOpt[1]
-    half_response_pref = (0.5 * (rMax_pref - pOpt[0])) + pOpt[0]
+    half_response_pref = (0.5 * (rMax_pref - pOpt[0])) + (2*pOpt[0])
     # ax1.plot([c50_pref, c50_pref], [0, half_response_pref],
     #          color='gray', linestyle=':')
-    ax1.scatter(c50_pref, half_response_pref, marker="x", color='gray')
+    ax1.scatter(c50_pref, half_response_pref, marker="x", color='gray',
+                s=mSize**2)
 
     # plot nonpref peri
     initialGuess = [max(nonprefPeriMean), np.median(contrasts), 2.0]
@@ -428,29 +435,34 @@ for filler in range(1):
     xFit = np.logspace(-1, 2, 100)
     yFit = contrastFn(xFit, *pOpt)
     ax1.plot(xFit, yFit, color='gray', linestyle='--',
-             label=f'c50={pOpt[2]:.2f}')
+             label=f'c50={pOpt[2]:.2f}', linewidth=lineWidth)
 
     # Add truncated lines for non-pref curve
     c50_nonpref = pOpt[2]
     rMax_nonpref = pOpt[1]
-    half_response_nonpref = (0.5 * (rMax_nonpref - pOpt[0])) + pOpt[0]
+    half_response_nonpref = (0.5 * (rMax_nonpref - pOpt[0])) + (2*pOpt[0])
     # ax1.plot([c50_nonpref, c50_nonpref], [0, half_response_nonpref],
     #          color='gray', linestyle=':')
-    ax1.scatter(c50_nonpref, half_response_nonpref, marker="x", color='gray')
+    ax1.scatter(c50_nonpref, half_response_nonpref, marker="x", color='gray',
+                s=mSize**2)
 
     # error bar scatters
     ax1.errorbar(contrasts[1:], prefPeriMean[1:], yerr=prefPeriSEM[1:],
-                 fmt='o', color='gray')
+                 fmt='o', color='gray', markersize=mSize)
     ax1.errorbar(contrasts[1:], nonprefPeriMean[1:], yerr=nonprefPeriSEM[1:],
-                 fmt='o', mfc='w', color='gray')
-    ax1.errorbar(contrasts[1:], prefCenterMean[1:], yerr=prefCenterSEM[1:], fmt='o', color='black')
-    ax1.errorbar(contrasts[1:], nonprefCenterMean[1:], yerr=nonprefCenterSEM[1:], fmt='o', mfc='w', color='black')
+                 fmt='o', mfc='w', color='gray', markersize=mSize)
+    ax1.errorbar(contrasts[1:], prefCenterMean[1:], yerr=prefCenterSEM[1:], fmt='o',
+                 color='black', markersize=mSize)
+    ax1.errorbar(contrasts[1:], nonprefCenterMean[1:], yerr=nonprefCenterSEM[1:], fmt='o',
+                 mfc='w', color='black', markersize=mSize)
 
     ax1.set_xscale('symlog', linthresh=0.1)
-    ax1.set_xlabel('Contrast (%)', **hfont, fontsize=25)
-    ax1.set_ylabel('Normalized Spike Rate', **hfont, fontsize=25)
-    ax1.set_title(f'Population Contrast Response Function n={len(prefCenterPopResp)}')
+    ax1.set_xlabel('Contrast (%)', **hfont, fontsize=fontSize)
+    ax1.set_ylabel('Normalized\nRate', **hfont, fontsize=fontSize)
+    ax1.yaxis.label.set_rotation(0)
+    # ax1.set_title(f'Population Contrast Response Function n={len(prefCenterPopResp)}')
 
+    ax1.set_ylim([0, 1.1])
     # Explicitly set y-ticks at 0, 1, and the others from get_yticks()
     y_ticks = ax1.get_yticks()  # Get all existing y-ticks
     if 1 not in y_ticks:
@@ -463,54 +475,287 @@ for filler in range(1):
     ]
     # Apply the y-ticks and labels
     ax1.set_yticks(y_ticks)  # Set ticks (including 0 and 1)
-    ax1.set_yticklabels(y_tick_labels)  # Label only 0 and 1
+    ax1.set_yticklabels(y_tick_labels, **hfont, fontsize=fontSize)  # Label only 0 and 1
 
     # Explicitly set x-ticks and labels
     x_ticks = [0.1, 1, 10, 100]  # Define tick positions
     x_tick_labels = [f"{tick:.1f}" if tick < 1 else f"{int(tick)}" for tick in x_ticks]  # Format labels
-
     ax1.set_xticks(x_ticks)
-    ax1.set_xticklabels(x_tick_labels, fontsize=20, **hfont)
-
-    # Apply consistent font sizes for y-ticks
-    ax1.tick_params(axis='y', labelsize=20)
-    ax1.tick_params(axis='x', labelsize=20)
+    ax1.set_xticklabels(x_tick_labels, fontsize=fontSize, **hfont)
+    ax1.tick_params(axis='both', width=1, length=4, direction='out', pad=3, labelsize=fontSize)
 
     ax1.legend()
-    ax1.set_ylim([-0.025, 1.1])
     ax1.set_xlim(left=0.3)
     ax1.xaxis.set_minor_locator(mticker.LogLocator(numticks=99, subs="auto"))
-    sns.despine(offset=5)
+    # sns.despine(offset=5)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(1)
+    ax1.spines['left'].set_linewidth(1)
+
+# save fig
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonMainFigures/CRF_plot.pdf',
+            bbox_inches='tight')
+plt.close('all')
+
+
+# plot box plots of center/peri pref/non-pref fit c50 naka-rushton
+centerPrefPopC50 = []
+centerPrefPopRMax = []
+centerPrefPopN = []
+centerNonprefPopC50 = []
+centerNonprefPopRMax = []
+centerNonprefPopN = []
+periPrefPopC50 = []
+periPrefPopRMax = []
+periPrefPopN = []
+periNonprefPopC50 = []
+periNonprefPopRMax = []
+periNonprefPopN = []
+for i in range(len(prefCenterPopResp)):
+    # pref center
+    initialGuess = [max(prefCenterPopResp[i]), np.median(contrasts),
+                    2.0, prefCenterPopResp[i][0]]
+    pOpt, pCov = curve_fit(contrastFn, contrasts, prefCenterPopResp[i],
+                           bounds=([0, 0, 0, 0],
+                                   [np.inf, np.inf, np.inf, np.inf]),
+                           p0=initialGuess)
+    centerPrefPopC50.append(pOpt[2])
+    centerPrefPopRMax.append(pOpt[1])
+    centerPrefPopN.append(pOpt[3])
+
+    # nonpref center
+    initialGuess = [max(nonprefCenterPopResp[i]), np.median(contrasts),
+                    2.0, nonprefCenterPopResp[i][0]]
+    pOpt, pCov = curve_fit(contrastFn, contrasts, nonprefCenterPopResp[i],
+                           bounds=([0, 0, 0, 0],
+                                   [np.inf, np.inf, np.inf, np.inf]),
+                           p0=initialGuess)
+    centerNonprefPopC50.append(pOpt[2])
+    centerNonprefPopRMax.append(pOpt[1])
+    centerNonprefPopN.append(pOpt[3])
+
+    # pref peri
+    initialGuess = [max(prefPeriPopResp[i]), np.median(contrasts),
+                    2.0, prefPeriPopResp[i][0]]
+    pOpt, pCov = curve_fit(contrastFn, contrasts, prefPeriPopResp[i],
+                           bounds=([0, 0, 0, 0],
+                                   [np.inf, np.inf, np.inf, np.inf]),
+                           p0=initialGuess)
+    periPrefPopC50.append(pOpt[2])
+    periPrefPopRMax.append(pOpt[1])
+    periPrefPopN.append(pOpt[3])
+
+    # nonpref peri
+    initialGuess = [max(nonprefPeriPopResp[i]), np.median(contrasts),
+                    2.0, nonprefPeriPopResp[i][0]]
+    pOpt, pCov = curve_fit(contrastFn, contrasts, nonprefPeriPopResp[i],
+                           bounds=([0, 0, 0, 0],
+                                   [np.inf, np.inf, np.inf, np.inf]),
+                           p0=initialGuess)
+    periNonprefPopC50.append(pOpt[2])
+    periNonprefPopRMax.append(pOpt[1])
+    periNonprefPopN.append(pOpt[3])
+
+centerPrefPopC50 = np.array(centerPrefPopC50)
+centerPrefPopRMax = np.array(centerPrefPopRMax)
+centerPrefPopN = np.array(centerPrefPopN)
+centerNonprefPopRMax = np.array(centerNonprefPopRMax)
+centerNonprefPopC50 = np.array(centerNonprefPopC50)
+centerNonprefPopN = np.array(centerNonprefPopN)
+periPrefPopRMax = np.array(periPrefPopRMax)
+periPrefPopC50 = np.array(periPrefPopC50)
+periPrefPopN = np.array(periPrefPopN)
+periNonprefPopC50 = np.array(periNonprefPopC50)
+periNonprefPopRMax = np.array(periNonprefPopRMax)
+periNonprefPopN = np.array(periNonprefPopN)
+
+# stats test for box plots
+# Defining only the specific pairs you want to compare
+data_pairs = [
+    (centerPrefPopC50, centerNonprefPopC50, "Center Pref vs Center Non-Pref"),
+    (centerPrefPopC50, periPrefPopC50, "Center Pref vs Peri Pref"),
+    (centerNonprefPopC50, periNonprefPopC50, "Center Non-Pref vs Peri Non-Pref"),
+    (periPrefPopC50, periNonprefPopC50, "Peri Pref vs Peri Non-Pref")
+]
+# Bonferroni correction for 4 comparisons
+alpha = 0.05
+# alpha_adjusted = alpha / len(data_pairs)
+alpha_adjusted = alpha / 2
+
+# Conduct Mann-Whitney U tests for each pair
+for data1, data2, comparison_name in data_pairs:
+    # stat, p = mannwhitneyu(data1, data2, alternative='two-sided')
+    stat, p = mannwhitneyu(data2, data1, alternative='greater')
+    print(f"{comparison_name} - Test statistic: {stat}, p-value: {p}")
+    if p < alpha_adjusted:
+        print(f"Significant difference after Bonferroni correction (p < {alpha_adjusted})")
+    else:
+        print(f"No significant difference after Bonferroni correction (p >= {alpha_adjusted})")
+
+
+for filler in range(1):
+    fig, ax1 = plt.subplots(figsize=(7, 7), layout='constrained')
+
+    ax1.boxplot(centerPrefPopC50, positions=[0.8],
+                widths=0.35, patch_artist=True,
+                boxprops=dict(facecolor='black', color='black'),
+                medianprops=dict(color='white'))
+
+    ax1.boxplot(centerNonprefPopC50, positions=[1.2],
+                widths=0.35, patch_artist=True,
+                boxprops=dict(facecolor='gray', color='gray'),
+                medianprops=dict(color='white'))
+
+
+    ax1.boxplot(periPrefPopC50, positions=[2.8],
+                widths=0.35, patch_artist=True,
+                boxprops=dict(facecolor='black', color='black'),
+                medianprops=dict(color='white'))
+
+    ax1.boxplot(periNonprefPopC50, positions=[3.2],
+                widths=0.35, patch_artist=True,
+                boxprops=dict(facecolor='gray', color='gray'),
+                medianprops=dict(color='white'))
+
+    ax1.set_xticks([1, 3])
+    ax1.set_xticklabels(['Center', 'Peripheral'], **hfont, fontsize=20)
+    ax1.set_ylabel('Fit C50', **hfont, fontsize=25)
+    ax1.set_xlabel('Stimulus Location', **hfont, fontsize=25)
+    ax1.set_ylim([0, 100])
+    ax1.tick_params(axis='both', width=2, length=8)
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_ticks = ax1.get_yticks()
+    y_tick_labels = [
+        '0' if tick == 0 else
+        '100' if tick == 100 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax1.set_yticklabels(y_tick_labels, fontsize=20, **hfont)
+
+    # # Draw significance lines and stars across groups
+    # y_max = max(max(centerPrefPopC50), max(centerNonprefPopC50), max(periPrefPopC50), max(periNonprefPopC50))
+    # line_height = y_max + 5  # height of the line for significance
+    # star_height = line_height + 0.02  # height of stars
+    #
+    # # Draw line from "Center" to "Peripheral" group
+    # ax1.plot([1, 3], [line_height, line_height], color='black', linewidth=1.5)
+    # ax1.text(2, star_height, '***', ha='center', va='bottom', color='black', fontsize=16)
 
     plt.show()
 
+# plot distributions of concatenated center vs peri
+a = np.concatenate((centerPrefPopC50, centerNonprefPopC50), axis=0)
+b = np.concatenate((periPrefPopC50, periNonprefPopC50), axis=0)
+
+fig, ax = plt.subplots()
+ax.hist(b, color="orange", alpha=0.5, edgecolor="black", label="Distribution B")
+ax.hist(a, color="blue", alpha=0.5, edgecolor="black", label="Distribution A")
+ax.legend()  # Add a legend to label each distribution
+plt.show()
+
+# bootstrap CI for population plots
+for filler in range(1):
+    n_bootstraps = 1000
+    c50bootstrapPrefCent = []
+    c50bootstrapNonprefCent = []
+    c50bootstrapPrefPeri = []
+    c50bootstrapNonprefPeri = []
+
+    # Bootstrap loop
+    for _ in range(n_bootstraps):
+        # pref center
+        # Sample rows with replacement to get a bootstrap sample
+        bootstrap_sample = prefCenterPopResp[
+            np.random.choice(prefCenterPopResp.shape[0],
+                             size=prefCenterPopResp.shape[0],
+                             replace=True)]
+        meanCount = np.mean(bootstrap_sample, axis=0)
+        pOpt, _ = curve_fit(contrastFn, contrasts, meanCount,
+                            bounds=([0, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                            maxfev=10000000)
+        c50bootstrapPrefCent.append(pOpt[2])
+
+        # nonpref cent
+        bootstrap_sample = nonprefCenterPopResp[
+            np.random.choice(nonprefCenterPopResp.shape[0],
+                             size=nonprefCenterPopResp.shape[0],
+                             replace=True)]
+        meanCount = np.mean(bootstrap_sample, axis=0)
+        pOpt, _ = curve_fit(contrastFn, contrasts, meanCount,
+                            bounds=([0, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                            maxfev=10000000)
+        c50bootstrapNonprefCent.append(pOpt[2])
+
+        # pref peri
+        bootstrap_sample = prefPeriPopResp[
+            np.random.choice(prefPeriPopResp.shape[0],
+                             size=prefPeriPopResp.shape[0],
+                             replace=True)]
+        meanCount = np.mean(bootstrap_sample, axis=0)
+        pOpt, _ = curve_fit(contrastFn, contrasts, meanCount,
+                            bounds=([0, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                            maxfev=10000000)
+        c50bootstrapPrefPeri.append(pOpt[2])
+
+        # nonpref peri
+        bootstrap_sample = nonprefPeriPopResp[
+            np.random.choice(nonprefPeriPopResp.shape[0],
+                             size=nonprefPeriPopResp.shape[0],
+                             replace=True)]
+        meanCount = np.mean(bootstrap_sample, axis=0)
+        pOpt, _ = curve_fit(contrastFn, contrasts, meanCount,
+                            bounds=([0, 0, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                            maxfev=10000000)
+        c50bootstrapNonprefPeri.append(pOpt[2])
+
+    c50bootstrapPrefCent = np.array(c50bootstrapPrefCent)
+    c50bootstrapNonprefCent = np.array(c50bootstrapNonprefCent)
+    c50bootstrapPrefPeri = np.array(c50bootstrapPrefPeri)
+    c50bootstrapNonprefPeri = np.array(c50bootstrapNonprefPeri)
+
+    # Calculate confidence interval (e.g., 95%)
+    prefCentCI = np.percentile(c50bootstrapPrefCent, [2.5, 97.5])
+    nonprefCentCI = np.percentile(c50bootstrapNonprefCent, [2.5, 97.5])
+    prefPeriCI = np.percentile(c50bootstrapPrefPeri, [2.5, 97.5])
+    nonprefPeriCI = np.percentile(c50bootstrapNonprefPeri, [2.5, 97.5])
+
+    print(prefCentCI)
+    print(nonprefCentCI)
+    print(prefPeriCI)
+    print(nonprefPeriCI)
+
+########################################################################################################################
+########################################################################################################################
+
 
 # normalization fit.
-def weightedNormMTSIG(C_terms, Lp, Lnp, W, sigma, b, condition, conditionPorNP):
+def weightedNormMTSIG(C_terms, Lp, Lnp, W0, W1, sigma, b, condition, conditionPorNP):
     result = np.zeros_like(C_terms)  # Initialize result array of same shape as C_terms
     for i, C in enumerate(C_terms):
         if conditionPorNP[i]:
             if condition[i]:
-                result[i] = ((C * Lp * W) / ((C * W) + (1 * sigma))) + b
+                result[i] = ((C * Lp * W1) / ((C * W1) + (1 * sigma))) + b
             else:
-                result[i] = ((C * Lp) / (C + sigma)) + b
+                result[i] = ((C * Lp * W0) / ((C * W0) + sigma)) + b
         else:
             if condition[i]:
-                result[i] = ((C * Lnp * W) / ((C * W) + (1 * sigma))) + b
+                result[i] = ((C * Lnp * W1) / ((C * W1) + (1 * sigma))) + b
             else:
-                result[i] = ((C * Lnp) / (C + sigma)) + b
+                result[i] = ((C * Lnp * W0) / ((C * W0) + sigma)) + b
     return result
 
 
 def fit_data(C_terms, y_data, condition, conditionPorNP):
     # Define the objective function for curve fitting
-    def objective(C_terms, Lp, Lnp, W, sigma, b):
-        return weightedNormMTSIG(C_terms, Lp, Lnp, W, sigma, b, condition, conditionPorNP)
+    def objective(C_terms, Lp, Lnp, W0, W1, sigma, b):
+        return weightedNormMTSIG(C_terms, Lp, Lnp, W0, W1, sigma, b, condition, conditionPorNP)
 
     # Initial guess for L, w, and sigma
-    initial_guess = [100, 50, 0.5, 0.07, y_data[0]]
-    bou = [[0, 0, 0, 0, 0],
-           [np.inf, np.inf, np.inf, np.inf, np.inf]]
+    initial_guess = [100, 50, 1, 0.5, 0.07, y_data[0]]
+    bou = [[0, 0, 0, 0, 0, 0],
+           [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]]
 
     # Perform the curve fitting
     popt, pcov = curve_fit(objective, C_terms, y_data, p0=initial_guess, maxfev=100000,

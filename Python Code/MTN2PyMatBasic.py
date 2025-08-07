@@ -26,8 +26,7 @@ import pandas as pd
 # fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
 #             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
 #             'Akshan_241025']
-fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
-            'Akshan_241016', 'Akshan_241017', 'Akshan_241021']
+# fileList = ['Akshan_240927', 'Akshan_241016', 'Akshan_241017', 'Akshan_241025']
 
 
 ########################################### Both ###########################################
@@ -38,6 +37,13 @@ fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
 #             'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
 #             'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
 #             'Akshan_241023', 'Akshan_241025']
+
+# some of akshan's sessions removed
+fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+            'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+            'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+            'Meetz_230126', 'Akshan_240927', 'Akshan_241016', 'Akshan_241017',
+            'Akshan_241025']
 
 t0 = time.time()
 totUnits = []
@@ -226,7 +232,7 @@ for fileIterator in fileList:
     loc0IndexArray = np.array([36, 37, 38, 39, 40, 41])
     loc1IndexArray = np.array([42, 43, 44, 45, 46, 47])
     angleMat = np.arange(180, 900, 60)
-    spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
+    spikeCountMat = np.full((len(units), blocksDone+1, 49), np.nan)
     spikeCountLong = []
     onLatency = 50/1000  # time in MS for counting window latency after stim on
     offLatency = 50/1000  # time in MS for counting window latency after stim off
@@ -287,8 +293,8 @@ for fileIterator in fileList:
     # create pandas dataframe of spikeCount with corresponding unit, stimIndex
     spikeCountDF = pd.DataFrame(spikeCountLong, columns=['unit', 'stimIndex',
                                                          'stimCount', 'stimSpikes'])
-    meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
-    spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
+    meanSpike = np.nanmean(spikeCountMat[:, :blocksDone, :], axis=1)
+    spikeCountSD = np.nanstd(spikeCountMat[:, :blocksDone, :], axis=1)
     spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
     meanSpikeReshaped = np.zeros((len(units), 1, 49))
     for count, i in enumerate(meanSpikeReshaped):
@@ -364,16 +370,20 @@ for fileIterator in fileList:
     ######################################## get units whose preferred response is #####################################
     ############################### statistically reliable above baseline in both locations ############################
     ####################################################################################################################
-    criterionPassedUnits = []
-    for unitCount, unit in enumerate(units):
-        # find direction tested that is closest to the pref dir
-        # and reindex around this so that it is in the middle of the grid
-        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+    def safe_mwu(a, b):
+        a_clean = a[np.isfinite(a)]
+        b_clean = b[np.isfinite(b)]
+        if len(a_clean) < 3 or len(b_clean) < 3:
+            return np.nan, np.nan
+        return mannwhitneyu(a_clean, b_clean, alternative='greater')
 
+    criterionPassedUnits = []
+    for unit in filterUnits:
+        unitCount = np.where(unit == units)[0][0]
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
         nullDirIndex = np.where(dirArray == nullDir)[0][0]
         reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
 
-        # matrix of indices for b and bReIndexed
         stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
         prefLoc1Indx = int(stimMatReIndex[3, 6])
         npLoc1Indx = int(stimMatReIndex[0, 6])
@@ -386,15 +396,12 @@ for fileIterator in fileList:
         prefLoc1Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc1Indx]
         npLoc1Spikes = spikeCountMat[unitCount, :blocksDone, npLoc1Indx]
 
-        stat0, p_value0 = mannwhitneyu(prefLoc0Spikes, sponSpikes,
-                                       alternative='greater')
-        stat1, p_value1 = mannwhitneyu(prefLoc1Spikes, sponSpikes,
-                                       alternative='greater')
-        stat2, p_value2 = mannwhitneyu(prefLoc0Spikes, npLoc0Spikes,
-                                       alternative='greater')
-        stat3, p_value3 = mannwhitneyu(prefLoc1Spikes, npLoc1Spikes,
-                                       alternative='greater')
-        if p_value0 < 0.05 and p_value1 < 0.05 and p_value2 < 0.05 and p_value3 < 0.05:
+        stat0, p_value0 = safe_mwu(prefLoc0Spikes, sponSpikes)
+        stat1, p_value1 = safe_mwu(prefLoc1Spikes, sponSpikes)
+        stat2, p_value2 = safe_mwu(prefLoc0Spikes, npLoc0Spikes)
+        stat3, p_value3 = safe_mwu(prefLoc1Spikes, npLoc1Spikes)
+
+        if all(p < 0.05 for p in [p_value0, p_value1, p_value2, p_value3]):
             criterionPassedUnits.append(unit)
 
     ####################################################################################################################

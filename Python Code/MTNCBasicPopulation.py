@@ -12,7 +12,7 @@ import pandas as pd
 # good sessions: 221110, 221115, 221117, 221124, 221128, 221208, 221229, 230123, 230126
 # okay sessions: 221010, 221013, 221108, 221206
 # bad sessions: 230124
-
+#
 # # # for loop to run through all good files
 # fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
 #             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
@@ -27,20 +27,29 @@ import pandas as pd
 # good sessions: 240927, 240930, 241016, 241017, 241023, 241025
 # okay sessions: 240826, 241002 (13 blocks), 241021 (17 blocks)
 # bad sessions: 240827, 240828
-
+#
 # fileList = ['Akshan_240826', 'Akshan_240927', 'Akshan_240930', 'Akshan_241002',
 #             'Akshan_241016', 'Akshan_241017', 'Akshan_241021', 'Akshan_241023',
 #             'Akshan_241025']
 
+# fileList = ['Akshan_240927', 'Akshan_241016', 'Akshan_241017', 'Akshan_241025']
+
 
 ################################################# Both #################################################################
 # # # for loop to run through all files
+# fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
+#             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
+#             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
+#             'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
+#             'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
+#             'Akshan_241023', 'Akshan_241025']
+
+# # for loop to run through all files but excluding some of akshans
 fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Meetz_221115', 'Meetz_221117', 'Meetz_221124', 'Meetz_221128',
             'Meetz_221206', 'Meetz_221208', 'Meetz_221229', 'Meetz_230123',
-            'Meetz_230126', 'Akshan_240826', 'Akshan_240927', 'Akshan_240930',
-            'Akshan_241002', 'Akshan_241016', 'Akshan_241017', 'Akshan_241021',
-            'Akshan_241023', 'Akshan_241025']
+            'Meetz_230126', 'Akshan_240927', 'Akshan_241016', 'Akshan_241017',
+            'Akshan_241025']
 
 # fileList = ['Akshan_241023', 'Akshan_241025']
 
@@ -229,7 +238,8 @@ for file in fileList:
     loc0IndexArray = np.array([36, 37, 38, 39, 40, 41])
     loc1IndexArray = np.array([42, 43, 44, 45, 46, 47])
     angleMat = np.arange(180, 900, 60)
-    spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
+    # spikeCountMat = np.zeros((len(units), blocksDone+1, 49))
+    spikeCountMat = np.full((len(units), blocksDone + 1, 49), np.nan)
     spikeCountLong = []
     onLatency = 50/1000  # time in MS for counting window latency after stim on
     offLatency = 50/1000  # time in MS for counting window latency after stim off
@@ -289,8 +299,8 @@ for file in fileList:
     # create pandas dataframe of spikeCount with corresponding unit, stimIndex
     spikeCountDF = pd.DataFrame(spikeCountLong, columns=['unit', 'stimIndex',
                                                          'stimCount', 'stimSpikes'])
-    meanSpike = np.mean(spikeCountMat[:, :blocksDone, :], axis=1)
-    spikeCountSD = np.std(spikeCountMat[:, :blocksDone, :], axis=1)
+    meanSpike = np.nanmean(spikeCountMat[:, :blocksDone, :], axis=1)
+    spikeCountSD = np.nanstd(spikeCountMat[:, :blocksDone, :], axis=1)
     spikeCountSEM = spikeCountSD/np.sqrt(blocksDone)
     meanSpikeReshaped = np.zeros((len(units), 1, 49))
     for count, i in enumerate(meanSpikeReshaped):
@@ -344,17 +354,54 @@ for file in fileList:
     ######################################## get units whose preferred response is #####################################
     ############################### statistically reliable above baseline in both locations ############################
     ####################################################################################################################
+    def safe_mwu(a, b):
+        a_clean = a[np.isfinite(a)]
+        b_clean = b[np.isfinite(b)]
+        if len(a_clean) < 3 or len(b_clean) < 3:
+            return np.nan, np.nan
+        return mannwhitneyu(a_clean, b_clean, alternative='greater')
+
     criterionPassedUnits = []
+    # for unit in filterUnits:
+    #     unitCount = np.where(unit == units)[0][0]
+    #     # find direction tested that is closest to the pref dir
+    #     # and reindex around this so that it is in the middle of the grid
+    #     prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+    #
+    #     nullDirIndex = np.where(dirArray == nullDir)[0][0]
+    #     reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+    #
+    #     # matrix of indices for b and bReIndexed
+    #     stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
+    #     prefLoc1Indx = int(stimMatReIndex[3, 6])
+    #     npLoc1Indx = int(stimMatReIndex[0, 6])
+    #     prefLoc0Indx = int(stimMatReIndex[6, 3])
+    #     npLoc0Indx = int(stimMatReIndex[6, 0])
+    #
+    #     sponSpikes = spikeCountMat[unitCount][:blocksDone, 48]
+    #     prefLoc0Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc0Indx]
+    #     npLoc0Spikes = spikeCountMat[unitCount, :blocksDone, npLoc0Indx]
+    #     prefLoc1Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc1Indx]
+    #     npLoc1Spikes = spikeCountMat[unitCount, :blocksDone, npLoc1Indx]
+    #
+    #     stat0, p_value0 = mannwhitneyu(prefLoc0Spikes, sponSpikes,
+    #                                    alternative='greater')
+    #     stat1, p_value1 = mannwhitneyu(prefLoc1Spikes, sponSpikes,
+    #                                    alternative='greater')
+    #     stat2, p_value2 = mannwhitneyu(prefLoc0Spikes, npLoc0Spikes,
+    #                                    alternative='greater')
+    #     stat3, p_value3 = mannwhitneyu(prefLoc1Spikes, npLoc1Spikes,
+    #                                    alternative='greater')
+    #     if p_value0 < 0.05 and p_value1 < 0.05 and p_value2 < 0.05 and p_value3 < 0.05:
+    #         criterionPassedUnits.append(unit)
+    #     # if p_value0 < 0.05 and p_value1 < 0.05:
+    #     #     criterionPassedUnits.append(unit)
     for unit in filterUnits:
         unitCount = np.where(unit == units)[0][0]
-        # find direction tested that is closest to the pref dir
-        # and reindex around this so that it is in the middle of the grid
         prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-
         nullDirIndex = np.where(dirArray == nullDir)[0][0]
         reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
 
-        # matrix of indices for b and bReIndexed
         stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
         prefLoc1Indx = int(stimMatReIndex[3, 6])
         npLoc1Indx = int(stimMatReIndex[0, 6])
@@ -367,18 +414,13 @@ for file in fileList:
         prefLoc1Spikes = spikeCountMat[unitCount, :blocksDone, prefLoc1Indx]
         npLoc1Spikes = spikeCountMat[unitCount, :blocksDone, npLoc1Indx]
 
-        stat0, p_value0 = mannwhitneyu(prefLoc0Spikes, sponSpikes,
-                                       alternative='greater')
-        stat1, p_value1 = mannwhitneyu(prefLoc1Spikes, sponSpikes,
-                                       alternative='greater')
-        stat2, p_value2 = mannwhitneyu(prefLoc0Spikes, npLoc0Spikes,
-                                       alternative='greater')
-        stat3, p_value3 = mannwhitneyu(prefLoc1Spikes, npLoc1Spikes,
-                                       alternative='greater')
-        if p_value0 < 0.05 and p_value1 < 0.05 and p_value2 < 0.05 and p_value3 < 0.05:
+        stat0, p_value0 = safe_mwu(prefLoc0Spikes, sponSpikes)
+        stat1, p_value1 = safe_mwu(prefLoc1Spikes, sponSpikes)
+        stat2, p_value2 = safe_mwu(prefLoc0Spikes, npLoc0Spikes)
+        stat3, p_value3 = safe_mwu(prefLoc1Spikes, npLoc1Spikes)
+
+        if all(p < 0.05 for p in [p_value0, p_value1, p_value2, p_value3]):
             criterionPassedUnits.append(unit)
-        # if p_value0 < 0.05 and p_value1 < 0.05:
-        #     criterionPassedUnits.append(unit)
 
     ####################################################################################################################
     ############################################# different combinations of units ######################################
@@ -388,7 +430,6 @@ for file in fileList:
     criterionPassedCombs = [i for i in combinations(criterionPassedUnits, 2)]
     # combinations of units separated by more than 250ums
     distCombs = []
-    # for i in combs:  #### working version
     for i in criterionPassedCombs:
         n1 = unitsChannel[np.where(units == i[0])[0][0]]
         n2 = unitsChannel[np.where(units == i[1])[0][0]]
@@ -445,11 +486,10 @@ for file in fileList:
             stimMatCond = stimMat[sli, :]
             stimMatCond = stimMatCond[:, sli]
 
-            # rf weight normalization
-            fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
+            fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
                                                     stimIndexDict, dir1, dir2)
-            resp = bCondensed.reshape(9)[:-1]
-
+            resp = bCondensed.reshape(9)
+            # rf weight normalization
             # parameters for fitting
             resp_loc0 = np.mean([bCondensed[2, 0], bCondensed[2, 1]])
             resp_loc1 = np.mean([bCondensed[0, 2], bCondensed[1, 2]])
@@ -457,16 +497,24 @@ for file in fileList:
             w1_guess = resp_loc1/(resp_loc0 + eps)  # epsilon to prevent guess from being division by 0
             log_w1_guess = np.log(w1_guess)
             # # with baseline
-            # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
-            #                          [log_w1_guess],
-            #                          [0.1], [bCondensed[2, 2]+eps]), axis=0)
-            # lb = [0, 0, np.log(0.01), 0, 0]
-            # ub = [np.inf, np.inf, np.log(100), np.inf, np.inf]
             guess0 = np.concatenate((bCondensed[2, :-1]+eps,
                                      [log_w1_guess],
-                                     [0.5]), axis=0)
-            lb = [0, 0, np.log(0.01), 0]
-            ub = [150, 150, np.log(100), np.inf]
+                                     [0.1], [bCondensed[2, 2]+eps]), axis=0)
+            lb = [0, 0, np.log(0.01), 0, 0]
+            ub = [np.inf, np.inf, np.log(100), np.inf, np.inf]
+
+            # # with sigma and no baseline
+            # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
+            #                          [log_w1_guess],
+            #                          [0.5]), axis=0)
+            # lb = [0, 0, np.log(0.01), 0]
+            # ub = [150, 150, np.log(100), np.inf]
+
+            # # without sigma and no baseline
+            # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
+            #                          [log_w1_guess]), axis=0)
+            # lb = [0, 0, np.log(0.01)]
+            # ub = [150, 150, np.log(100)]
 
             # pOpt, pCov = multi_start_curve_fit(rfWeightCondensed, fixedVals, resp.squeeze(),
             #                                    n_starts=10, seed=42)
@@ -498,7 +546,8 @@ for file in fileList:
         if skipSubpair:
             continue  # skip rest of subpair loop,
 
-        for pairCount, pair in enumerate(distCombs):
+        # for pairCount, pair in enumerate(distCombs):
+        for pairCount, pair in enumerate(criterionPassedCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
@@ -537,7 +586,7 @@ for file in fileList:
                 loc1Resp = y_predN1[row, 2]
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n1][2])
-                sig = unitNormFitEstimate[n1][3]
+                # sig = unitNormFitEstimate[n1][3]
                 n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
 
                 # n2 selectivity and suppression index
@@ -545,14 +594,26 @@ for file in fileList:
                 loc1Resp = y_predN2[row, 2]
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n2][2])
-                sig = unitNormFitEstimate[n2][3]
+                # sig = unitNormFitEstimate[n2][3]
                 n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
 
                 # pair selectivity and suppression index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                    np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
+
+                eps = 1e-6  # to prevent atanh(±1)
+                # Clip values to avoid infinite z-transform
+                n1_clipped = np.clip(abs(n1Selectivity), -1 + eps, 1 - eps)
+                n2_clipped = np.clip(abs(n2Selectivity), -1 + eps, 1 - eps)
+                # Fisher z-transform (atanh), average, then back-transform (tanh)
+                z1 = np.arctanh(n1_clipped)
+                z2 = np.arctanh(n2_clipped)
+                z_mean = 0.5 * (z1 + z2)
+                pairSelectivity = np.sign(n1Selectivity) * np.sign(n2Selectivity) * np.tanh(z_mean)
+
                 pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
 
+                # append to list
                 pairPairedCorr.append(pairStimCorr)
                 pairSelectivityIndex.append(pairSelectivity)
                 pairNonPrefSuppIndex.append(pairSuppression)

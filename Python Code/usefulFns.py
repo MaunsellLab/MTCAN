@@ -28,7 +28,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.ticker as ticker
 import time
-from astropy.modeling import models, fitting
+# from astropy.modeling import models, fitting
 from pymatreader import read_mat
 from binsreg import *
 from scipy.stats import f_oneway
@@ -40,6 +40,7 @@ from scipy.stats import ttest_ind
 from matplotlib import pyplot as plt, ticker as mticker
 from sklearn.covariance import LedoitWolf
 from scipy.optimize import minimize_scalar
+from sklearn.linear_model import LinearRegression
 
 
 # fig saving params
@@ -1007,7 +1008,7 @@ def genNormCondensed(fixed, L0_0, L0_1, L1_0, L1_1, al1):
 
     # generic norm
     num = ((c0 * (L0 ** 2) * l0).sum(-1) + (c1 * (L1 ** 2) * l1).sum(-1))
-    denom = ((1 * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
+    denom = (((1 ** 2) * c0[:, 0]) + ((al1 ** 2) * c1[:, 0]))
 
     return num / denom
 
@@ -1208,10 +1209,77 @@ def generateTwoCorrArrays(numSamples, corr):
 #
 #     return pairStimCorr, pairDCov, pairDSD
 
+# # new version that allows for different correlation methods
+# def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='shrinkage'):
+#     """
+#     Compute correlation between neuron pairs after z-scoring and excluding ±3SD outliers.
+#
+#     Parameters:
+#         n1SpikeMat, n2SpikeMat : arrays of spike counts (1D)
+#         method : 'shrinkage' (default) or 'pearson' or 'spearman'
+#
+#     Returns:
+#         pairCorr : correlation coefficient (shrinkage or Pearson/Spearman)
+#         pairCov  : covariance matrix
+#         pairSD   : product of SDs (or NaN if invalid)
+#     """
+#
+#     try:
+#         # Z-score
+#         n1Z = stats.zscore(n1SpikeMat, nan_policy='omit')
+#         n2Z = stats.zscore(n2SpikeMat, nan_policy='omit')
+#
+#         # Find outlier trials
+#         badTrials = np.unique(
+#             np.concatenate([
+#                 np.where(np.abs(n1Z) >= 3)[0],
+#                 np.where(np.abs(n2Z) >= 3)[0],
+#                 np.where(~np.isfinite(n1Z))[0],
+#                 np.where(~np.isfinite(n2Z))[0]
+#             ])
+#         )
+#
+#         allTrials = np.arange(len(n1SpikeMat))
+#         goodTrials = np.setdiff1d(allTrials, badTrials)
+#
+#         if len(goodTrials) < 4:
+#             return np.nan, np.nan, np.nan
+#
+#         x = n1SpikeMat[goodTrials]
+#         y = n2SpikeMat[goodTrials]
+#
+#         if method == 'shrinkage':
+#             data = np.vstack([x, y]).T
+#             lw = LedoitWolf().fit(data)
+#             cov = lw.covariance_
+#             corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+#             sd_product = np.sqrt(cov[0, 0] * cov[1, 1])
+#             return corr, cov, sd_product
+#
+#         elif method == 'pearson':
+#             corr, _ = stats.pearsonr(x, y)
+#             cov = np.cov(x, y, ddof=1)
+#             sd_product = np.std(x, ddof=1) * np.std(y, ddof=1)
+#             return corr, cov, sd_product
+#
+#         elif method == 'spearman':
+#             corr, _ = stats.spearmanr(x, y)
+#             cov = np.cov(x, y, ddof=1)
+#             sd_product = np.std(x, ddof=1) * np.std(y, ddof=1)
+#             return corr, cov, sd_product
+#
+#         else:
+#             raise ValueError(f"Unknown method: {method}")
+#
+#     except Exception as e:
+#         print(f"Correlation failed: {e}")
+#         return np.nan, np.nan, np.nan
+#
 
+# updated version to allow for nan values
 def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='shrinkage'):
     """
-    Compute correlation between neuron pairs after z-scoring and excluding ±3SD outliers.
+    Compute correlation between neuron pairs after z-scoring and excluding ±3SD outliers and NaNs.
 
     Parameters:
         n1SpikeMat, n2SpikeMat : arrays of spike counts (1D)
@@ -1224,28 +1292,30 @@ def pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='shrinkage'):
     """
 
     try:
-        # Z-score
-        n1Z = stats.zscore(n1SpikeMat, nan_policy='omit')
-        n2Z = stats.zscore(n2SpikeMat, nan_policy='omit')
+        # Find finite (non-NaN) trials
+        validTrials = np.isfinite(n1SpikeMat) & np.isfinite(n2SpikeMat)
 
-        # Find outlier trials
-        badTrials = np.unique(
-            np.concatenate([
-                np.where(np.abs(n1Z) >= 3)[0],
-                np.where(np.abs(n2Z) >= 3)[0],
-                np.where(~np.isfinite(n1Z))[0],
-                np.where(~np.isfinite(n2Z))[0]
-            ])
-        )
-
-        allTrials = np.arange(len(n1SpikeMat))
-        goodTrials = np.setdiff1d(allTrials, badTrials)
-
-        if len(goodTrials) < 4:
+        if np.sum(validTrials) < 4:
             return np.nan, np.nan, np.nan
 
-        x = n1SpikeMat[goodTrials]
-        y = n2SpikeMat[goodTrials]
+        # Restrict to valid trials
+        n1Valid = n1SpikeMat[validTrials]
+        n2Valid = n2SpikeMat[validTrials]
+
+        # Z-score the valid trials
+        n1Z = stats.zscore(n1Valid)
+        n2Z = stats.zscore(n2Valid)
+
+        # Identify outlier trials beyond ±3SD
+        outliers = (np.abs(n1Z) >= 3) | (np.abs(n2Z) >= 3)
+        goodTrials = ~outliers
+
+        # Check again for minimum number of good trials
+        if np.sum(goodTrials) < 4:
+            return np.nan, np.nan, np.nan
+
+        x = n1Valid[goodTrials]
+        y = n2Valid[goodTrials]
 
         if method == 'shrinkage':
             data = np.vstack([x, y]).T

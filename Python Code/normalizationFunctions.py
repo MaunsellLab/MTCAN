@@ -677,7 +677,7 @@ def fixedValsForRFWeightMTNC(stimMatReIndex, stimIndexDict):
     return np.array(c0s), np.array(c1s), np.array(l0s), np.array(l1s)
 
 
-def rfWeightCondensed(fixed, L0, L1, log_w1, sig):
+def rfWeightCondensed(fixed, L0, L1, log_w1, sig, b):
     """
     RF weight normalization condensed: w is log weighted
     """
@@ -690,11 +690,11 @@ def rfWeightCondensed(fixed, L0, L1, log_w1, sig):
     L1_array = np.array([L0, L1])
 
     # generic norm
-    num = ((c0 * (L0_array ** 1) * l0).sum(-1) +
+    num = (((c0 * (L0_array ** 1) * l0).sum(-1) * 1) +
            ((c1 * (L1_array ** 1) * l1).sum(-1) * w1))
-    denom = (c0[:, 0] + (c1[:, 0] * w1) + sig)
+    denom = ((c0[:, 0] * 1) + (c1[:, 0] * w1) + sig)
 
-    return (num/denom)
+    return (num/denom) + b
 
 
 # def rfWeightMTNC(fixed, L0_0, L0_60, L0_120, L0_180, L0_240, L0_300,

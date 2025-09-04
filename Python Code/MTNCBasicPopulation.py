@@ -343,7 +343,7 @@ for file in fileList:
         params = gaussFit(x, y)
         yPred = gauss(x, *params)
         r2 = r2_score(y, yPred)
-        if r2 > 0.95:
+        if r2 > 0.60:
             filterUnits.append(unit)
             totFilterR2.append(r2)
         unitGaussMean[unitCount] = params[2] % 360
@@ -466,8 +466,7 @@ for file in fileList:
         dir2 = dirArray[sli[1]]
         condArr = np.array([dir1, dir2, dir1, dir2])
 
-        for unit in criterionPassedUnits:
-
+        for unit in units:
             unitCount = np.where(unit == units)[0][0]
             prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
             nullDirIndex = np.where(dirArray == nullDir)[0][0]
@@ -496,6 +495,7 @@ for file in fileList:
             eps = 1e-6
             w1_guess = resp_loc1/(resp_loc0 + eps)  # epsilon to prevent guess from being division by 0
             log_w1_guess = np.log(w1_guess)
+
             # # with baseline
             guess0 = np.concatenate((bCondensed[2, :-1]+eps,
                                      [log_w1_guess],
@@ -503,12 +503,12 @@ for file in fileList:
             lb = [0, 0, np.log(0.01), 0, 0]
             ub = [np.inf, np.inf, np.log(100), np.inf, np.inf]
 
-            # # with sigma and no baseline
+            # # # with sigma and no baseline
             # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
             #                          [log_w1_guess],
-            #                          [0.5]), axis=0)
+            #                          [0.1]), axis=0)
             # lb = [0, 0, np.log(0.01), 0]
-            # ub = [150, 150, np.log(100), np.inf]
+            # ub = [np.inf, np.inf, np.log(100), np.inf]
 
             # # without sigma and no baseline
             # guess0 = np.concatenate((bCondensed[2, :-1]+eps,
@@ -546,8 +546,8 @@ for file in fileList:
         if skipSubpair:
             continue  # skip rest of subpair loop,
 
-        # for pairCount, pair in enumerate(distCombs):
-        for pairCount, pair in enumerate(criterionPassedCombs):
+        for pairCount, pair in enumerate(distCombs):
+            # for pairCount, pair in enumerate(criterionPassedCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
@@ -584,33 +584,37 @@ for file in fileList:
                 # n1 selectivity and suppression index
                 loc0Resp = y_predN1[2, col]
                 loc1Resp = y_predN1[row, 2]
+                # loc0Resp = unitNormFitEstimate[n1][np.where(condArr == loc0Dir)[0][0]]
+                # loc1Resp = unitNormFitEstimate[n1][np.where(condArr == loc1Dir)[0][0]] * np.exp(
+                #     unitNormFitEstimate[n1][2])
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n1][2])
-                # sig = unitNormFitEstimate[n1][3]
-                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
+                sig = unitNormFitEstimate[n1][3]
+                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1, sig)
 
                 # n2 selectivity and suppression index
                 loc0Resp = y_predN2[2, col]
                 loc1Resp = y_predN2[row, 2]
+                # loc0Resp = unitNormFitEstimate[n2][np.where(condArr == loc0Dir)[0][0]]
+                # loc1Resp = unitNormFitEstimate[n2][np.where(condArr == loc1Dir)[0][0]] * np.exp(
+                #     unitNormFitEstimate[n2][2])
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n2][2])
-                # sig = unitNormFitEstimate[n2][3]
-                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1)
+                sig = unitNormFitEstimate[n2][3]
+                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1, sig)
 
                 # pair selectivity and suppression index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
                                    np.sqrt(abs(n1Selectivity) * abs(n2Selectivity)))
-
-                eps = 1e-6  # to prevent atanh(±1)
-                # Clip values to avoid infinite z-transform
-                n1_clipped = np.clip(abs(n1Selectivity), -1 + eps, 1 - eps)
-                n2_clipped = np.clip(abs(n2Selectivity), -1 + eps, 1 - eps)
-                # Fisher z-transform (atanh), average, then back-transform (tanh)
-                z1 = np.arctanh(n1_clipped)
-                z2 = np.arctanh(n2_clipped)
-                z_mean = 0.5 * (z1 + z2)
-                pairSelectivity = np.sign(n1Selectivity) * np.sign(n2Selectivity) * np.tanh(z_mean)
-
+                # eps = 1e-6  # to prevent atanh(±1)
+                # # Clip values to avoid infinite z-transform
+                # n1_clipped = np.clip(abs(n1Selectivity), -1 + eps, 1 - eps)
+                # n2_clipped = np.clip(abs(n2Selectivity), -1 + eps, 1 - eps)
+                # # Fisher z-transform (atanh), average, then back-transform (tanh)
+                # z1 = np.arctanh(n1_clipped)
+                # z2 = np.arctanh(n2_clipped)
+                # z_mean = 0.5 * (z1 + z2)
+                # pairSelectivity = np.sign(n1Selectivity) * np.sign(n2Selectivity) * np.tanh(z_mean)
                 pairSuppression = np.sqrt(n1NonPrefSupp * n2NonPrefSupp)
 
                 # append to list
@@ -625,6 +629,16 @@ for file in fileList:
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
                 singleStimLoc0Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat,
                                                                            method='shrinkage')
+                # # n1
+                # w0 = 1
+                # sig = unitNormFitEstimate[n1][3]
+                # n1supp = w0/(w0+sig)
+                # # n2
+                # w0 = 1
+                # sig = unitNormFitEstimate[n2][3]
+                # n2supp = w0/(w0+sig)
+                #
+                # pairSuppression = np.sqrt(n1supp * n2supp)
 
                 pairSingleCorr.append(singleStimLoc0Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)
@@ -637,6 +651,17 @@ for file in fileList:
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
                 singleStimLoc1Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat,
                                                                            method='shrinkage')
+
+                # # n1
+                # w1 = np.exp(unitNormFitEstimate[n1][2])
+                # sig = unitNormFitEstimate[n1][3]
+                # n1supp = w1 / (w1 + sig)
+                # # n2
+                # w1 = np.exp(unitNormFitEstimate[n2][2])
+                # sig = unitNormFitEstimate[n2][3]
+                # n2supp = w1 / (w1 + sig)
+                #
+                # pairSuppression = np.sqrt(n1supp * n2supp)
 
                 pairSingleCorr.append(singleStimLoc1Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)

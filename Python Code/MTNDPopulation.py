@@ -50,35 +50,6 @@ fileList = ['Meetz_230607', 'Meetz_230608', 'Meetz_230612', 'Meetz_230613', 'Mee
             'Akshan_240610', 'Akshan_240611', 'Akshan_240613', 'Akshan_240628', 'Akshan_240703',
             'Akshan_240704', 'Akshan_240705', 'Akshan_240709', 'Akshan_241014', 'Akshan_241024']
 
-# # original
-# unitList = ['230607_147', '230607_146', '230607_144', '230607_126', '230607_125',
-#             '230608_143', '230608_145', '230608_149', '230612_213', '230613_187',
-#             '230615_83', '230615_166', '230620_58', '230626_131', '230627_147',
-#             '230627_141', '230627_106', '230627_71', '230627_70', '230627_14',
-#             '230628_143', '230630_50', '230707_140', '230710_137', '230711_45',
-#             '230711_50', '230718_178', '230719_147', '230719_156', '230720_149',
-#             '240530_55', '240603_167', '240606_176', '240607_137', '240607_170',
-#             '240607_179', '240611_136', '240613_138', '240628_19', '240703_19',
-#             '240703_91', '240704_86', '240705_74', '240705_162', '240709_53',
-#             '240709_108', '241014_3', '241014_61', '241014_71', '241024_2',
-#             '241024_21', '241024_25']
-
-# some new units added
-# unitList = ['230607_147', '230607_146', '230607_144', '230607_126', '230607_125',
-#             '230607_80', '230607_77', '230608_112', '230608_117', '230608_140',
-#             '230608_143', '230608_145', '230608_149', '230612_213', '230613_187',
-#             '230615_83', '230615_166', '230615_164', '230615_74', '230620_58',
-#             '230626_131', '230626_58', '230626_65', '230626_64', '230627_147',
-#             '230627_141', '230627_106', '230627_71', '230627_70', '230627_14',
-#             '230627_79', '230627_148', '230627_112', '230627_93', '230628_143',
-#             '230630_50', '230630_138', '230707_140', '230707_23', '230707_144',
-#             '230707_143', '230710_137', '230711_45', '230711_50', '230711_55',
-#             '230718_178', '230719_147', '230719_156', '230719_155', '230720_149',
-#             '240530_55', '240603_167', '240606_176', '240607_137', '240607_170',
-#             '240607_179', '240611_136', '240613_138', '240628_19', '240703_19',
-#             '240703_91', '240704_86', '240705_74', '240705_162', '240709_53',
-#             '240709_108', '241014_3', '241014_61', '241014_71', '241024_2',
-#             '241024_21', '241024_25']
 
 
 # # unitList with only one optimized cell/day ignoring the ancillary cells
@@ -89,26 +60,45 @@ fileList = ['Meetz_230607', 'Meetz_230608', 'Meetz_230612', 'Meetz_230613', 'Mee
 #             '240611_136', '240613_138', '240628_19', '240703_91', '240704_86',
 #             '240705_74', '240709_108', '241014_61',  '241024_2']
 
-# some new units added + most of Akshan's sessions run through KS4
-unitList = ['230607_147', '230607_146', '230607_144', '230607_126', '230607_125',
-            '230607_80', '230607_77', '230608_112', '230608_117', '230608_140',
-            '230608_143', '230608_145', '230608_149', '230612_213', '230613_187',
-            '230615_83', '230615_166', '230615_164', '230615_74', '230620_58',
-            '230626_131', '230626_58', '230626_65', '230626_64', '230627_147',
-            '230627_141', '230627_106', '230627_71', '230627_70', '230627_14',
-            '230627_79', '230627_148', '230627_112', '230627_93', '230628_143',
-            '230630_50', '230630_138', '230707_140', '230707_23', '230707_144',
-            '230707_143', '230710_137', '230711_45', '230711_50', '230711_55',
-            '230718_178', '230719_147', '230719_156', '230719_155', '230720_149',
-            '240530_54', '240603_118', '240606_46', '240606_52', '240606_78',
-            '240606_79', '240606_80', '240606_99', '240607_137', '240607_170',
-            '240607_179', '240611_21', '240611_28', '240611_29', '240611_36',
-            '240611_37', '240611_46', '240611_81', '240611_86', '240611_97',
-            '240611_101', '240611_103', '240611_110', '240613_12', '240628_49',
-            '240703_7', '240703_57', '240703_66', '240703_72', '240704_24',
-            '240705_56', '240705_60', '240709_53', '240709_108', '241014_3',
-            '241014_61', '241014_71', '241024_2', '241024_21', '241024_25']
+# # some new units added + most of Akshan's sessions run through KS4
+# unitList = ['230607_147', '230607_146', '230607_144', '230607_126', '230607_125',
+#             '230607_80', '230607_77', '230608_112', '230608_117', '230608_140',
+#             '230608_143', '230608_145', '230608_149', '230612_213', '230613_187',
+#             '230615_83', '230615_166', '230615_164', '230615_74', '230620_58',
+#             '230626_131', '230626_58', '230626_65', '230626_64', '230627_147',
+#             '230627_141', '230627_106', '230627_71', '230627_70', '230627_14',
+#             '230627_79', '230627_148', '230627_112', '230627_93', '230628_143',
+#             '230630_50', '230630_138', '230707_140', '230707_23', '230707_144',
+#             '230707_143', '230710_137', '230711_45', '230711_50', '230711_55',
+#             '230718_178', '230719_147', '230719_156', '230719_155', '230720_149',
+#             '240530_54', '240603_118', '240606_46', '240606_52', '240606_78',
+#             '240606_79', '240606_80', '240606_99', '240607_137', '240607_170',
+#             '240607_179', '240611_21', '240611_28', '240611_29', '240611_36',
+#             '240611_37', '240611_46', '240611_81', '240611_86', '240611_97',
+#             '240611_101', '240611_103', '240611_110', '240613_12', '240628_49',
+#             '240703_7', '240703_57', '240703_66', '240703_72', '240704_24',
+#             '240705_56', '240705_60', '240709_53', '240709_108', '241014_3',
+#             '241014_61', '241014_71', '241024_2', '241024_21', '241024_25']
 
+# # updated list with new cell IDs
+unitList = ['230607_149', '230607_147', '230607_146', '230607_144', '230607_126',
+            '230607_125', '230607_80', '230607_77', '230608_117', '230608_140',
+            '230608_143', '230608_149', '230613_187', '230615_166', '230620_58',
+            '230626_58', '230626_63', '230626_64', '230626_65', '230626_131',
+            '230627_14', '230627_70', '230627_71', '230627_79', '230627_93',
+            '230627_106', '230627_112', '230627_141', '230627_147', '230627_148',
+            '230627_152', '230628_42', '230628_143', '230630_50', '230630_138',
+            '230707_140', '230707_143', '230707_144', '230710_137', '230711_45',
+            '230711_50', '230718_178', '230719_112', '230719_147', '230719_155',
+            '230719_156', '230720_149', '240530_39', '240603_127', '240606_74',
+            '240606_84', '240606_90', '240606_94', '240606_103', '240607_31',
+            '240610_29', '240610_32', '240610_37', '240610_92', '240611_22',
+            '240611_31', '240611_37', '240611_42', '240611_52', '240611_93',
+            '240611_95', '240611_98', '240611_104', '240611_112', '240611_116',
+            '240611_125', '240611_127', '240611_129', '240628_49', '240703_7',
+            '240703_57', '240704_24', '240705_56', '240705_60', '240705_64',
+            '240705_65', '240709_72', '240709_108', '241014_3', '241014_15',
+            '241014_61', '241024_2', '241024_21', '241024_23', '241024_25']
 
 ########################################################################################################################
 
@@ -221,6 +211,9 @@ allBlocksDone = []
 masterGoodUnits = []
 totUnits = []
 corrLists = [[] for _ in range(4)]
+masterCorrUnits = []
+masterCorrPairNum = []
+masterCorrUnitsSpikeCountMat = []
 popGaborSD = []
 popGaborOffsetDeg = []
 akshanFixWindow = []
@@ -566,6 +559,16 @@ for file in fileList:
             corrUnits.append(unit)
 
     if len(corrUnits) > 1:
+        # add units for correlation analysis to master list
+        masterCorrPairNum.append(len(corrUnits))
+        for unit in corrUnits:
+            masterCorrUnits.append(f'{seshDate}_{unit}')
+
+        # add the spike count mat for these units to a master list
+        for uid in corrUnits:
+            idx = np.where(units == uid)[0][0]
+            masterCorrUnitsSpikeCountMat.append(spikeCountMat[idx, :blocksDone, :])
+
         corrUnits = np.array(corrUnits)
         # the different combinations of neuron pairs from total units
         combs = [i for i in combinations(corrUnits, 2)]
@@ -612,6 +615,7 @@ sponNormalized = np.array(sponNormalized)
 meanSpon = np.mean(sponNormalized)
 semSpon = np.std(sponNormalized) / np.sqrt(numUnits)
 masterGoodUnits = np.array(masterGoodUnits)
+masterCorrUnits = np.array(masterCorrUnits)
 
 prefNormalized = np.array(prefNormalized)
 nonprefNormalized = np.array(nonprefNormalized)
@@ -1031,6 +1035,7 @@ plt.close('all')
 # individual neurons
 r2ScoresRFWeightFullWithBase = []
 aicScoresRFWeightFullWithBase = []
+rfWeightNeuronFits = []
 for i in range(len(prefNormalized)):
     resp = np.concatenate((prefNormalizedWithBase[i], nonprefNormalizedWithBase[i],
                            pnNormalizedWithBase[i], npNormalizedWithBase[i],
@@ -1051,6 +1056,7 @@ for i in range(len(prefNormalized)):
                                          stim_type_peripherySpon, *popt)
     r2 = r2_score(resp, y_pred1)
     r2ScoresRFWeightFullWithBase.append(r2)
+    rfWeightNeuronFits.append(popt)
 
     # compute AIC and append to list
     residuals = resp - y_pred1
@@ -2061,6 +2067,373 @@ stat, p_value = wilcoxon(individualNeuronR2RFWeight,
                          individualNeuronR2EMS,
                          alternative='greater')
 print(p_value)
+
+
+########################################################################################################################
+#################################################### Correlation Analysis ##############################################
+########################################################################################################################
+def shared_geom_share_rectified(w1, w2, sigma1, sigma2):
+    eps = 1e-9
+    w1p = max(w1, 0.0)
+    w2p = max(w2, 0.0)
+    s1 = w1p / (1 + w1p + sigma1 + eps)   # in [0,1)
+    s2 = w2p / (1 + w2p + sigma2 + eps)
+    return np.sqrt(s1 * s2)
+
+
+# generate the different pair combinations from the days with more than 1 unit
+all_combs = []
+start = 0
+for n in masterCorrPairNum:
+    day_units = masterCorrUnits[start:start + n]
+    all_combs.extend(combinations(day_units, 2))
+    start += n
+
+# find correlations for paired stimuli across all combs
+masterCorr = []
+masterPairWeight = []
+sameSelCorr = []
+sameSelWeight = []
+oppositeSelCorr = []
+oppositeSelWeight = []
+for comb in all_combs:
+    n1 = np.where(masterGoodUnits == comb[0])[0][0]
+    n2 = np.where(masterGoodUnits == comb[1])[0][0]
+
+    for i in range(10, 18):  # center N offsets P or N
+        # correlation for that Gabor pair b/w 2 units excluding trials where
+        # spike counts exceeded 3 SD from mean
+        n1SpkMatIdx = np.where(masterCorrUnits == comb[0])[0][0]
+        n2SpkMatIdx = np.where(masterCorrUnits == comb[1])[0][0]
+        n1SpikeMat = masterCorrUnitsSpikeCountMat[n1SpkMatIdx][:, i]
+        n2SpikeMat = masterCorrUnitsSpikeCountMat[n2SpkMatIdx][:, i]
+        pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+
+        indx = (i - 10) // 2
+        w0 = 1
+        n1w = rfWeightNeuronFits[n1][2+indx]
+        sig1 = rfWeightNeuronFits[n1][6]
+        n2w = rfWeightNeuronFits[n2][2+indx]
+        sig2 = rfWeightNeuronFits[n2][6]
+
+        if n1w <= 0 or n2w <= 0:
+            continue
+
+        # pairWeightGeomMean = np.sqrt(n1AvgW * n2AvgW)
+        pairWeightGeomMean = shared_geom_share_rectified(w1=n1w, w2=n2w,
+                                                         sigma1=sig1, sigma2=sig2)
+        masterPairWeight.append(pairWeightGeomMean)
+        masterCorr.append(pairStimCorr)
+
+        # n1 selectivity
+        loc0Resp = rfWeightNeuronFits[n1][1] / (1 + rfWeightNeuronFits[n1][6])
+        loc0Resp = loc0Resp + rfWeightNeuronFits[n1][7]
+        if i % 2 == 0:
+            loc1Resp = (rfWeightNeuronFits[n1][1] * rfWeightNeuronFits[n1][2+indx]) / (
+                rfWeightNeuronFits[n1][2+indx] + rfWeightNeuronFits[n1][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n1][7]
+        else:
+            loc1Resp = (rfWeightNeuronFits[n1][0] * rfWeightNeuronFits[n1][2+indx]) / (
+                rfWeightNeuronFits[n1][2 + indx] + rfWeightNeuronFits[n1][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n1][7]
+        n1Sel = (loc0Resp-loc1Resp) / (loc0Resp + loc1Resp)
+        # n1Sel = (w0 - n1w) / (w0 + n1w)
+
+        # n2 selectivity
+        loc0Resp = rfWeightNeuronFits[n2][1] / (1 + rfWeightNeuronFits[n2][6])
+        loc0Resp = loc0Resp + rfWeightNeuronFits[n2][7]
+        if i % 2 == 0:
+            loc1Resp = (rfWeightNeuronFits[n2][1] * rfWeightNeuronFits[n2][2 + indx]) / (
+                    rfWeightNeuronFits[n2][2 + indx] + rfWeightNeuronFits[n2][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n2][7]
+        else:
+            loc1Resp = (rfWeightNeuronFits[n2][0] * rfWeightNeuronFits[n2][2 + indx]) / (
+                    rfWeightNeuronFits[n2][2 + indx] + rfWeightNeuronFits[n2][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n2][7]
+        n2Sel = (loc0Resp-loc1Resp) / (loc0Resp + loc1Resp)
+        # n2Sel = (w0 - n2w) / (w0 + n2w)
+
+        if np.sign(n1Sel) * np.sign(n2Sel) == 1:
+            sameSelCorr.append(pairStimCorr)
+            # sameSelWeight.append(pairWeightGeomMean)
+            if n1Sel >= 0:
+                n1NonprefWeight = n1w / (1 + n1w + sig1)
+            else:
+                n1NonprefWeight = 1 / (1 + n1w + sig1)
+            if n2Sel >= 0:
+                n2NonprefWeight = n2w / (1 + n2w + sig2)
+            else:
+                n2NonprefWeight = 1 / (1 + n2w + sig2)
+            sameSelWeight.append(np.sqrt(n1NonprefWeight * n2NonprefWeight))
+        else:
+            oppositeSelCorr.append(pairStimCorr)
+            # oppositeSelWeight.append(pairWeightGeomMean)
+            if n1Sel >= 0:
+                n1NonprefWeight = n1w / (1 + n1w + sig1)
+            else:
+                n1NonprefWeight = 1 / (1 + n1w + sig1)
+            if n2Sel >= 0:
+                n2NonprefWeight = n2w / (1 + n2w + sig2)
+            else:
+                n2NonprefWeight = 1 / (1 + n2w + sig2)
+            oppositeSelWeight.append(np.sqrt(n1NonprefWeight * n2NonprefWeight))
+
+    for i in range(19, 27):  # center P offsets P or N
+        n1SpkMatIdx = np.where(masterCorrUnits == comb[0])[0][0]
+        n2SpkMatIdx = np.where(masterCorrUnits == comb[1])[0][0]
+        n1SpikeMat = masterCorrUnitsSpikeCountMat[n1SpkMatIdx][:, i]
+        n2SpikeMat = masterCorrUnitsSpikeCountMat[n2SpkMatIdx][:, i]
+        pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+
+        indx = (i - 19) // 2
+        w0 = 1
+        n1w = rfWeightNeuronFits[n1][2+indx]
+        sig1 = rfWeightNeuronFits[n1][6]
+        n2w = rfWeightNeuronFits[n2][2+indx]
+        sig2 = rfWeightNeuronFits[n2][6]
+
+        if n1w <= 0 or n2w <= 0:
+            continue
+
+        # pairWeightGeomMean = np.sqrt(n1AvgW * n2AvgW)
+        pairWeightGeomMean = shared_geom_share_rectified(w1=n1w, w2=n2w,
+                                                         sigma1=sig1, sigma2=sig2)
+        masterPairWeight.append(pairWeightGeomMean)
+        masterCorr.append(pairStimCorr)
+
+        # n1 selectivity
+        loc0Resp = rfWeightNeuronFits[n1][0] / (1 + rfWeightNeuronFits[n1][6])
+        loc0Resp = loc0Resp + rfWeightNeuronFits[n1][7]
+        if i % 2 == 0:
+            loc1Resp = (rfWeightNeuronFits[n1][0] * rfWeightNeuronFits[n1][2+indx]) / (
+                rfWeightNeuronFits[n1][2 + indx] + rfWeightNeuronFits[n1][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n1][7]
+        else:
+            loc1Resp = (rfWeightNeuronFits[n1][1] * rfWeightNeuronFits[n1][2+indx]) / (
+                rfWeightNeuronFits[n1][2 + indx] + rfWeightNeuronFits[n1][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n1][7]
+        n1Sel = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+        # n1Sel = (w0-n1w) / (w0+n1w)
+
+        # n2 selectivity
+        loc0Resp = rfWeightNeuronFits[n2][0] / (1 + rfWeightNeuronFits[n2][6])
+        loc0Resp = loc0Resp + rfWeightNeuronFits[n2][7]
+        if i % 2 == 0:
+            loc1Resp = (rfWeightNeuronFits[n2][0] * rfWeightNeuronFits[n2][2+indx]) / (
+                rfWeightNeuronFits[n2][2 + indx] + rfWeightNeuronFits[n2][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n2][7]
+        else:
+            loc1Resp = (rfWeightNeuronFits[n2][1] * rfWeightNeuronFits[n2][2+indx]) / (
+                rfWeightNeuronFits[n2][2 + indx] + rfWeightNeuronFits[n2][6])
+            loc1Resp = loc1Resp + rfWeightNeuronFits[n2][7]
+        n2Sel = (loc0Resp-loc1Resp) / (loc0Resp + loc1Resp)
+        # n2Sel = (w0 - n2w) / (w0 + n2w)
+
+        if np.sign(n1Sel) * np.sign(n2Sel) == 1:
+            sameSelCorr.append(pairStimCorr)
+            # sameSelWeight.append(pairWeightGeomMean)
+            if n1Sel >= 0:
+                n1NonprefWeight = n1w / (1 + n1w + sig1)
+            else:
+                n1NonprefWeight = 1 / (1 + n1w + sig1)
+            if n2Sel >= 0:
+                n2NonprefWeight = n2w / (1 + n2w + sig2)
+            else:
+                n2NonprefWeight = 1 / (1 + n2w + sig2)
+            sameSelWeight.append(np.sqrt(n1NonprefWeight * n2NonprefWeight))
+        else:
+            oppositeSelCorr.append(pairStimCorr)
+            # oppositeSelWeight.append(pairWeightGeomMean)
+            if n1Sel >= 0:
+                n1NonprefWeight = n1w / (1 + n1w + sig1)
+            else:
+                n1NonprefWeight = 1 / (1 + n1w + sig1)
+            if n2Sel >= 0:
+                n2NonprefWeight = n2w / (1 + n2w + sig2)
+            else:
+                n2NonprefWeight = 1 / (1 + n2w + sig2)
+            oppositeSelWeight.append(np.sqrt(n1NonprefWeight * n2NonprefWeight))
+
+masterCorr = np.array(masterCorr)
+masterPairWeight = np.array(masterPairWeight)
+sameSelCorr = np.array(sameSelCorr)
+sameSelWeight = np.array(sameSelWeight)
+oppositeSelCorr = np.array(oppositeSelCorr)
+oppositeSelWeight = np.array(oppositeSelWeight)
+
+# binned plot
+for filler in range(1):
+    # 1) filter to 0–2 on x
+    mask = (masterPairWeight >= 0) & (masterPairWeight <= 2)
+    x = masterPairWeight[mask]
+    y = masterCorr[mask]
+
+    # x = sameSelWeight
+    # y = sameSelCorr
+
+    # x = oppositeSelWeight
+    # y = oppositeSelCorr
+
+    # 2) choose bins
+    bin_width = 0.1
+    bins = np.arange(0, 2 + bin_width, bin_width)  # inclusive of 2
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    n_bins = len(bins) - 1
+
+    # 3) compute bin means and SEM
+    bin_idx = np.digitize(x, bins) - 1
+    valid_points = (bin_idx >= 0) & (bin_idx < n_bins)
+    bin_idx = bin_idx[valid_points]
+    xv = x[valid_points]
+    yv = y[valid_points]
+
+    counts = np.bincount(bin_idx, minlength=n_bins)
+    y_sums = np.bincount(bin_idx, weights=yv, minlength=n_bins)
+    y2_sums = np.bincount(bin_idx, weights=yv ** 2, minlength=n_bins)
+
+    bin_means = np.full(n_bins, np.nan)
+    bin_sems = np.full(n_bins, np.nan)
+
+    nonempty = counts > 0
+    bin_means[nonempty] = y_sums[nonempty] / counts[nonempty]
+
+    # unbiased variance (ddof=1) for bins with n >= 2
+    ge2 = counts >= 2
+    bin_vars = np.full(n_bins, np.nan)
+    bin_vars[ge2] = (y2_sums[ge2] - counts[ge2] * (bin_means[ge2] ** 2)) / (counts[ge2] - 1)
+    bin_sems[ge2] = np.sqrt(bin_vars[ge2] / counts[ge2])
+
+    # --- compute per-bin medians ---
+    bin_medians = np.full(n_bins, np.nan)
+    for k in range(n_bins):
+        if counts[k] > 0:
+            bin_medians[k] = np.median(yv[bin_idx == k])
+
+    # 4) plot raw + overlay means with SEM error bars + median line
+    plt.scatter(x, y, s=12, alpha=0.6, label="raw")
+
+    plt.errorbar(
+        bin_centers[nonempty],
+        bin_means[nonempty],
+        yerr=bin_sems[nonempty],
+        fmt='o-',
+        linewidth=2,
+        color='black',
+        capsize=3,
+        label=f"bin means ± SEM (bin={bin_width})",
+    )
+
+    # median line in magenta
+    plt.plot(
+        bin_centers[nonempty],
+        bin_medians[nonempty],
+        marker='o',
+        linewidth=2,
+        color='red',
+        label="bin median",
+    )
+
+    plt.xlabel("Pair Weight (geometric mean)")
+    plt.ylabel("Spike Count Correlations")
+    plt.title("Raw scatter with binned means ± SEM and median")
+    plt.legend()
+    plt.show()
+
+# equally populated bins
+for filler in range(1):
+    # 1) filter to 0–2 on x
+    # mask = (masterPairWeight >= 0) & (masterPairWeight <= 2)
+    # x = masterPairWeight[mask]
+    # y = masterCorr[mask]
+
+    x = sameSelWeight
+    y = sameSelCorr
+
+    # x = oppositeSelWeight
+    # y = oppositeSelCorr
+
+    # 2) choose number of equal-count bins
+    n_bins_target = 5  # tweak as you like
+
+    # quantile-based bin edges (equal-count bins)
+    edges = np.quantile(x, np.linspace(0, 1, n_bins_target + 1))
+
+    # handle duplicates (ties) in edges → drop duplicates, reduce bin count
+    edges = np.unique(edges)
+    n_bins = max(1, len(edges) - 1)
+
+    # if everything collapsed to one edge (e.g., constant x), just plot scatter
+    if n_bins < 1:
+        plt.scatter(x, y, s=12, alpha=0.6, label="raw")
+        plt.xlabel("masterPairWeight (0–2)")
+        plt.ylabel("masterCorr")
+        plt.title("Raw scatter (binning unavailable due to constant x)")
+        plt.legend()
+        plt.show()
+    else:
+        # bin centers (midpoints in x; widths vary with quantiles)
+        bin_centers = (edges[:-1] + edges[1:]) / 2
+
+        # 3) compute bin means and SEM
+        # use searchsorted like digitize with right-closed bins
+        bin_idx = np.searchsorted(edges, x, side='right') - 1
+        valid_points = (bin_idx >= 0) & (bin_idx < n_bins)
+        bin_idx = bin_idx[valid_points]
+        xv = x[valid_points]
+        yv = y[valid_points]
+
+        counts = np.bincount(bin_idx, minlength=n_bins)
+        y_sums = np.bincount(bin_idx, weights=yv, minlength=n_bins)
+        y2_sums = np.bincount(bin_idx, weights=yv ** 2, minlength=n_bins)
+
+        bin_means = np.full(n_bins, np.nan)
+        bin_sems = np.full(n_bins, np.nan)
+
+        nonempty = counts > 0
+        bin_means[nonempty] = y_sums[nonempty] / counts[nonempty]
+
+        # unbiased variance (ddof=1) for bins with n >= 2
+        ge2 = counts >= 2
+        bin_vars = np.full(n_bins, np.nan)
+        bin_vars[ge2] = (y2_sums[ge2] - counts[ge2] * (bin_means[ge2] ** 2)) / (counts[ge2] - 1)
+        bin_sems[ge2] = np.sqrt(bin_vars[ge2] / counts[ge2])
+
+        # 4) plot raw + overlay means with SEM error bars
+        plt.scatter(x, y, s=12, alpha=0.6, label="raw")
+        plt.errorbar(
+            bin_centers[nonempty],
+            bin_means[nonempty],
+            yerr=bin_sems[nonempty],
+            fmt='o-',
+            linewidth=2,
+            capsize=3,
+            color='black',
+            label=f"equal-count bin means ± SEM (bins≈{n_bins_target})"
+        )
+        plt.xlabel("masterPairWeight (0–2)")
+        plt.ylabel("masterCorr")
+        plt.title("Raw scatter with equal-count binned means ± SEM")
+        plt.legend()
+        plt.show()
+
+# plot
+for filler in range(1):
+    # Create mask for x values between 0 and 2
+    mask = (masterPairWeight >= 0) & (masterPairWeight <= 2)
+
+    # Filtered values
+    x_filtered = masterPairWeight[mask]
+    y_filtered = masterCorr[mask]
+    indices = np.where(mask)[0]  # indices in the original arrays
+
+    # Plot
+    plt.scatter(x_filtered, y_filtered)
+    plt.xlabel("masterPairWeight")
+    plt.ylabel("masterCorr")
+    plt.title("Pairs with 0 ≤ masterPairWeight ≤ 2")
+    plt.show()
+
+    print("Indices in original arrays:", indices)
 
 
 ########################################################################################################################

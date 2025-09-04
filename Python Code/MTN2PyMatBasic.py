@@ -46,6 +46,10 @@ fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Akshan_241025']
 
 t0 = time.time()
+meetzGlobalNMI = []
+meetzGlobalA1 = []
+akshanGlobalNMI = []
+akshanGlobalA1 = []
 totUnits = []
 totR2 = []
 totCombs = []
@@ -96,7 +100,7 @@ n1n2NMISimIndx = []
 n1n2ElectrodeDiff = []
 
 for fileIterator in fileList:
-
+    print(fileIterator)
     # Load relevant file here with pyMat reader
     monkeyName, seshDate = fileIterator.split('_')
     fileName = f'{monkeyName}_{seshDate}_MTNC_Spikes.mat'
@@ -569,6 +573,7 @@ for fileIterator in fileList:
     # # subsampling the 6x6 matrix of directions into unique 2x2 matrices
     subsampleMatrix = [i for i in combinations([0, 1, 2, 3, 4, 5], 2)]
     for subpair in subsampleMatrix:
+        skipSubPair = False
         unitPairedNormFit = []
         unitPairedNormR2 = np.zeros(len(units))
         unitNormFitEstimate = [[] for i in range(len(units))]
@@ -598,14 +603,15 @@ for fileIterator in fileList:
             stimMatCond = stimMatCond[:, sli]
 
             # (working version has initial guess for alpha = 0.2)
-            # Generic Normalization (L1+L2)/(1+al2+sig) w.o scalar
+            # Generic Normalization (L1+L2)/(1+al2) w.o scalar
             guess0 = np.concatenate((bCondensed[2, :-1],
                                      bCondensed[:-1, 2],
-                                     [0.2]), axis=0)
-            resp = bCondensed.reshape(9)[:-1]
+                                     [1]), axis=0)
+            # remove baseline to get driven rate
+            # resp = bCondensed.reshape(9)[:-1] - bCondensed.reshape(9)[-1]
+            resp = bCondensed.reshape(9)[:-1]  # all responses except for baseline
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
                                                     stimIndexDict, dir1, dir2)
-
             # # bram implementation
             # lb = np.sqrt([0.01, 0.01, 0.01, 0.01, 0.1])
             # ub = np.sqrt([20, 20, 20, 20, 1])
@@ -633,113 +639,126 @@ for fileIterator in fileList:
             ## working version
             # pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
             #                         p0=guess0, maxfev=10000000)
-            pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-                                    maxfev=10000000)
+            try:
+                # fit model
+                pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
+                                        maxfev=10000000)
 
-            y_pred = genNormCondensed(fixedVals, *pOpt)
-            r2 = r2_score(resp.squeeze(), y_pred)
-            print(unit, r2)
+                y_pred = genNormCondensed(fixedVals, *pOpt)
+                r2 = r2_score(resp.squeeze(), y_pred)
 
-            # bram trick to keep values > 0
-            pOpt = pOpt ** 2
+                # bram trick to keep values > 0
+                pOpt = pOpt ** 2
 
-            # Append fit parameters for condensed matrix
-            totR2.append(r2)
-            # alphaLoc0Cond.append(pOpt[4])
-            # alphaLoc1Cond.append(pOpt[5])
-            unitPairedNormR2[unitCount] = r2
-            unitPairedNormFit.append(pOpt)
-            unitNormFitEstimate[unitCount] = pOpt
+                # Append fit parameters for condensed matrix
+                totR2.append(r2)
+                # alphaLoc0Cond.append(pOpt[4])
+                # alphaLoc1Cond.append(pOpt[5])
+                unitPairedNormR2[unitCount] = r2
+                unitPairedNormFit.append(pOpt)
+                unitNormFitEstimate[unitCount] = pOpt
+                if monkeyName == 'Meetz':
+                    meetzGlobalA1.append(pOpt[4])
+                else:
+                    akshanGlobalA1.append(pOpt[4])
 
-            # if subpair[0] == nullDirIndex and subpair[1] == prefDirIndex:
-            #     alphaLoc0PrefOnly.append(pOpt[4])
-            #     alphaLoc1PrefOnly.append(pOpt[5])
-            # if subpair[0] == prefDirIndex and subpair[1] == nullDirIndex:
-            #     alphaLoc0PrefOnly.append(pOpt[4])
-            #     alphaLoc1PrefOnly.append(pOpt[5])
+                # if subpair[0] == nullDirIndex and subpair[1] == prefDirIndex:
+                #     alphaLoc0PrefOnly.append(pOpt[4])
+                #     alphaLoc1PrefOnly.append(pOpt[5])
+                # if subpair[0] == prefDirIndex and subpair[1] == nullDirIndex:
+                #     alphaLoc0PrefOnly.append(pOpt[4])
+                #     alphaLoc1PrefOnly.append(pOpt[5])
 
-            # alphaRankMat[unitCount, :, orthoAxis] = pOpt
+                # alphaRankMat[unitCount, :, orthoAxis] = pOpt
 
-            # # fit using scipy.optimize.minimize for condensed mat
-            # p0 = np.concatenate((bCondensed[2, :-1], bCondensed[:-1, 2],
-            #                      [0.0, 0.05]), axis=0)
-            # bnds = ((0, None), (0, None), (0, None),
-            #         (0, None), (0, 5), (0, None))
-            # resp = bCondensed.reshape(9)
-            # fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
-            #                                         stimIndexDict, dir1, dir2)
-            #
-            # # # res with bounds
-            # res = scipy.optimize.minimize(driverFuncCondensend, p0, args=(fixedVals, resp),
-            #                               method='Nelder-Mead', bounds=bnds,
-            #                               options={'maxfev': 1*(10**20),
-            #                                        'fatol': 0.11,
-            #                                        'maxiter': 10000,
-            #                                        'xatol': 0.0001})
-            # y_pred = genNormCondensed(fixedVals, *res.x)
-            # r2_1 = r2_score(resp.squeeze(), y_pred)
-            #
-            # res2 = scipy.optimize.minimize(driverFuncCondensend1, p0, args=(fixedVals, resp),
-            #                               method='Nelder-Mead', bounds=bnds,
-            #                               options={'maxfev': 1*(10**20),
-            #                                        'fatol': 0.11,
-            #                                        'maxiter': 10000,
-            #                                        'xatol': 0.0001})
-            # y_pred = genNormCondensed1(fixedVals, *res2.x)
-            # r2_2 = r2_score(resp.squeeze(), y_pred)
-            #
-            # if r2_1 > r2_2:
-            #     unitPrefSite.append(0)
-            #     param = res.x
-            #     r2 = r2_1
-            # else:
-            #     unitPrefSite.append(1)
-            #     param = res2.x
-            #     r2 = r2_2
-            #
-            # print(r2)
-            # # res without bounds
-            # res = scipy.optimize.minimize(driverFuncCondensend, p0, args=(fixedVals, resp),
-            #                               method='Nelder-Mead',
-            #                               options={'maxfev': 1*(10**20),
-            #                                        'fatol': 0.11,
-            #                                        'maxiter': 10000,
-            #                                        'xatol': 0.0001})
+                # # fit using scipy.optimize.minimize for condensed mat
+                # p0 = np.concatenate((bCondensed[2, :-1], bCondensed[:-1, 2],
+                #                      [0.0, 0.05]), axis=0)
+                # bnds = ((0, None), (0, None), (0, None),
+                #         (0, None), (0, 5), (0, None))
+                # resp = bCondensed.reshape(9)
+                # fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
+                #                                         stimIndexDict, dir1, dir2)
+                #
+                # # # res with bounds
+                # res = scipy.optimize.minimize(driverFuncCondensend, p0, args=(fixedVals, resp),
+                #                               method='Nelder-Mead', bounds=bnds,
+                #                               options={'maxfev': 1*(10**20),
+                #                                        'fatol': 0.11,
+                #                                        'maxiter': 10000,
+                #                                        'xatol': 0.0001})
+                # y_pred = genNormCondensed(fixedVals, *res.x)
+                # r2_1 = r2_score(resp.squeeze(), y_pred)
+                #
+                # res2 = scipy.optimize.minimize(driverFuncCondensend1, p0, args=(fixedVals, resp),
+                #                               method='Nelder-Mead', bounds=bnds,
+                #                               options={'maxfev': 1*(10**20),
+                #                                        'fatol': 0.11,
+                #                                        'maxiter': 10000,
+                #                                        'xatol': 0.0001})
+                # y_pred = genNormCondensed1(fixedVals, *res2.x)
+                # r2_2 = r2_score(resp.squeeze(), y_pred)
+                #
+                # if r2_1 > r2_2:
+                #     unitPrefSite.append(0)
+                #     param = res.x
+                #     r2 = r2_1
+                # else:
+                #     unitPrefSite.append(1)
+                #     param = res2.x
+                #     r2 = r2_2
+                #
+                # print(r2)
+                # # res without bounds
+                # res = scipy.optimize.minimize(driverFuncCondensend, p0, args=(fixedVals, resp),
+                #                               method='Nelder-Mead',
+                #                               options={'maxfev': 1*(10**20),
+                #                                        'fatol': 0.11,
+                #                                        'maxiter': 10000,
+                #                                        'xatol': 0.0001})
 
 
-            # # Append fit parameters for condensed matrix
-            # totR2.append(r2)
-            # # alphaLoc0Cond.append(res.x[4])
-            # # alphaLoc1Cond.append(res.x[5])
-            # unitPairedNormR2[unitCount] = r2
-            # unitPairedNormFit.append(param)
-            # unitNormFitEstimate[unitCount] = param
-            # unitsNormParams.append(param)
+                # # Append fit parameters for condensed matrix
+                # totR2.append(r2)
+                # # alphaLoc0Cond.append(res.x[4])
+                # # alphaLoc1Cond.append(res.x[5])
+                # unitPairedNormR2[unitCount] = r2
+                # unitPairedNormFit.append(param)
+                # unitNormFitEstimate[unitCount] = param
+                # unitsNormParams.append(param)
 
-            # # append fit params to alpha ranking mat
-            # alphaRankMat[unitCount, :, orthoAxis] = res.x
+                # # append fit params to alpha ranking mat
+                # alphaRankMat[unitCount, :, orthoAxis] = res.x
 
-            # if r2 > 0.75:
-            #     filterUnits.append(unit)
-            #     totFilterR2.append(r2)
+                # if r2 > 0.75:
+                #     filterUnits.append(unit)
+                #     totFilterR2.append(r2)
 
-            # reindex the single presentation conditions to align to direction
-            # that is closest to unit's preferred direction
+                # reindex the single presentation conditions to align to direction
+                # that is closest to unit's preferred direction
 
-            prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
-            nullDirIndex = np.where(dirArray == nullDir)[0][0]
-            reIndex = (np.array([0, 1, 2, 3, 4, 5])+nullDirIndex) % 6
-            loc1ReIndex = b[:6, 6][reIndex]
-            loc0ReIndex = b[6, :6][reIndex]
-            respAvg = ((loc1ReIndex + loc0ReIndex) / 2)
-            baselineNormalized = b[6, 6] / np.max(respAvg)
-            respNormalized = respAvg / np.max(respAvg)
-            respNormalized = np.concatenate((respNormalized,
-                                             respNormalized[:1],
-                                             [np.array(unitGaussMean[unitCount])],
-                                             [np.array(baselineNormalized)]),
-                                            axis=0).tolist()
-            popTunCurve.append(respNormalized)
+                prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+                nullDirIndex = np.where(dirArray == nullDir)[0][0]
+                reIndex = (np.array([0, 1, 2, 3, 4, 5])+nullDirIndex) % 6
+                loc1ReIndex = b[:6, 6][reIndex]
+                loc0ReIndex = b[6, :6][reIndex]
+                respAvg = ((loc1ReIndex + loc0ReIndex) / 2)
+                baselineNormalized = b[6, 6] / np.max(respAvg)
+                respNormalized = respAvg / np.max(respAvg)
+                respNormalized = np.concatenate((respNormalized,
+                                                 respNormalized[:1],
+                                                 [np.array(unitGaussMean[unitCount])],
+                                                 [np.array(baselineNormalized)]),
+                                                axis=0).tolist()
+                popTunCurve.append(respNormalized)
+
+            except (RuntimeError, ValueError) as e:
+                print(f'Fit failed for unit {unit} in subpair {subpair}: {e}, session, {fileIterator}')
+                skipSubPair = True
+                break
+
+        if skipSubPair:
+            continue
 
         # generate paired stimulus correlation, selectivity index,
         # suppression, and NMI index for each gabor pair for each pair
@@ -748,8 +767,8 @@ for fileIterator in fileList:
         stimIndexMat = np.arange(36).reshape(6, 6)
         upperTriangle = upperTriMasking(stimIndexMat)
 
-        # for pairCount, pair in enumerate(distCombs):   ### working version
-        for pairCount, pair in enumerate(criterionPassedCombs):
+        for pairCount, pair in enumerate(distCombs):   ### working version
+        # for pairCount, pair in enumerate(criterionPassedCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
 
@@ -769,7 +788,7 @@ for fileIterator in fileList:
                 # spike counts exceeded 3 SD from mean
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, i]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, i]
-                pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+                pairStimCorr, pairDCov, pairDSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='pearson')
 
                 # extract directions of the gabor pair
                 loc0Dir = stimIndexDict[i][0]['direction']
@@ -787,9 +806,9 @@ for fileIterator in fileList:
                 rp, rn = max([loc0SingleResp, loc1SingleResp]), min(
                              [loc0SingleResp, loc1SingleResp])
                 rx = pairedMat[count]
-                # n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
-                #       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
-                n1NMI = (rp - rx) / (rp + rx)
+                n1NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
+                        (loc0SingleResp + loc1SingleResp) + pairedMat[count])
+                # n1NMI = (rp - rx) / (rp + rx)
                 n1SimpleNMI = (loc0SingleResp + loc1SingleResp) / pairedMat[count]
                 n1RawSelectivity = (loc0SingleResp - loc1SingleResp) / (
                                     loc0SingleResp + loc1SingleResp)
@@ -810,9 +829,9 @@ for fileIterator in fileList:
                 rp, rn = max([loc0SingleResp, loc1SingleResp]), min(
                              [loc0SingleResp, loc1SingleResp])
                 rx = pairedMat[count]
-                # n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
-                #       (loc0SingleResp + loc1SingleResp) + pairedMat[count])
-                n2NMI = (rp - rx) / (rp + rx)
+                n2NMI = ((loc0SingleResp + loc1SingleResp) - pairedMat[count]) / (
+                        (loc0SingleResp + loc1SingleResp) + pairedMat[count])
+                # n2NMI = (rp - rx) / (rp + rx)
                 n2SimpleNMI = (loc0SingleResp + loc1SingleResp) / pairedMat[count]
                 n2RawSelectivity = (loc0SingleResp - loc1SingleResp) / (
                                     loc0SingleResp + loc1SingleResp)
@@ -820,6 +839,13 @@ for fileIterator in fileList:
                 #     n2NMI = 0.5 * (-n2NMI + 1)
                 # else:
                 #     n2NMI = 0.5 * (n2NMI + 1)
+
+                if monkeyName == 'Meetz':
+                    meetzGlobalNMI.append(n1NMI)
+                    meetzGlobalNMI.append(n2NMI)
+                else:
+                    akshanGlobalNMI.append(n1NMI)
+                    akshanGlobalNMI.append(n2NMI)
 
                 # bram selectivity recreation
                 # n1 selectivity and suppression index
@@ -852,8 +878,11 @@ for fileIterator in fileList:
                                       np.sqrt(abs(n1RawSelectivity) *
                                               abs(n2RawSelectivity)))
 
+                if not np.isnan(pairDCov).any():
+                    pairDoubleCov.append(pairDCov[0][1])
+                else:
+                    pairDoubleCov.append(np.nan)
                 pairPairedCorr.append(pairStimCorr)
-                pairDoubleCov.append(pairDCov[0][1])
                 pairDoubleSD.append(pairDSD)
                 pairSelectivityIndex.append(pairSelectivity)
                 pairNewSelectivityIndex.append(pairNewSelectivity)
@@ -880,9 +909,13 @@ for fileIterator in fileList:
 
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                singleStimLoc0Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+                singleStimLoc0Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='pearson')
 
-                pairSingleCov.append(pairSCov[0][1])
+                # pairSingleCov.append(pairSCov[0][1])
+                if not np.isnan(pairSCov).any():
+                    pairSingleCov.append(pairSCov[0][1])
+                else:
+                    pairSingleCov.append(np.nan)
                 pairSingleSD.append(pairSSD)
                 pairSingleCorr.append(singleStimLoc0Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)
@@ -901,9 +934,12 @@ for fileIterator in fileList:
 
                 n1SpikeMat = spikeCountMat[n1, :blocksDone, stimIndex]
                 n2SpikeMat = spikeCountMat[n2, :blocksDone, stimIndex]
-                singleStimLoc1Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat)
+                singleStimLoc1Corr, pairSCov, pairSSD = pairCorrExclude3SD(n1SpikeMat, n2SpikeMat, method='pearson')
 
-                pairSingleCov.append(pairSCov[0][1])
+                if not np.isnan(pairSCov).any():
+                    pairSingleCov.append(pairSCov[0][1])
+                else:
+                    pairSingleCov.append(np.nan)
                 pairSingleSD.append(pairSSD)
                 pairSingleCorr.append(singleStimLoc1Corr)
                 pairSingleSelectivityIndex.append(pairSelectivity)
@@ -1085,6 +1121,80 @@ extra code
 """
 
 # Plotting Code
+
+# # plot distribution of NMI for both monkeys
+meetzGlobalNMI = np.array(meetzGlobalNMI)
+akshanGlobalNMI = np.array(akshanGlobalNMI)
+for filler in range(1):
+    # Remove NaNs
+    meetzClean = meetzGlobalNMI[~np.isnan(meetzGlobalNMI)]
+    akshanClean = akshanGlobalNMI[~np.isnan(akshanGlobalNMI)]
+    # Compute medians
+    median_meetz = np.median(meetzClean)
+    median_akshan = np.median(akshanClean)
+
+    # Perform Mann-Whitney U Test
+    stat, p_val = mannwhitneyu(meetzClean, akshanClean, alternative='two-sided')
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    sns.histplot(meetzClean, kde=True, color='skyblue',
+                 label='Meetz', stat='density', alpha=0.5)
+    sns.histplot(akshanClean, kde=True, color='orange',
+                 label='Akshan', stat='density', alpha=0.5)
+    plt.axvline(median_meetz, color='black', linestyle='--', linewidth=1.5)
+    plt.text(median_meetz, plt.ylim()[1] * 0.9,
+             f'Meetz median\n{median_meetz:.2f}', color='black', ha='right')
+    plt.axvline(median_akshan, color='black', linestyle='--', linewidth=1.5)
+    plt.text(median_akshan, plt.ylim()[1] * 0.7,
+             f'Akshan median\n{median_akshan:.2f}', color='black', ha='left')
+    plt.xlabel('NMI Value')
+    plt.ylabel('Density')
+    plt.title(f'NMI Distributions (Mann–Whitney U, p = {p_val:.3g})')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+# # plot distributions of alpha at loc 1 for both monkeys
+meetzGlobalA1 = np.array(meetzGlobalA1)
+akshanGlobalA1 = np.array(akshanGlobalA1)
+for filler in range(1):
+    # Filter values less than 5
+    filterVal = 5
+    meetzFiltered = meetzGlobalA1[meetzGlobalA1 < filterVal]
+    akshanFiltered = akshanGlobalA1[akshanGlobalA1 < filterVal]
+
+    # Compute statistics
+    median_meetz = np.median(meetzFiltered)
+    mean_meetz = np.mean(meetzFiltered)
+    median_akshan = np.median(akshanFiltered)
+    mean_akshan = np.mean(akshanFiltered)
+
+    # Print stats
+    print(f"Meetz A1 (<3): Median = {median_meetz:.3f}, Mean = {mean_meetz:.3f}")
+    print(f"Akshan A1 (<3): Median = {median_akshan:.3f}, Mean = {mean_akshan:.3f}")
+
+    # Plot histograms
+    plt.figure(figsize=(10, 6))
+    sns.histplot(meetzFiltered, bins=30, color='skyblue', label='Meetz (<3)', stat='density', alpha=0.6)
+    sns.histplot(akshanFiltered, bins=30, color='orange', label='Akshan (<3)', stat='density', alpha=0.6)
+
+    # Plot medians
+    plt.axvline(median_meetz, color='blue', linestyle='--', label=f'Meetz Median: {median_meetz:.2f}')
+    plt.axvline(median_akshan, color='darkorange', linestyle='--', label=f'Akshan Median: {median_akshan:.2f}')
+
+    # Plot means
+    plt.axvline(mean_meetz, color='blue', linestyle=':', label=f'Meetz Mean: {mean_meetz:.2f}')
+    plt.axvline(mean_akshan, color='darkorange', linestyle=':', label=f'Akshan Mean: {mean_akshan:.2f}')
+
+    # Format plot
+    plt.xlabel('A1 Value')
+    plt.ylabel('Density')
+    plt.title('Distributions of A1 Values < 3')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 
 # distribution of spike counts around PN, NP mean
 pnZscoSpikeCounts = [ele for i in pnZscoSpikeCounts for ele in i]

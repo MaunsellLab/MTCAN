@@ -23,12 +23,13 @@ from matplotlib.patches import Ellipse
 import math
 import os
 from collections import defaultdict
+from collections import Counter
 import mat73
 import seaborn as sns
 import pandas as pd
 import matplotlib.ticker as ticker
 import time
-# from astropy.modeling import models, fitting
+from astropy.modeling import models, fitting
 from pymatreader import read_mat
 from binsreg import *
 from scipy.stats import f_oneway
@@ -41,6 +42,9 @@ from matplotlib import pyplot as plt, ticker as mticker
 from sklearn.covariance import LedoitWolf
 from scipy.optimize import minimize_scalar
 from sklearn.linear_model import LinearRegression
+from scipy.special import i0
+from matplotlib.lines import Line2D
+from scipy.io import savemat
 
 
 # fig saving params
@@ -203,6 +207,62 @@ def contrastFnNoBaseline(c, rMax, c50, n):
     """
 
     return (rMax * (c ** n)) / ((c ** n) + (c50 ** n))
+
+
+# --- von Mises (unnormalized) ---
+# y(θ) = A * exp(kappa * cos(θ - mu)) + B
+def von_mises_model(theta_rad, A, mu, kappa, B):
+    return A * np.exp(kappa * np.cos(theta_rad - mu)) + B
+
+
+def _von_mises_fixedB(theta, A, mu, kappa, B_fixed):
+    # theta, mu in radians
+    return B_fixed + A * np.exp(kappa * np.cos(theta - mu))
+
+
+def fit_von_mises_params_fixed_baseline(angles_deg, responses, baseline_resp):
+    """Fit VM with baseline fixed to the neuron's true spontaneous rate (baseline_resp).
+       Returns dict: A, mu_deg, kappa, B  (with B == baseline_resp).
+       Gracefully returns NaNs if fit fails or data are degenerate."""
+    angles_deg = np.asarray(angles_deg, dtype=float) % 360.0
+    theta = np.deg2rad(angles_deg)
+    y = np.asarray(responses, dtype=float)
+    Bfix = float(baseline_resp)
+
+    # Degenerate / no dynamic range relative to baseline
+    if np.all(~np.isfinite(y)) or not np.isfinite(Bfix):
+        return {"A": np.nan, "mu_deg": np.nan, "kappa": np.nan, "B": np.nan}
+
+    # Initial guesses:
+    # amplitude relative to the fixed baseline (clip at tiny positive)
+    y_rel = y - Bfix
+    A0 = float(max(np.nanmax(y_rel), 1e-6))
+    # peak direction from raw responses (works even if baseline is imperfect)
+    mu0 = float(np.deg2rad(angles_deg[np.nanargmax(y)]))
+    kappa0 = 2.0
+
+    p0 = [A0, mu0, kappa0]
+    lb = [0.0, 0.0, 0.0]
+    ub = [np.inf, 2*np.pi, 200.0]
+
+    try:
+        # Fit only A, mu, kappa; baseline is fixed.
+        popt, _ = curve_fit(
+            lambda th, A, mu, kappa: _von_mises_fixedB(th, A, mu, kappa, Bfix),
+            theta, y, p0=p0, bounds=(lb, ub), maxfev=20000
+        )
+        A, mu, kappa = popt
+        return {
+            "A": float(A),
+            "mu_deg": float(np.rad2deg(mu) % 360.0),
+            "kappa": float(kappa),
+            "B": float(Bfix),          # <- true spontaneous rate, fixed
+        }
+    except Exception:
+        # If the signal never rises above baseline, return zero amp with fixed baseline.
+        if np.nanmax(y_rel) <= 1e-8:
+            return {"A": 0.0, "mu_deg": np.nan, "kappa": np.nan, "B": float(Bfix)}
+        return {"A": np.nan, "mu_deg": np.nan, "kappa": np.nan, "B": np.nan}
 
 
 def confidenceIntervalCRF(popt, pcov, x, confidence=0.95):
@@ -1413,8 +1473,34 @@ def getSelAndSuppIndx(loc0Resp, loc1Resp, al0, al1):
     selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
     if selectivity >= 0:
         nonPrefSupp = al1 / (al0 + al1)
+        # nonPrefSupp = al1 / (al1 + sig)
     else:
         nonPrefSupp = al0 / (al0 + al1)
+        # nonPrefSupp = al0 / (al0 + sig)
+
+    return selectivity, nonPrefSupp
+
+
+def getSelAndSuppIndxWithSig(loc0Resp, loc1Resp, al0, al1, sig):
+    """
+    this function will compute the selectivity and suppression index
+    for the neuron of interest to different pairings of stimuli
+    Inputs: loc0Resp (int): the response to loc0 stimuli from normalization fit
+            loc1Resp (int): the response to loc1 stimuli from normalization fit
+            al0 (int): the suppression at loc0 (alpha 0 from norm fit)
+                            this is usually 1
+            al1 (int): the suppression at loc1 (alpha 1 from norm fit)
+    Outputs: n1Selectivity (int): selectivity index for neuron
+             n1NonPrefSupp (int): suppression index for neuron
+    """
+
+    selectivity = (loc0Resp - loc1Resp) / (loc0Resp + loc1Resp)
+    if selectivity >= 0:
+        nonPrefSupp = al1 / (al0 + al1 + sig)
+        # nonPrefSupp = al1 / (al1 + sig)
+    else:
+        nonPrefSupp = al0 / (al0 + al1 + sig)
+        # nonPrefSupp = al0 / (al0 + sig)
 
     return selectivity, nonPrefSupp
 

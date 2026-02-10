@@ -51,58 +51,17 @@ fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Meetz_230126', 'Akshan_240927', 'Akshan_241016', 'Akshan_241017',
             'Akshan_241025']
 
-# fileList = ['Akshan_241023', 'Akshan_241025']
-
 t0 = time.time()
-totUnits = []
-totW1 = []
-totR2 = []
-totR2Bram = []
-totR2RFWeight = []
-totCombs = []
-totFilterUnits = []
-totFilterR2 = []
-totFilterCombs = []
-unitIdentifier = []
-unitsNormParams = []
-alphaLoc0Cond = []
-alphaLoc1Cond = []
-popTunCurve = []
-pairSelFromCond = []
-pairNPSuppFromCond = []
-stimIndex12Cond = [0, 3, 18, 21, 7, 10,
-                   25, 28, 14, 17, 32, 35]
+
 popPrefFR = []
-highFRAlpha = []
-highFRParams = []
-medFRAlpha = []
-medFRParams = []
-lowFRAlpha = []
-lowFRParams = []
 gaborSigmaSep = []
-# arrays for nn, pn, np, pp, and baseline PSTHs
-ppArr = []
-pnArr = []
-npArr = []
-nnArr = []
-baseArr = []
-# arrays for loc 0, 1 p and n PSTHs
-p0Arr = []
-p1Arr = []
-n0Arr = []
-n1Arr = []
-# arrays for PN, NP z-scored spike counts
-pnZscoSpikeCounts = []
-npZscoSpikeCounts = []
-# array for population heatmap 7x7 grid of resp to loc0,loc1 6 dirs
-popRespHeatmap = []
 electrodeArr = np.array(np.arange(0, 32)).reshape(16, 2)
 pairDistance = []
-# ruff and cohen 2016 analysis arr
-allNMIAvg = []
-alln1n2CorrAvg = []
-n1n2NMISimIndx = []
-n1n2ElectrodeDiff = []
+masterGoodUnits = []
+masterAllUnits = []
+corr_records_RFWeight = []
+allUnitsLocationTuning = []
+
 
 for file in fileList:
 
@@ -122,10 +81,9 @@ for file in fileList:
     units = activeUnits('spikeData', allTrials)
     unitCluster = allTrials[corrTrials[0]]['spikeTempInfo']['cgs']
     unitsChannel = unitsInfo(units, corrTrials, allTrials)
-
     # adds sessions unit to master list of units across sessions
     for unit in units:
-        unitIdentifier.append(f'{file}_{unit}')
+        masterAllUnits.append(f'{seshDate}_{unit}')
 
     # change stimDesc to be list of dictionaries
     for corrTrial in corrTrials:
@@ -335,6 +293,7 @@ for file in fileList:
     for unitCount, unit in enumerate(units):
         loc0Resp = meanSpike[unitCount][36:42]
         loc1Resp = meanSpike[unitCount][42:48]
+        baselineResp = meanSpike[unitCount][48]
         combResp = (loc0Resp + loc1Resp) / 2
         extRespMat = np.concatenate((combResp[3:], combResp, combResp[:3]), axis=0)
         maxIndex = np.where(combResp == np.max(combResp))[0][0] + 3
@@ -343,13 +302,25 @@ for file in fileList:
         params = gaussFit(x, y)
         yPred = gauss(x, *params)
         r2 = r2_score(y, yPred)
+        # if r2 > 0.90:   # working version
         if r2 > 0.60:
             filterUnits.append(unit)
-            totFilterR2.append(r2)
         unitGaussMean[unitCount] = params[2] % 360
         unitGaussSig[unitCount] = params[3]
-        popPrefFR.append(params[1])
 
+        # fit von Mises for each location and save to allUnitsLocationTuning ---
+        angles_loc0 = np.arange(0, 360, 60)  # degrees for loc 0
+        angles_loc1 = np.arange(0, 360, 60)  # degrees for loc 1
+
+        vm_loc0 = fit_von_mises_params_fixed_baseline(angles_loc0, loc0Resp, baselineResp)
+        vm_loc1 = fit_von_mises_params_fixed_baseline(angles_loc1, loc1Resp, baselineResp)
+
+        allUnitsLocationTuning.append({
+            "unit_id": f"{seshDate}_{unit}",
+            "monkey": monkeyName,
+            "loc0_params": vm_loc0,  # dict: A, mu_deg, kappa, B
+            "loc1_params": vm_loc1,  # dict: A, mu_deg, kappa, B
+        })
     ####################################################################################################################
     ######################################## get units whose preferred response is #####################################
     ############################### statistically reliable above baseline in both locations ############################
@@ -421,6 +392,7 @@ for file in fileList:
 
         if all(p < 0.05 for p in [p_value0, p_value1, p_value2, p_value3]):
             criterionPassedUnits.append(unit)
+            masterGoodUnits.append(f'{seshDate}_{unit}')
 
     ####################################################################################################################
     ############################################# different combinations of units ######################################
@@ -532,10 +504,7 @@ for file in fileList:
                 #     break
 
                 # Append fit results
-                totR2.append(r2)
                 rfWeightR2.append(r2)
-                totR2RFWeight.append(r2)
-                totW1.append(np.exp(pOpt[2]))
                 unitNormFitEstimate[unitCount] = pOpt
 
             except (RuntimeError, ValueError) as e:
@@ -546,10 +515,13 @@ for file in fileList:
         if skipSubpair:
             continue  # skip rest of subpair loop,
 
-        for pairCount, pair in enumerate(distCombs):
-            # for pairCount, pair in enumerate(criterionPassedCombs):
+        # for pairCount, pair in enumerate(distCombs):
+        for pairCount, pair in enumerate(criterionPassedCombs):
             n1 = np.where(units == pair[0])[0][0]
             n2 = np.where(units == pair[1])[0][0]
+
+            u1 = f"{seshDate}_{pair[0]}"
+            u2 = f"{seshDate}_{pair[1]}"
 
             # find predicted responses for the 3x3 matrix for each neuron:
             fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9),
@@ -589,8 +561,8 @@ for file in fileList:
                 #     unitNormFitEstimate[n1][2])
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n1][2])
-                sig = unitNormFitEstimate[n1][3]
-                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1, sig)
+                sig1 = unitNormFitEstimate[n1][3]
+                n1Selectivity, n1NonPrefSupp = getSelAndSuppIndxWithSig(loc0Resp, loc1Resp, w0, w1, sig1)
 
                 # n2 selectivity and suppression index
                 loc0Resp = y_predN2[2, col]
@@ -600,8 +572,8 @@ for file in fileList:
                 #     unitNormFitEstimate[n2][2])
                 w0 = 1
                 w1 = np.exp(unitNormFitEstimate[n2][2])
-                sig = unitNormFitEstimate[n2][3]
-                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndx(loc0Resp, loc1Resp, w0, w1, sig)
+                sig2 = unitNormFitEstimate[n2][3]
+                n2Selectivity, n2NonPrefSupp = getSelAndSuppIndxWithSig(loc0Resp, loc1Resp, w0, w1, sig2)
 
                 # pair selectivity and suppression index
                 pairSelectivity = (np.sign(n1Selectivity) * np.sign(n2Selectivity) *
@@ -667,6 +639,37 @@ for file in fileList:
                 pairSingleSelectivityIndex.append(pairSelectivity)
                 pairSingleNonPrefSuppIndex.append(pairSuppression)
 
+                corr_records_RFWeight.append({
+                    "date": seshDate,
+                    "monkey": monkeyName,
+                    "unit_i": u1,
+                    "unit_j": u2,
+                    "pair_key": tuple(sorted((u1, u2))),  # handy for grouping/joining later
+                    "cond_index": int(i),  # stimulus condition index you used
+                    "cond_order": int(count),  # 0..3 within the 2x2 paired block (optional)
+                    "loc0_dir": int(loc0Dir),
+                    "loc1_dir": int(loc1Dir),
+
+                    # correlations
+                    "corr_paired": float(pairStimCorr),
+                    "corr_single_loc0": float(singleStimLoc0Corr),
+                    "corr_single_loc1": float(singleStimLoc1Corr),
+
+                    # pair metrics
+                    "neuron 1 preferred stim": n1Selectivity,
+                    "neuron 2 preferred stim": n2Selectivity,
+                    "neuron 1 nonpref suppression": n1NonPrefSupp,
+                    "neuron 2 nonpref suppression": n2NonPrefSupp,
+                    "neuron 1 w0": 1,
+                    "neuron 2 w0": 1,
+                    "neuron 1 w1": np.exp(unitNormFitEstimate[n1][2]),
+                    "neuron 2 w1": np.exp(unitNormFitEstimate[n2][2]),
+                    "neuron 1 sig": unitNormFitEstimate[n1][3],
+                    "neuron 2 sig": unitNormFitEstimate[n2][3],
+                    "pair_selectivity": float(pairSelectivity),
+                    "pair_suppression": float(pairSuppression),
+                })
+
     pairPairedCorr = np.array(pairPairedCorr)
     pairSelectivityIndex = np.array(pairSelectivityIndex)
     pairNonPrefSuppIndex = np.array(pairNonPrefSuppIndex)
@@ -691,46 +694,117 @@ for file in fileList:
 print(time.time()-t0)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # plot # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-totW = np.array(totW1)
 
-# # plotting Bram vs RF Weight R2
-# plotData = [totR2Bram, totR2RFWeight]
-#
-# fig, axes = plt.subplots(1, 1, figsize=(4, 4))
-#
-# # Plot the violin plots for genNorm arrays
-# sns.boxplot(data=plotData, ax=axes)
-# axes.set_title('Box Plot for bramNorm Arrays')
-# axes.set_xlabel('Position')
-# axes.set_ylabel('Values')
-# axes.set_xticks([0, 1])
-# axes.set_xticklabels(['Bram Norm', 'RF Weight Norm'])
-# axes.set_ylim(0, 1.2)
-# plt.show()
-#
+import numpy as np
+import pandas as pd
 
-# plt.hist(totW1, bins=50, range=(0, 1), edgecolor='black')
-# plt.xlabel('totW')
-# plt.ylabel('Frequency')
-# plt.title('Histogram of totW (x-range: 0 to 3)')
-# plt.grid(True)
-# plt.show()
+eps = 1e-9  # numerical guard
 
-#### extra code
-# # Bram Normalization (L1+L2)/(1+al2+sig) w.o scalar
-# guess0 = np.concatenate((bCondensed[2, :-1],
-#                          bCondensed[:-1, 2],
-#                          [0.2]), axis=0)
-# resp = bCondensed.reshape(9)[:-1]
-# fixedVals = fixedValsForEMSGenCondensed(stimMatCond.reshape(9)[:-1],
-#                                         stimIndexDict, dir1, dir2)
-# pOpt, pCov, = curve_fit(genNormCondensed, fixedVals, resp.squeeze(),
-#                         maxfev=10000000)
-#
-# y_pred = genNormCondensed(fixedVals, *pOpt)
-# r2Bram = r2_score(resp.squeeze(), y_pred)
-#
-# bramR2.append(r2Bram)
-# totR2Bram.append(r2Bram)
+def delta_angle(deg1, deg2):
+    """Return absolute difference between angles in degrees, folded to [0,180]."""
+    diff = abs(deg1 - deg2) % 360
+    if diff > 180:
+        diff = 360 - diff
+    return diff
+
+# Map: unit_id -> avg mu_deg (from your location tuning struct/list)
+mu_map = {}
+for u in allUnitsLocationTuning:
+    unit_id = u["unit_id"]
+    mu0 = u["loc0_params"]["mu_deg"]
+    mu1 = u["loc1_params"]["mu_deg"]
+    mu_map[unit_id] = np.mean([mu0, mu1])  # average preferred direction across locations
+
+new_records = []
+for rec in corr_records_RFWeight:
+    # Ensure we work on a copy
+    rec = dict(rec)
+
+    u1, u2 = rec["unit_i"], rec["unit_j"]
+
+    # --- preferred direction difference ---
+    mu1 = mu_map.get(u1, np.nan)
+    mu2 = mu_map.get(u2, np.nan)
+    delta_mu = delta_angle(mu1, mu2) if np.isfinite(mu1) and np.isfinite(mu2) else np.nan
+
+    # --- shares computed from fields in corr_records_RFWeight ---
+    # neuron 1
+    w0_1  = float(rec.get("neuron 1 w0", np.nan))
+    w1_1  = float(rec.get("neuron 1 w1", np.nan))
+    sig_1 = float(rec.get("neuron 1 sig", np.nan))
+
+    # neuron 2
+    w0_2  = float(rec.get("neuron 2 w0", np.nan))
+    w1_2  = float(rec.get("neuron 2 w1", np.nan))
+    sig_2 = float(rec.get("neuron 2 sig", np.nan))
+
+    # s = w / (w0 + w + sigma), with guards for NaNs
+    def safe_share(w0, w, sig):
+        if not (np.isfinite(w0) and np.isfinite(w) and np.isfinite(sig)):
+            return np.nan
+        denom = w0 + w + sig + eps
+        if denom <= 0:
+            return np.nan
+        return w / denom
+
+    s1 = safe_share(w0_1, w1_1, sig_1)
+    s2 = safe_share(w0_2, w1_2, sig_2)
+
+    # Geometric mean for the pair
+    if np.isfinite(s1) and np.isfinite(s2) and s1 >= 0 and s2 >= 0:
+        pair_share = np.sqrt(s1 * s2)
+    else:
+        pair_share = np.nan
+
+    # --- write out fields ---
+    rec["delta_pref_dir"]   = delta_mu
+    rec["unit1_avg_weight"] = s1
+    rec["unit2_avg_weight"] = s2
+    rec["pair_avg_weight"]  = pair_share
+
+    new_records.append(rec)
+
+df_corr_ext = pd.DataFrame(new_records)
+
+# Quick check of the new columns
+print(
+    df_corr_ext[
+        ["unit_i", "unit_j", "delta_pref_dir",
+         "unit1_avg_weight", "unit2_avg_weight", "pair_avg_weight"]
+    ].head()
+)
+
+for filler in range(1):
+    savemat("corr_data.mat", {
+        "nonPrefSupp": df_corr_ext['pair_avg_weight'].values,
+        # "selectivity": df_corr_ext['delta_pref_dir'].values,
+        "selectivity": df_corr_ext['pair_selectivity'].values,
+        "pairedCorr": df_corr_ext['corr_paired'].values,
+        "singleCorrLoc0": df_corr_ext['corr_single_loc0'].values,
+        "singleCorrLoc1": df_corr_ext['corr_single_loc1'].values,
+        "monkey": df_corr_ext['monkey'].values.astype('U')  # save as strings
+    })
+
+    x = df_corr_ext['pair_avg_weight'].values
+    y = df_corr_ext['delta_pref_dir'].values
+    c = df_corr_ext['corr_paired'].values
+
+    plt.figure(figsize=(7, 6))
+    sc = plt.scatter(
+        x, y,
+        c=c,
+        cmap='bwr',  # red = positive, blue = negative, white ~ 0
+        vmin=-1, vmax=1,  # fix scale from -1 to 1
+        alpha=0.7,
+        edgecolor='k', linewidth=0.3
+    )
+    plt.colorbar(sc, label='Paired correlation')
+    plt.xlabel('Pair geometric mean suppression')
+    plt.ylabel('Pair selectivity')
+    plt.title('Pair selectivity vs suppression\nColored by correlation')
+    plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+    plt.axvline(0, color='gray', linestyle='--', linewidth=0.8)
+    plt.show()
+
 
 

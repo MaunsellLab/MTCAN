@@ -250,6 +250,18 @@ nonprefPeriPopResp = np.array(nonprefPeriPopResp)
 popBlocksDone = np.array(popBlocksDone)
 popUnitCluster = np.array(popUnitCluster)
 
+# # ## save data of neurons and normalized spike counts for every condition
+save_path = "/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/Journal Submissions/PNAS/Data/MTSIGnormalized_responses.npz"
+
+np.savez(
+    save_path,
+    prefCenterPopResp=prefCenterPopResp,
+    prefPeriPopResp=prefPeriPopResp,
+    nonprefCenterPopResp=nonprefCenterPopResp,
+    nonprefPeriPopResp=nonprefPeriPopResp,
+    unitList=unitList,
+)
+
 prefCenterMean = np.mean(prefCenterPopResp, axis=0)
 prefPeriMean = np.mean(prefPeriPopResp, axis=0)
 prefCenterSEM = stats.sem(prefCenterPopResp, axis=0)
@@ -372,9 +384,12 @@ for filler in range(1):
 
     plt.show()
 
+########################################################################################################################
+############################################# FIGURE 4 in the manuscript ###############################################
+########################################################################################################################
 # combined plot of pref/non pref at center and peri
 for filler in range(1):
-    fig, ax1 = plt.subplots(figsize=(3, 3))
+    fig, ax1 = plt.subplots(figsize=(3.8, 3.8))
 
     # plot pref center
     x_min = ax1.get_xlim()[0]
@@ -462,7 +477,7 @@ for filler in range(1):
     ax1.yaxis.label.set_rotation(0)
     # ax1.set_title(f'Population Contrast Response Function n={len(prefCenterPopResp)}')
 
-    ax1.set_ylim([0, 1.1])
+
     # Explicitly set y-ticks at 0, 1, and the others from get_yticks()
     y_ticks = ax1.get_yticks()  # Get all existing y-ticks
     if 1 not in y_ticks:
@@ -476,6 +491,7 @@ for filler in range(1):
     # Apply the y-ticks and labels
     ax1.set_yticks(y_ticks)  # Set ticks (including 0 and 1)
     ax1.set_yticklabels(y_tick_labels, **hfont, fontsize=fontSize)  # Label only 0 and 1
+    ax1.set_ylim([0, 1.05])
 
     # Explicitly set x-ticks and labels
     x_ticks = [0.1, 1, 10, 100]  # Define tick positions
@@ -490,11 +506,13 @@ for filler in range(1):
     # sns.despine(offset=5)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
-    ax1.spines['bottom'].set_linewidth(1)
-    ax1.spines['left'].set_linewidth(1)
+    ax1.spines['bottom'].set_linewidth(0.5)
+    ax1.spines['left'].set_linewidth(0.5)
+    ax1.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
+
 
 # save fig
-plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonMainFigures/CRF_plot.pdf',
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/PythonMainFigures/CRF_plot.pdf',
             bbox_inches='tight')
 plt.close('all')
 

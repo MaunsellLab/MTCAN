@@ -44,7 +44,6 @@ fileList = ['Meetz_221010', 'Meetz_221013', 'Meetz_221108', 'Meetz_221110',
             'Meetz_230126', 'Akshan_240927', 'Akshan_241016', 'Akshan_241017',
             'Akshan_241025']
 
-
 t0 = time.time()
 meetzGlobalNMI = []
 meetzGlobalA1 = []
@@ -55,6 +54,13 @@ masterGoodUnits = []
 masterAllUnits = []
 corr_records = []
 allUnitsLocationTuning = []
+# Storage for population curves
+site0_single_all = []        # (Nunits, 6)
+site0_paired_all = []        # (Nunits, 6, 6)  rows=fixed site0 dir, cols=vary site1 dir
+site1_single_all = []        # (Nunits, 6)
+site1_paired_all = []        # (Nunits, 6, 6)  rows=vary site0 dir, cols=fixed site1 dir
+degrees = np.arange(6) * 60  # [0,60,120,180,240,300]
+gridResp7by7_all = []
 
 for fileIterator in fileList:
     print(fileIterator)
@@ -260,7 +266,6 @@ for fileIterator in fileList:
     # filter units based off of gauss fit > 0.90
     unitGaussMean = np.zeros(len(units))
     unitGaussSig = np.zeros(len(units))
-
     filterUnits = []
     for unitCount, unit in enumerate(units):
         loc0Resp = meanSpike[unitCount][36:42]
@@ -351,6 +356,50 @@ for fileIterator in fileList:
         pairDistOnElectrode = abs(n1ElectrodePos - n2ElectrodePos)
         if pairDistOnElectrode >= 5:
             distCombs.append(i)
+
+    ####################################################################################################################
+    ############################################### normalized 7x7 grid ################################################
+    ####################################################################################################################
+    for unit in criterionPassedUnits:
+        unitCount = np.where(unit == units)[0][0]
+        prefDir, nullDir = dirClosestToPref(unitGaussMean[unitCount])
+        nullDirIndex = np.where(dirArray == nullDir)[0][0]
+        prefDirIndex = np.where(dirArray == prefDir)[0][0]
+        reIndex = (np.array([0, 1, 2, 3, 4, 5]) + nullDirIndex) % 6
+
+        # responses (dependent variables) - matrix of responses
+        b = meanSpikeReshaped[unitCount].reshape(7, 7) * 1000 / trueStimDurMS
+
+        # fixed (independent) variables - matrix of corresponding stim Indexes
+        stimMat, stimMatReIndex = reIndexedStimMat(reIndex)
+        bReIndex = reIndexedRespMat(b, reIndex)
+
+        # Single-stimulus rows/cols (drop spontaneous)
+        site0_single = bReIndex[-1, :6].astype(float)  # last row
+        site1_single = bReIndex[:6, -1].astype(float)  # last col
+
+        # Preferred responses at each site (index 3 post-reindex)
+        pref0 = site0_single[3]
+        pref1 = site1_single[3]
+
+        # Use the larger of the two preferreds as the per-unit normalization
+        norm_ref = np.nanmax([pref0, pref1])
+        norm_ref = pref0
+        if not np.isfinite(norm_ref) or norm_ref == 0:
+            continue  # skip unit if invalid normalization
+
+        # normalize the entire grid by pref resp at site 0
+        bReIndexNorm = bReIndex / norm_ref
+        gridResp7by7_all.append(bReIndexNorm)
+
+        # --- Normalize everything for this unit by norm_ref ---
+        # Site 0
+        site0_single_all.append(site0_single / norm_ref)  # (6,)
+        site0_paired_all.append(bReIndex[:6, :6].astype(float) / norm_ref)  # (6,6)
+
+        # Site 1
+        site1_single_all.append(site1_single / norm_ref)  # (6,)
+        site1_paired_all.append(bReIndex[:6, :6].astype(float) / norm_ref)  # (6,6)
 
     ####################################################################################################################
     ############################################## Compute Correlations ################################################
@@ -580,6 +629,189 @@ for fileIterator in fileList:
 
 print(time.time()-t0)
 
+
+# plot 7x7 population to show response preservation
+def _close_curve(y):
+    """Append the first point so curve closes at +180 (duplicate of -180)."""
+    return np.concatenate([y, y[:1]])
+
+
+def _legend_label(rel_deg):
+    """Pretty legend labels with ± for 180 and signs for others."""
+    if rel_deg in (-180, 180):
+        return "±180°"
+    if rel_deg == 0:
+        return "0°"
+    sign = "+" if rel_deg > 0 else "−"
+    return f"{sign}{abs(rel_deg)}°"
+
+
+def _nansem(a, axis=0):
+    a = np.asarray(a, float)
+    m = np.isfinite(a)
+    n = np.sum(m, axis=axis)
+    sd = np.nanstd(a, axis=axis, ddof=1)
+    return sd / np.maximum(n, 1)**0.5
+
+
+# ===== Population aggregates =====
+site0_single_all = np.asarray(site0_single_all)   # (N,6)
+site0_paired_all = np.asarray(site0_paired_all)   # (N,6,6)
+
+site1_single_all = np.asarray(site1_single_all)   # (N,6)
+site1_paired_all = np.asarray(site1_paired_all)   # (N,6,6)
+
+# ---------- Build COMBINED (per-unit) then aggregate ----------
+# Single (per unit): average site0 & site1 single curves elementwise
+combined_single_all = 0.5 * (site0_single_all + site1_single_all)             # (N,6)
+
+# Paired (per unit): align orientation first, then average elementwise.
+# site0_paired_all: rows=fixed site0 dir, cols=vary site1 dir
+# site1_paired_all: rows=vary site0 dir,  cols=fixed site1 dir  -> transpose last two axes
+site1_paired_as_rows_fixed = np.transpose(site1_paired_all, (0, 2, 1))        # (N,6,6): rows=fixed site1 dir, cols=vary site0 dir
+combined_paired_all = 0.5 * (site0_paired_all + site1_paired_as_rows_fixed)   # (N,6,6): rows=fixed dir, cols=vary dir
+
+# Combined means & SEMs
+combined_single_mean = np.nanmean(combined_single_all, axis=0)
+combined_single_sem = _nansem(combined_single_all, axis=0)
+combined_paired_mean = np.nanmean(combined_paired_all, axis=0)   # (6,6)
+combined_paired_sem = _nansem(combined_paired_all, axis=0)      # (6,6)
+
+# Means & SEMs
+site0_single_mean = np.nanmean(site0_single_all, axis=0)
+site0_single_sem  = _nansem(site0_single_all, axis=0)
+
+site0_paired_mean = np.nanmean(site0_paired_all, axis=0)   # (6,6)
+site0_paired_sem  = _nansem(site0_paired_all, axis=0)      # (6,6)
+
+site1_single_mean = np.nanmean(site1_single_all, axis=0)
+site1_single_sem  = _nansem(site1_single_all, axis=0)
+
+site1_paired_mean = np.nanmean(site1_paired_all, axis=0)   # (6,6)
+site1_paired_sem  = _nansem(site1_paired_all, axis=0)      # (6,6)
+
+# X positions (relative to preferred) and closed x for plotting
+rel_deg = np.array([-180, -120, -60, 0, 60, 120])
+x_closed = np.append(rel_deg, 180)
+
+# Ticks and labels (show 0° again at +180 to indicate 360 wrap)
+xticks = np.array([-180, -120, -60, 0, 60, 120, 180])
+xticklabels = ["−180°", "−120°", "−60°", "0°", "+60°", "+120°", "+180°"]
+
+# Close all mean/SEM curves for proper wrap
+site0_single_mean_c = _close_curve(site0_single_mean)
+site0_single_sem_c = _close_curve(site0_single_sem)
+site1_single_mean_c = _close_curve(site1_single_mean)
+site1_single_sem_c = _close_curve(site1_single_sem)
+combined_single_mean_c = _close_curve(combined_single_mean)
+combined_single_sem_c = _close_curve(combined_single_sem)
+
+# Precompute closed paired curves (rows = fixed rel dir; cols = varying dir)
+site0_paired_mean_c = np.vstack([_close_curve(site0_paired_mean[i,  :]) for i in range(6)])  # (6,7)
+site0_paired_sem_c = np.vstack([_close_curve(site0_paired_sem[i,   :]) for i in range(6)])
+site1_paired_mean_c = np.vstack([_close_curve(site1_paired_mean[:, j]) for j in range(6)])   # (6,7)
+site1_paired_sem_c = np.vstack([_close_curve(site1_paired_sem[:,  j]) for j in range(6)])
+combined_paired_mean_c = np.vstack([_close_curve(combined_paired_mean[i, :]) for i in range(6)])
+combined_paired_sem_c = np.vstack([_close_curve(combined_paired_sem[i,  :]) for i in range(6)])
+
+# compute avg 7x7 resp
+grid_stack = np.stack(gridResp7by7_all, axis=0)
+avg_grid = np.nanmean(grid_stack, axis=0)
+
+for filler in range(1):
+    # Make a 2×2 grid with NO global sharing
+    fig, axes = plt.subplots(2, 2, figsize=(11, 9), sharey=False)
+
+    # Make the first three axes share y among themselves
+    axes[0, 1].sharey(axes[0, 0])  # Site 1 shares with Site 0
+    axes[1, 0].sharey(axes[0, 0])  # Combined shares with Site 0
+
+    # ---- Site 0 subplot ----
+    ax = axes[0, 0]
+    ax.plot(x_closed, site0_single_mean_c, 'k-', lw=2, label='Site 0 single (mean)')
+    ax.fill_between(x_closed, site0_single_mean_c - site0_single_sem_c,
+                    site0_single_mean_c + site0_single_sem_c, alpha=0.2)
+    for i in range(6):
+        rel = int((i - 3) * 60)
+        label = f"Fixed Site0 @ {_legend_label(rel)}"
+        y, e = site0_paired_mean_c[i, :], site0_paired_sem_c[i, :]
+        ax.plot(x_closed, y, '-o', label=label)
+        ax.fill_between(x_closed, y - e, y + e, alpha=0.15)
+    ax.set_title('Site 0 — normalized to max(single preferred across sites)')
+    ax.set_xlabel('Degrees from preferred (°)')
+    ax.set_ylabel('Normalized response')
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlim([-180, 180])
+    ax.axhline(1.0, ls='--', lw=1)
+    ax.legend(fontsize=8, ncol=2, loc='lower center')
+
+    # ---- Site 1 subplot ----
+    ax = axes[0, 1]
+    ax.plot(x_closed, site1_single_mean_c, 'k-', lw=2, label='Site 1 single (mean)')
+    ax.fill_between(x_closed, site1_single_mean_c - site1_single_sem_c,
+                    site1_single_mean_c + site1_single_sem_c, alpha=0.2)
+    for j in range(6):
+        rel = int((j - 3) * 60)
+        label = f"Fixed Site1 @ {_legend_label(rel)}"
+        y, e = site1_paired_mean_c[j, :], site1_paired_sem_c[j, :]
+        ax.plot(x_closed, y, '-o', label=label)
+        ax.fill_between(x_closed, y - e, y + e, alpha=0.15)
+    ax.set_title('Site 1 — normalized to max(single preferred across sites)')
+    ax.set_xlabel('Degrees from preferred (°)')
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlim([-180, 180])
+    ax.axhline(1.0, ls='--', lw=1)
+
+    # ---- Combined subplot ----
+    ax = axes[1, 0]
+    ax.plot(x_closed, combined_single_mean_c, 'k-', lw=2, label='Combined single (mean)')
+    ax.fill_between(x_closed, combined_single_mean_c - combined_single_sem_c,
+                    combined_single_mean_c + combined_single_sem_c, alpha=0.2)
+    for i in range(6):
+        rel = int((i - 3) * 60)
+        label = f"Fixed Combined @ {_legend_label(rel)}"
+        y, e = combined_paired_mean_c[i, :], combined_paired_sem_c[i, :]
+        ax.plot(x_closed, y, '-o', label=label)
+        ax.fill_between(x_closed, y - e, y + e, alpha=0.15)
+    ax.set_title('Combined (average of Site 0 & Site 1)')
+    ax.set_xlabel('Degrees from preferred (°)')
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlim([-180, 180])
+    ax.axhline(1.0, ls='--', lw=1)
+
+    # ---- Heatmap subplot (independent y) ----
+    ax = axes[1, 1]
+    im = ax.imshow(avg_grid, interpolation='nearest', aspect='equal', cmap='RdPu',
+                   vmin=0, vmax=np.nanmax(avg_grid))
+    cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label("Mean response (a.u.)", rotation=90)
+
+    # Axis labeling for heatmap
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    ax.set_xlabel("Location 0 Stimulus Direction Δ From Pref")
+    ax.set_ylabel("Location 1 Stimulus Direction Δ From Pref")
+
+    tick_labels = ["−180°", "−120°", "−60°", "0°", "+60°", "+120°", "blank"]
+    ax.set_xticks(range(7))
+    ax.set_xticklabels(tick_labels)
+    ax.set_yticks(range(7))
+    ax.set_yticklabels(tick_labels)
+
+    # Annotate each cell with value
+    vmin, vmax = np.nanmin(avg_grid), np.nanmax(avg_grid)
+    mid = (vmin + vmax) / 2.0
+    for i in range(7):
+        for j in range(7):
+            val = avg_grid[i, j]
+            txt_color = "white" if val > mid else "black"
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center", fontsize=9, color=txt_color)
+
+    plt.tight_layout()
+    plt.show()
 
 ########################################################################################################################
 ######################################## Assign relative weights to each location ######################################
@@ -880,9 +1112,11 @@ print(df_corr_ext[["unit_i", "unit_j", "delta_pref_dir",
                    "unit1_avg_weight", "unit2_avg_weight", "pair_avg_weight"]].head())
 
 for filler in range(1):
-    savemat("corr_data.mat", {
-        "nonPrefSupp": df_corr_ext['pair_avg_weight'].values,
-        "selectivity": df_corr_ext['delta_pref_dir'].values,
+    savemat("corr_dataMTNC.mat", {
+        "nonPrefSupp": df_corr_ext['pair_suppression'].values,
+        "selectivity": df_corr_ext['pair_selectivity'].values,
+        "deltaPD": df_corr_ext['delta_pref_dir'].values,
+        "pairAvgWeight": df_corr_ext['pair_avg_weight'].values,
         "pairedCorr": df_corr_ext['corr_paired'].values,
         "singleCorrLoc0": df_corr_ext['corr_single_loc0'].values,
         "singleCorrLoc1": df_corr_ext['corr_single_loc1'].values,
@@ -909,10 +1143,6 @@ for filler in range(1):
     plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
     plt.axvline(0, color='gray', linestyle='--', linewidth=0.8)
     plt.show()
-
-
-
-
 
 
 ########################################################################################################################

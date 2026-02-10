@@ -638,6 +638,24 @@ sponNormalizedToPrefCenter = sponNormalized[:, np.newaxis] / normVal
 normValBase = np.copy(normVal)
 transectNormalized = transectNormalized / normValBase
 
+# # ## save data of neurons and normalized spike counts for every condition
+# save_path = "/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/Journal Submissions/PNAS/Data/MTNDnormalized_responses.npz"
+#
+# np.savez(
+#     save_path,
+#     prefNormalizedWithBase=prefNormalizedWithBase,
+#     nonprefNormalizedWithBase=nonprefNormalizedWithBase,
+#     pnNormalizedWithBase=pnNormalizedWithBase,
+#     npNormalizedWithBase=npNormalizedWithBase,
+#     ppNormalizedWithBase=ppNormalizedWithBase,
+#     nnNormalizedWithBase=nnNormalizedWithBase,
+#     sponNormalizedToPrefCenter=sponNormalizedToPrefCenter,
+#     normValBase=normValBase,
+#     transectNormalized=transectNormalized,
+#     masterGoodUnits=masterGoodUnits,
+#     exampleUnitHist=exampleUnitHist,
+# )
+
 # normalize each response matrix by subtracting baseline
 # and then normalizing the pref center response
 prefNormalized = prefNormalized - sponNormalized[:, np.newaxis]
@@ -814,6 +832,7 @@ stim_type_peripherySpon = np.array([-1, 1, 1, 1, 1,
 
 # fit gaussian to average responses
 params = gaussFit(transX, transectMean)
+x = np.arange(0, numSteps + 1)
 xFull = np.linspace(transX[0], transX[-1], 1000)
 respFull = gauss(xFull, *params)
 
@@ -838,56 +857,58 @@ r2GaussFit25 = np.percentile(r2_all, 25)
 
 
 # plot transect response
-# fig, ax1 = plt.subplots(figsize=(8, 6), layout='constrained')
-fig, ax1 = plt.subplots(figsize=(2.75, 2.75))
+for filler in range(1):
+    # fig, ax1 = plt.subplots(figsize=(8, 6), layout='constrained')
+    fig, ax1 = plt.subplots(figsize=(2.5, 2.5))
 
-ax1.plot(xFull, respFull, color='black', linestyle='--', label='Gauss Fit',
-         linewidth=lineWidth)
-ax1.plot(transX, transectMean, color='black', label='Pref', linewidth=lineWidth)
-ax1.errorbar(transX, transectMean, yerr=transectSEM, fmt='o', ecolor='black',
-             color='black', markersize=2)
-ax1.plot(x, nonprefMeanWithBase, color='grey', label='NO', linewidth=lineWidth)
-ax1.errorbar(x, nonprefMeanWithBase, yerr=nonprefSEM, fmt='o', ecolor='grey',
-             color='grey', markersize=2)
-ax1.plot([-4, 4], [np.mean(sponNormalizedToPrefCenter)] * 2,
-         color='black', linewidth=0.5)
-sponSEM = np.std(sponNormalizedToPrefCenter) / np.sqrt(numUnits)
-ax1.fill_between(x=xFull,
-                 y1=np.mean(sponNormalizedToPrefCenter) + sponSEM,
-                 y2=np.mean(sponNormalizedToPrefCenter) - sponSEM,
-                 color='black', alpha=0.1,
-                 linewidth=0.5)
+    ax1.plot(xFull, respFull, color='black', linestyle='--', label='Gauss Fit',
+             linewidth=lineWidth)
+    ax1.plot(transX, transectMean, color='black', label='Pref', linewidth=lineWidth)
+    ax1.errorbar(transX, transectMean, yerr=transectSEM, fmt='o', ecolor='black',
+                 color='black', markersize=2)
+    ax1.plot(x, nonprefMeanWithBase, color='grey', label='NO', linewidth=lineWidth)
+    ax1.errorbar(x, nonprefMeanWithBase, yerr=nonprefSEM, fmt='o', ecolor='grey',
+                 color='grey', markersize=2)
+    ax1.plot([-4, 4], [np.mean(sponNormalizedToPrefCenter)] * 2,
+             color='black', linewidth=0.5)
+    sponSEM = np.std(sponNormalizedToPrefCenter) / np.sqrt(numUnits)
+    ax1.fill_between(x=xFull,
+                     y1=np.mean(sponNormalizedToPrefCenter) + sponSEM,
+                     y2=np.mean(sponNormalizedToPrefCenter) - sponSEM,
+                     color='black', alpha=0.1,
+                     linewidth=0.5)
 
-# # individual neuron fits
-# for i in transectNormalized:
-#     ax1.plot(transX, i, color='purple', alpha=0.2)
+    # # individual neuron fits
+    # for i in transectNormalized:
+    #     ax1.plot(transX, i, color='purple', alpha=0.2)
 
-ax1.set_ylabel('Normalized\nResponse', fontsize=fontSize, **hfont)
-ax1.yaxis.label.set_rotation(0)
-ax1.yaxis.set_label_coords(-0.20, 0.5)
-ax1.set_xlabel('Receptive Field Location', fontsize=fontSize, **hfont)
-ax1.set_ylim([0, 1.2])
+    ax1.set_ylabel('Normalized\nResponse', fontsize=fontSize, **hfont)
+    ax1.yaxis.label.set_rotation(0)
+    ax1.yaxis.set_label_coords(-0.20, 0.5)
+    ax1.set_xlabel('Receptive Field Location', fontsize=fontSize, **hfont)
+    ax1.set_ylim([0, 1.2])
 
-y_ticks = ax1.get_yticks()
-# Create a list of y-tick labels with only 0 and 1.0 labeled
-y_tick_labels = [
-    '0' if tick == 0 else
-    '1' if tick == 1.0 else
-    ''  # blank for other ticks
-    for tick in y_ticks
-]
-ax1.set_yticklabels(y_tick_labels, fontsize=8, **hfont)
-ax1.set_xticks([-4, -3, -2, -1, 0, 1, 2, 3, 4])
-ax1.set_xticklabels(['-4', '-3', '-2', '-1', '0', '1', '2', '3', '4'], **hfont, fontsize=8)
-ax1.spines['top'].set_visible(False)
-ax1.spines['right'].set_visible(False)
-ax1.spines['bottom'].set_linewidth(0.5)
-ax1.spines['left'].set_linewidth(0.5)
-ax1.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
+    y_ticks = ax1.get_yticks()
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_tick_labels = [
+        '0' if tick == 0 else
+        '1' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks
+    ]
+    ax1.set_yticklabels(y_tick_labels, fontsize=8, **hfont)
+    ax1.set_xticks([-4, -3, -2, -1, 0, 1, 2, 3, 4])
+    ax1.set_xticklabels(['-4', '-3', '-2', '-1', '0', '1', '2', '3', '4'], **hfont, fontsize=8)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(0.5)
+    ax1.spines['left'].set_linewidth(0.5)
+    ax1.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
 
 # plt.savefig('transect_plot.pdf', dpi=500, bbox_inches='tight')
-plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonMainFigures/transect_plot.pdf',
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/PythonMainFigures/transect_plot.pdf',
             bbox_inches='tight')
+plt.close('all')
 
 
 ########################################################################################################################
@@ -899,7 +920,7 @@ plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonM
 # # remove spon rate
 # exampleUnitHist = exampleUnitHist - exampleUnitHist[0]
 # figure
-fig, axs = plt.subplots(1, 2, figsize=(6, 3))
+fig, axs = plt.subplots(1, 2, figsize=(5, 3))
 yMax = 0
 smoothValue = 5
 lineWidth = 1
@@ -970,7 +991,7 @@ for axCount, i in enumerate([1, 2]):
     ytick_labels = [str(int(tick)) if tick == 200 else '' for tick in yticks]
     axs[axCount].set_yticklabels(ytick_labels, fontsize=fontSize, **hfont)
 
-plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonMainFigures/PSTH_plot.pdf',
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/PythonMainFigures/PSTH_plot.pdf',
             bbox_inches='tight')
 plt.close('all')
 
@@ -981,7 +1002,7 @@ plt.close('all')
 # i = np.where(masterGoodUnits == '230627_71')[0][0]
 i = np.where(masterGoodUnits == '230719_147')[0][0]
 
-fig, ax1 = plt.subplots(figsize=(2.785, 3))
+fig, ax1 = plt.subplots(figsize=(2.27, 3))
 
 lineWidth = 1.0
 markerSize = mSize ** 2
@@ -1087,80 +1108,80 @@ for i in range(len(prefNormalized)):
     predResp = np.concatenate((pSingleFitPred, npSingleFitPred, pnFitPred,
                                npFitPred, ppFitPred, nnFitPred), axis=0)
 
-    # # figure
-    # fig, ax1 = plt.subplots(figsize=(2.785, 3))
-    # popt_str = (f"Lp = {popt[0]:.2f}\n"
-    #             f"Lnp = {popt[1]:.2f}\n"
-    #             f"W1 = {popt[2]:.2f}\n"
-    #             f"W2 = {popt[3]:.2f}\n"
-    #             f"W3 = {popt[4]:.2f}\n"
-    #             f"W4 = {popt[5]:.2f}\n"
-    #             f"sigma = {popt[6]:.2f}\n"
-    #             f"spon = {popt[7]:.2f}\n"
-    #             f"r2= {r2:.3f}")
-    #
-    # markerSize = mSize ** 2
-    # x = np.arange(0, numSteps + 1)
-    #
-    # ax1.scatter(x, prefNormalizedWithBase[i], s=markerSize,
-    #             facecolor='white', edgecolor='black')
-    # ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=lineWidth)
-    # ax1.scatter(x, nonprefNormalizedWithBase[i], s=markerSize,
-    #             facecolor='white', edgecolor='grey')
-    # ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=lineWidth)
-    # ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=lineWidth)
-    # ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=markerSize)
-    # ax1.plot(xNorm, npNormalizedWithBase[i], color='magenta', label='N0 P1', linewidth=lineWidth)
-    # ax1.scatter(xNorm, npNormalizedWithBase[i], color='magenta', s=markerSize)
-    # ax1.plot(xNorm, ppNormalizedWithBase[i], color='black', label='P0 P1',
-    #          linewidth=lineWidth)
-    # ax1.scatter(xNorm, ppNormalizedWithBase[i], color='black', s=markerSize)
-    # ax1.plot(xNorm, nnNormalizedWithBase[i], color='grey', label='N0 N1',
-    #          linewidth=lineWidth)
-    # ax1.scatter(xNorm, nnNormalizedWithBase[i], color='grey', s=markerSize)
-    # ax1.axhline(y=sponNormalizedToPrefCenter[i], color='black', alpha=1, linewidth=0.5)
-    # ax1.axhline(y=y_pred1[-1], linestyle='--', color='black', alpha=0.8, linewidth=0.5)
-    # ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=lineWidth)
-    # ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=markerSize)
-    # ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=lineWidth)
-    # ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=markerSize)
-    # ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=lineWidth)
-    # ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=markerSize)
-    # ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=lineWidth)
-    # ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=markerSize)
-    # ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=markerSize)
-    # ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=lineWidth)
-    # ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=markerSize)
-    # ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=lineWidth)
-    # ax1.set_xlabel('Receptive Field Location', fontsize=fontSize, **hfont)
-    # ax1.set_ylabel('Response Rate\n(spikes/s)', fontsize=fontSize, **hfont)
-    # ax1.yaxis.label.set_rotation(0)
-    # ax1.set_ylim([-0.02, 1.6])
-    # # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
-    # #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
-    # #          transform=ax1.transAxes)
-    # y_ticks = ax1.get_yticks()
-    # # Create a list of y-tick labels with only 0 and 1.0 labeled
-    # y_tick_labels = [
-    #     '0' if tick == 0 else
-    #     f'{round(normValBase[i][0])}' if tick == 1.0 else
-    #     ''  # blank for other ticks
-    #     for tick in y_ticks]
-    #
-    # ax1.set_yticklabels(y_tick_labels, fontsize=fontSize, **hfont)
-    # ax1.set_xticks([0, 1, 2, 3, 4])
-    # ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=fontSize)
-    # ax1.spines['top'].set_visible(False)
-    # ax1.spines['right'].set_visible(False)
-    # ax1.spines['bottom'].set_linewidth(1)
-    # ax1.spines['left'].set_linewidth(1)
-    # ax1.set_xlim([-0.5, 4.5])
-    # ax1.tick_params(axis='both', width=1, length=4, direction='out', pad=3)
-    #
-    # # Save as a PDF with tight bounding box and high DPI
-    # filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_RFWeightWithBase.pdf'
-    # fig.savefig(filePath, format="pdf", bbox_inches='tight')
-    # plt.close('all')
+    # figure
+    fig, ax1 = plt.subplots(figsize=(2.27, 3))
+    popt_str = (f"Lp = {popt[0]:.2f}\n"
+                f"Lnp = {popt[1]:.2f}\n"
+                f"W1 = {popt[2]:.2f}\n"
+                f"W2 = {popt[3]:.2f}\n"
+                f"W3 = {popt[4]:.2f}\n"
+                f"W4 = {popt[5]:.2f}\n"
+                f"sigma = {popt[6]:.2f}\n"
+                f"spon = {popt[7]:.2f}\n"
+                f"r2= {r2:.3f}")
+
+    markerSize = mSize ** 2
+    x = np.arange(0, numSteps + 1)
+
+    ax1.scatter(x, prefNormalizedWithBase[i], s=markerSize,
+                facecolor='white', edgecolor='black')
+    ax1.plot(x, prefNormalizedWithBase[i], color='black', label='PO', linewidth=lineWidth)
+    ax1.scatter(x, nonprefNormalizedWithBase[i], s=markerSize,
+                facecolor='white', edgecolor='grey')
+    ax1.plot(x, nonprefNormalizedWithBase[i], color='grey', label='NO', linewidth=lineWidth)
+    ax1.plot(xNorm, pnNormalizedWithBase[i], color='green', label='P0 N1', linewidth=lineWidth)
+    ax1.scatter(xNorm, pnNormalizedWithBase[i], color='green', s=markerSize)
+    ax1.plot(xNorm, npNormalizedWithBase[i], color='magenta', label='N0 P1', linewidth=lineWidth)
+    ax1.scatter(xNorm, npNormalizedWithBase[i], color='magenta', s=markerSize)
+    ax1.plot(xNorm, ppNormalizedWithBase[i], color='black', label='P0 P1',
+             linewidth=lineWidth)
+    ax1.scatter(xNorm, ppNormalizedWithBase[i], color='black', s=markerSize)
+    ax1.plot(xNorm, nnNormalizedWithBase[i], color='grey', label='N0 N1',
+             linewidth=lineWidth)
+    ax1.scatter(xNorm, nnNormalizedWithBase[i], color='grey', s=markerSize)
+    ax1.axhline(y=sponNormalizedToPrefCenter[i], color='black', alpha=1, linewidth=0.5)
+    ax1.axhline(y=y_pred1[-1], linestyle='--', color='black', alpha=0.8, linewidth=0.5)
+    ax1.plot(xNorm, pnFitPred, color='green', linestyle='--', linewidth=lineWidth)
+    ax1.scatter(xNorm, pnFitPred, facecolors='green', edgecolors='g', s=markerSize)
+    ax1.plot(xNorm, npFitPred, color='magenta', linestyle='--', linewidth=lineWidth)
+    ax1.scatter(xNorm, npFitPred, facecolors='magenta', edgecolors='m', s=markerSize)
+    ax1.plot(xNorm, ppFitPred, color='black', linestyle='--', linewidth=lineWidth)
+    ax1.scatter(xNorm, ppFitPred, facecolors='black', edgecolors='black', s=markerSize)
+    ax1.plot(xNorm, nnFitPred, color='grey', linestyle='--', linewidth=lineWidth)
+    ax1.scatter(xNorm, nnFitPred, facecolors='gray', edgecolors='gray', s=markerSize)
+    ax1.scatter(x, pSingleFitPred, facecolors='white', edgecolors='black', s=markerSize)
+    ax1.plot(x, pSingleFitPred, color='black', linestyle='--', linewidth=lineWidth)
+    ax1.scatter(x, npSingleFitPred, facecolors='white', edgecolors='gray', s=markerSize)
+    ax1.plot(x, npSingleFitPred, color='grey', linestyle='--', linewidth=lineWidth)
+    ax1.set_xlabel('Receptive Field Location', fontsize=fontSize, **hfont)
+    ax1.set_ylabel('Response Rate\n(spikes/s)', fontsize=fontSize, **hfont)
+    ax1.yaxis.label.set_rotation(0)
+    ax1.set_ylim([-0.02, 1.6])
+    # ax1.text(0.95, 0.95, popt_str, fontsize=10, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle="round,pad=0.3", edgecolor='black', facecolor='lightyellow'),
+    #          transform=ax1.transAxes)
+    y_ticks = ax1.get_yticks()
+    # Create a list of y-tick labels with only 0 and 1.0 labeled
+    y_tick_labels = [
+        '0' if tick == 0 else
+        f'{round(normValBase[i][0])}' if tick == 1.0 else
+        ''  # blank for other ticks
+        for tick in y_ticks]
+
+    ax1.set_yticklabels(y_tick_labels, fontsize=fontSize, **hfont)
+    ax1.set_xticks([0, 1, 2, 3, 4])
+    ax1.set_xticklabels(['0', '1', '2', '3', '4'], **hfont, fontsize=fontSize)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(1)
+    ax1.spines['left'].set_linewidth(1)
+    ax1.set_xlim([-0.5, 4.5])
+    ax1.tick_params(axis='both', width=1, length=4, direction='out', pad=3)
+
+    # Save as a PDF with tight bounding box and high DPI
+    filePath = f'/Users/chery/Desktop/Project 2 Figs/individualNeuronsFits/{masterGoodUnits[i]}_RFWeightWithBase.pdf'
+    fig.savefig(filePath, format="pdf", bbox_inches='tight')
+    plt.close('all')
 
 r2ScoresRFWeightFullWithBase = np.array(r2ScoresRFWeightFullWithBase)
 np.median(r2ScoresRFWeightFullWithBase)
@@ -1287,7 +1308,6 @@ for filler in range(1):
     ax1.spines['left'].set_linewidth(0.5)
     ax1.set_xlim([-0.5, 4.5])
     ax1.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
-
 
 # save fig
 plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/PythonMainFigures/popRFWeight_plot.pdf',
@@ -1424,6 +1444,9 @@ for i in range(len(prefNormalized)):
 
 r2ScoresClassicHeegerWithBase = np.array(r2ScoresClassicHeegerWithBase)
 np.median(r2ScoresClassicHeegerWithBase)
+
+r2Classic75 = np.percentile(r2ScoresClassicHeegerWithBase, 75)
+r2Classic25 = np.percentile(r2ScoresClassicHeegerWithBase, 25)
 
 # population
 resp = np.concatenate((prefMeanWithBase, nonprefMeanWithBase, pnMeanWithBase,
@@ -1697,6 +1720,91 @@ for filler in range(1):
 
     plt.show()
 
+########################################################################################################################
+################################# Violin Plots of r2 scores for classic vs RF weighted #################################
+########################################################################################################################
+
+# Data setup
+data = [r2ScoresRFWeightFullWithBase, r2ScoresClassicHeegerWithBase]
+labels = ["RF Weighted\nNormalization", "Classic\nNormalization"]
+
+fig, axes = plt.subplots(figsize=(1.5, 3))
+
+# ==== Violin plot ====
+vp = axes.violinplot(data, showmedians=True, showextrema=False)
+axes.set_xticks([1, 2])
+axes.set_xticklabels(labels, fontsize=fontSize, **hfont)
+
+axes.set_yticks(np.linspace(0, 1, 6))
+axes.set_yticklabels(["0", "", "", "", "", "1"], **hfont, fontsize=fontSize)
+
+axes.spines['top'].set_visible(False)
+axes.spines['right'].set_visible(False)
+axes.spines['bottom'].set_linewidth(0.5)
+axes.spines['left'].set_linewidth(0.5)
+axes.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
+
+axes.set_ylim([0, 1])
+# axes.grid(True, axis='y', linestyle='--', alpha=0.7)
+axes.set_ylabel("R² Score", fontsize=fontSize, **hfont)
+
+# Annotate medians and IQRs
+for i, arr in enumerate(data, start=1):
+    median = np.median(arr)
+    q1 = np.percentile(arr, 25)
+    q3 = np.percentile(arr, 75)
+    axes.hlines([q1, q3], i - 0.25, i + 0.25, colors="blue", linestyles="-", linewidth=1.0)
+    # axes.text(i, median, f"{median:.3f}", ha='center', va='bottom', fontsize=9, color='red')
+    # axes.text(i, q1, f"{q1:.3f}", ha='center', va='top', fontsize=8, color='blue')
+    # axes.text(i, q3, f"{q3:.3f}", ha='center', va='bottom', fontsize=8, color='blue')
+
+plt.tight_layout()
+# plt.show()
+
+# save fig
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/PythonMainFigures/violinPlot.pdf',
+            bbox_inches='tight')
+plt.close('all')
+
+########################################################################################################################
+###################################### Scatter of r2 scores for classic vs RF weighted #################################
+########################################################################################################################
+
+# Ensure numpy arrays
+x = np.array(r2ScoresRFWeightFullWithBase)   # RF Weighted → x-axis
+y = np.array(r2ScoresClassicHeegerWithBase)  # Classic → y-axis
+
+plt.figure(figsize=(2.6, 2))
+plt.scatter(x, y, alpha=0.2, edgecolor="k")
+
+# Add unity line
+lims = [0, 1]
+plt.plot(lims, lims, "r--", linewidth=1)
+
+plt.xlim(lims)
+plt.ylim(lims)
+
+# Keep ticks but only label 0 and 1
+axes = plt.gca()
+axes.set_xticks(np.linspace(0, 1, 6))  # tick marks at 0.0,0.2,...,1.0
+axes.set_yticks(np.linspace(0, 1, 6))
+axes.set_xticklabels(["0", "", "", "", "", "1"], **hfont, fontsize=fontSize)
+axes.set_yticklabels(["0", "", "", "", "", "1"], **hfont, fontsize=fontSize)
+plt.xlabel("RF Weighted Normalization (R²)", **hfont, fontsize=fontSize)
+plt.ylabel("Classic\nNormalization (R²)", **hfont, fontsize=fontSize)
+axes.spines['top'].set_visible(False)
+axes.spines['right'].set_visible(False)
+axes.spines['bottom'].set_linewidth(0.5)
+axes.spines['left'].set_linewidth(0.5)
+axes.tick_params(axis='both', width=0.5, length=4, direction='out', pad=3)
+
+plt.tight_layout()
+# plt.show()
+
+# save fig
+plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Intensity Weighted Average/PythonMainFigures/classicVsRFScatter.pdf',
+            bbox_inches='tight')
+plt.close('all')
 
 ########################################################################################################################
 ####################################################### STAT TESTS #####################################################

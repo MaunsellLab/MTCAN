@@ -61,6 +61,99 @@ site1_single_all = []        # (Nunits, 6)
 site1_paired_all = []        # (Nunits, 6, 6)  rows=vary site0 dir, cols=fixed site1 dir
 degrees = np.arange(6) * 60  # [0,60,120,180,240,300]
 gridResp7by7_all = []
+gridResp7by7_nmi_var_all = []
+gridResp7by7_nmi_mean_all = []
+totalPairsMeetz = []
+totalPairsAkshan = []
+
+ratios01 = []
+ratios10 = []
+
+
+def bootstrap_nmi_variance(spikeCountMat, unitCount, blocksDone,
+                            stimMatReIndex, trueStimDurMS, norm_ref,
+                            n_boot=1000, seed=42):
+    """
+    For one unit, bootstrap:
+      1. NMI variance per (r,c) pair           -> (6,6) array
+      2. Per-neuron mean NMI and its SE        -> (mean, SE) scalar pair
+
+    Returns
+    -------
+    nmi_var_grid  : (6,6) array of per-pair bootstrap variances
+    nmi_mean      : scalar, mean NMI across valid (r,c) pairs (from real data)
+    nmi_mean_se   : scalar, bootstrap SE of that per-neuron mean
+    """
+    rng = np.random.default_rng(seed)
+    EPS = 1e-9
+    trial_idx = np.arange(blocksDone)
+
+    nmi_boots      = np.full((n_boot, 6, 6), np.nan)  # all (r,c) per boot
+    nmi_mean_boots = np.full(n_boot, np.nan)           # per-neuron mean per boot
+
+    for b in range(n_boot):
+        boot_idx  = rng.choice(trial_idx, size=blocksDone, replace=True)
+        boot_mean = np.nanmean(spikeCountMat[unitCount][boot_idx, :], axis=0)  # (49,)
+        boot_rate = boot_mean * 1000 / trueStimDurMS
+
+        # Rebuild 7x7 grid
+        boot_grid = np.full((7, 7), np.nan)
+        boot_grid[:6, :6] = boot_rate[np.arange(36)].reshape(6, 6)
+        boot_grid[6,  :6] = boot_rate[36:42]
+        boot_grid[:6,  6] = boot_rate[42:48]
+        boot_grid[6,   6] = boot_rate[48]
+
+        # Reindex and normalize
+        boot_reindex = reIndexedRespMat(boot_grid, reIndex)
+        boot_norm    = boot_reindex / norm_ref
+
+        # Compute NMI for all 36 pairs
+        boot_nmis = []
+        for r in range(6):
+            for c in range(6):
+                PN    = boot_norm[r, c]
+                P     = boot_norm[6, c]
+                N     = boot_norm[r, 6]
+                denom = (P + N) + PN
+                num   = (P + N) - PN
+                if np.isfinite(num) and np.isfinite(denom) and denom > EPS:
+                    nmi_boots[b, r, c] = num / denom
+                    boot_nmis.append(num / denom)
+
+        # Per-neuron mean NMI for this bootstrap replicate
+        if len(boot_nmis) > 0:
+            nmi_mean_boots[b] = np.nanmean(boot_nmis)
+
+    # --- Output 1: per-(r,c) variance grid ---
+    nmi_var_grid = np.nanvar(nmi_boots, axis=0, ddof=1)   # (6,6)
+
+    # --- Output 2: per-neuron mean NMI from real data ---
+    # Recompute from the actual (non-bootstrapped) grid passed in
+    real_nmis = []
+    g = spikeCountMat[unitCount][:blocksDone, :]
+    real_mean = np.nanmean(g, axis=0) * 1000 / trueStimDurMS
+    real_grid = np.full((7, 7), np.nan)
+    real_grid[:6, :6] = real_mean[np.arange(36)].reshape(6, 6)
+    real_grid[6,  :6] = real_mean[36:42]
+    real_grid[:6,  6] = real_mean[42:48]
+    real_grid[6,   6] = real_mean[48]
+    real_reindex = reIndexedRespMat(real_grid, reIndex)
+    real_norm    = real_reindex / norm_ref
+    for r in range(6):
+        for c in range(6):
+            PN    = real_norm[r, c]
+            P     = real_norm[6, c]
+            N     = real_norm[r, 6]
+            denom = (P + N) + PN
+            num   = (P + N) - PN
+            if np.isfinite(num) and np.isfinite(denom) and denom > EPS:
+                real_nmis.append(num / denom)
+
+    nmi_mean   = np.nanmean(real_nmis) if real_nmis else np.nan
+    nmi_mean_se = np.nanstd(nmi_mean_boots, ddof=1)       # SE of per-neuron mean
+
+    return nmi_var_grid, nmi_mean, nmi_mean_se
+
 
 for fileIterator in fileList:
     print(fileIterator)
@@ -357,6 +450,11 @@ for fileIterator in fileList:
         if pairDistOnElectrode >= 5:
             distCombs.append(i)
 
+    if monkeyName == 'Meetz':
+        totalPairsMeetz.append(len(criterionPassedCombs))
+    else:
+        totalPairsAkshan.append(len(criterionPassedCombs))
+
     ####################################################################################################################
     ############################################### normalized 7x7 grid ################################################
     ####################################################################################################################
@@ -383,7 +481,7 @@ for fileIterator in fileList:
         pref1 = site1_single[3]
 
         # Use the larger of the two preferreds as the per-unit normalization
-        norm_ref = np.nanmax([pref0, pref1])
+        # norm_ref = np.nanmax([pref0, pref1])
         norm_ref = pref0
         if not np.isfinite(norm_ref) or norm_ref == 0:
             continue  # skip unit if invalid normalization
@@ -391,6 +489,15 @@ for fileIterator in fileList:
         # normalize the entire grid by pref resp at site 0
         bReIndexNorm = bReIndex / norm_ref
         gridResp7by7_all.append(bReIndexNorm)
+
+        # Bootstrap NMI variance + per-neuron mean and SE
+        nmi_var_grid, nmi_mean, nmi_mean_se = bootstrap_nmi_variance(
+            spikeCountMat, unitCount, blocksDone,
+            stimMatReIndex, trueStimDurMS, norm_ref
+        )
+        gridResp7by7_nmi_var_all.append(nmi_var_grid)
+        gridResp7by7_nmi_mean_all.append((nmi_mean, nmi_mean_se))  # <-- ADD
+
 
         # --- Normalize everything for this unit by norm_ref ---
         # Site 0
@@ -400,6 +507,13 @@ for fileIterator in fileList:
         # Site 1
         site1_single_all.append(site1_single / norm_ref)  # (6,)
         site1_paired_all.append(bReIndex[:6, :6].astype(float) / norm_ref)  # (6,6)
+
+        # after pref0/pref1 computed and before continue
+        if np.isfinite(pref0) and np.isfinite(pref1) and pref0 > 0 and pref1 > 0:
+            ratio01 = pref0 / pref1
+            ratio10 = pref1 / pref0
+            ratios01.append(ratio01)
+            ratios10.append(ratio10)
 
     ####################################################################################################################
     ############################################## Compute Correlations ################################################
@@ -630,6 +744,20 @@ for fileIterator in fileList:
 print(time.time()-t0)
 
 
+ratios01 = np.array(ratios01, float)
+ratios10 = np.array(ratios10, float)
+
+print("N =", len(ratios01))
+print("mean(pref0/pref1) =", np.nanmean(ratios01))
+print("median(pref0/pref1) =", np.nanmedian(ratios01))
+print("mean(pref1/pref0) =", np.nanmean(ratios10))
+print("median(pref1/pref0) =", np.nanmedian(ratios10))
+
+# also check if a few outliers dominate
+print("95th pct pref0/pref1 =", np.nanpercentile(ratios01, 95))
+print("max pref0/pref1 =", np.nanmax(ratios01))
+
+
 # plot 7x7 population to show response preservation
 def _close_curve(y):
     """Append the first point so curve closes at +180 (duplicate of -180)."""
@@ -717,7 +845,52 @@ combined_paired_sem_c = np.vstack([_close_curve(combined_paired_sem[i,  :]) for 
 # compute avg 7x7 resp
 grid_stack = np.stack(gridResp7by7_all, axis=0)
 avg_grid = np.nanmean(grid_stack, axis=0)
+avg_grid = np.nanmedian(grid_stack, axis=0)
 
+# plot just the 7x7 heatmap FIGURE 1B
+# ---- Heatmap subplot (independent y) ----
+hfont = {'fontname': 'Arial'}
+fontSize = 5
+for filler in range(1):
+    fig, ax = plt.subplots(1, 1, figsize=(1.9, 1.9))
+
+    im = ax.imshow(avg_grid, interpolation='nearest', aspect='equal', cmap='RdPu',
+                   vmin=0, vmax=np.nanmax(avg_grid))
+    cb = plt.colorbar(im, ax=ax, fraction=0.035, pad=0.03)  # Thinner colorbar
+    cb.set_ticks([0, 1])
+    cb.set_ticklabels(["0", "1"], fontsize=fontSize, **hfont)
+    cb.set_label("Mean response (a.u.)", rotation=90, fontsize=fontSize, **hfont)
+    cb.ax.tick_params(labelsize=fontSize)  # Colorbar tick labels were inheriting large size
+
+    # Axis labeling for heatmap
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    ax.set_xlabel("Loc 0 Direction Δ From Pref", **hfont, fontsize=fontSize, labelpad=3)
+    ax.set_ylabel("Loc 1 Direction Δ From Pref", **hfont, fontsize=fontSize, labelpad=3)
+
+    tick_labels = ["−180°", "−120°", "−60°", "0°", "+60°", "+120°", "No stim"]
+    ax.set_xticks(range(7))
+    ax.set_xticklabels(tick_labels, **hfont, fontsize=fontSize, rotation=45, ha='left')  # Rotate to prevent overlap
+    ax.set_yticks(range(7))
+    ax.set_yticklabels(tick_labels, **hfont, fontsize=fontSize)
+
+    ax.tick_params(axis='both', which='both', length=2, pad=2)  # Shorter ticks, tighter pad
+
+    # Annotate each cell with value
+    vmin, vmax = np.nanmin(avg_grid), np.nanmax(avg_grid)
+    mid = (vmin + vmax) / 2.0
+    for i in range(7):
+        for j in range(7):
+            val = avg_grid[i, j]
+            txt_color = "white" if val > mid else "black"
+            ax.text(j, i, f"{val:.1f}", ha="center", va="center",  # .1f instead of .2f saves space
+                    fontsize=3.5, **hfont, color=txt_color)  # Cell annotations even smaller
+
+    plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Correlations/PythonMainFigures/7x7heatmap.pdf',
+        bbox_inches='tight', dpi=500)
+    plt.close('all')
+
+# all the conditions together
 for filler in range(1):
     # Make a 2×2 grid with NO global sharing
     fig, axes = plt.subplots(2, 2, figsize=(11, 9), sharey=False)
@@ -811,6 +984,253 @@ for filler in range(1):
             ax.text(j, i, f"{val:.2f}", ha="center", va="center", fontsize=9, color=txt_color)
 
     plt.tight_layout()
+    plt.show()
+
+
+########################################################################################################################
+######################################## Compute NMI FIGURE 1C #########################################################
+########################################################################################################################
+
+for filler in range(1):
+    # ============================================================
+    # Combined NMI distribution using ALL paired conditions (6×6 = 36)
+    # For each neuron:
+    #   For every paired cell (r,c) with r,c in [0..5], compute:
+    #     P  = g[6, c]   (site0 single at that column)
+    #     N  = g[r, 6]   (site1 single at that row)
+    #     PN = g[r, c]   (paired response)
+    #   NMI = ((P + N) - PN) / ((P + N) + PN)
+    # Concatenate all NMIs across neurons into one vector and histogram it.
+    #
+    # Assumes:
+    #   gridResp7by7_all is a list of per-neuron 7×7 grids (already aligned / normalized as you want)
+    #   Paired block = rows/cols 0..5
+    #   Singles are at index 6 (row 6 for site0 singles; col 6 for site1 singles)
+    # ============================================================
+
+    # ---------- stack ----------
+    grid_stack = np.stack(gridResp7by7_all, axis=0).astype(float)  # (N,7,7)
+    nmi_var_stack = np.stack(gridResp7by7_nmi_var_all, axis=0).astype(float)
+    N = grid_stack.shape[0]
+
+    # ---------- settings ----------
+    EPS = 1e-9                 # denom guard; raise (e.g. 1e-6) if needed
+    BASELINE_SUBTRACT = False  # set True only if g[6,6] is spontaneous/blank and you want evoked
+
+    # ---------- collect NMIs ----------
+    all_nmi = []
+    all_nmi_var = []   # <-- measurement variance per point
+
+    for i in range(N):
+        g = grid_stack[i].copy()
+        v = nmi_var_stack[i]        # (6,6) bootstrap variances
+
+        for r in range(6):
+            for c in range(6):
+                PN = g[r, c]
+                P  = g[6, c]
+                Nl = g[r, 6]
+                denom = (P + Nl) + PN
+                num   = (P + Nl) - PN
+                if np.isfinite(num) and np.isfinite(denom) and (denom > EPS):
+                    all_nmi.append(num / denom)
+                    all_nmi_var.append(v[r, c])     # matched variance
+
+    all_nmi     = np.asarray(all_nmi, float)
+    all_nmi_var = np.asarray(all_nmi_var, float)
+    valid = np.isfinite(all_nmi) & np.isfinite(all_nmi_var) & (all_nmi_var > 0)
+    all_nmi     = all_nmi[valid]
+    all_nmi_var = all_nmi_var[valid]
+
+    # --- Cochran Q test ---
+    w = 1.0 / all_nmi_var                          # inverse-variance weights
+    nmi_wmean = np.sum(w * all_nmi) / np.sum(w)    # weighted grand mean
+    Q = np.sum(w * (all_nmi - nmi_wmean)**2)
+    df = len(all_nmi) - 1
+    p_cochran = stats.chi2.sf(Q, df)
+
+    # --- Variance decomposition ---
+    var_observed  = np.var(all_nmi, ddof=1)
+    var_meas_mean = np.mean(all_nmi_var)
+    var_biological = max(var_observed - var_meas_mean, 0)
+    noise_fraction = var_meas_mean / var_observed
+
+    print(f"Cochran Q={Q:.1f}, df={df}, p={p_cochran:.2e}")
+    print(f"Var observed={var_observed:.4f}, Var measurement={var_meas_mean:.4f}, "
+          f"Var biological={var_biological:.4f}")
+    print(f"Noise fraction of total variance: {noise_fraction:.1%}")
+
+    # ================================================================
+    # NEURON-LEVEL ANALYSIS
+    # ================================================================
+    nmi_mean_arr  = np.array([x[0] for x in gridResp7by7_nmi_mean_all], float)
+    nmi_se_arr    = np.array([x[1] for x in gridResp7by7_nmi_mean_all], float)
+    valid_neurons = np.isfinite(nmi_mean_arr) & np.isfinite(nmi_se_arr) & (nmi_se_arr > 0)
+    nmi_mean_arr  = nmi_mean_arr[valid_neurons]
+    nmi_se_arr    = nmi_se_arr[valid_neurons]
+    nmi_var_arr   = nmi_se_arr ** 2
+    n_neurons     = len(nmi_mean_arr)
+
+    t_stat, p_ttest  = stats.ttest_1samp(nmi_mean_arr, popmean=0)
+    w_stat, p_wilcox = stats.wilcoxon(nmi_mean_arr)
+
+    print(f"\n--- Neuron-level analysis (N={n_neurons} neurons) ---")
+    print(f"Mean NMI = {np.mean(nmi_mean_arr):.4f} ± {np.std(nmi_mean_arr, ddof=1):.4f} SD")
+    print(f"t-test vs 0: t={t_stat:.2f}, p={p_ttest:.2e}")
+    print(f"Wilcoxon vs 0: W={w_stat:.1f}, p={p_wilcox:.2e}")
+
+    w_n         = 1.0 / nmi_var_arr
+    nmi_wmean_n = np.sum(w_n * nmi_mean_arr) / np.sum(w_n)
+    Q_n         = np.sum(w_n * (nmi_mean_arr - nmi_wmean_n) ** 2)
+    df_n        = n_neurons - 1
+    p_cochran_n = stats.chi2.sf(Q_n, df_n)
+
+    var_obs_n      = np.var(nmi_mean_arr, ddof=1)
+    var_meas_n     = np.mean(nmi_var_arr)
+    var_bio_n      = max(var_obs_n - var_meas_n, 0)
+    noise_frac_var = var_meas_n / var_obs_n
+    sd_obs_n       = np.sqrt(var_obs_n)
+    sd_meas_n      = np.sqrt(var_meas_n)
+    sd_bio_n       = np.sqrt(var_bio_n)
+    noise_frac_sd  = sd_meas_n / sd_obs_n
+
+    print(f"\n--- Neuron-level variance decomposition ---")
+    print(f"Cochran Q={Q_n:.1f}, df={df_n}, p={p_cochran_n:.2e}")
+    print(f"Var observed   = {var_obs_n:.4f}  (SD={sd_obs_n:.3f})")
+    print(f"Var measurement= {var_meas_n:.4f}  (SD={sd_meas_n:.3f})")
+    print(f"Var biological = {var_bio_n:.4f}  (SD={sd_bio_n:.3f})")
+    print(f"Noise fraction of variance: {noise_frac_var:.1%}")
+    print(f"Noise SD as fraction of observed SD: {noise_frac_sd:.1%}")
+
+    # --- also stack nmi_var for the plot ---
+    nmi_var_stack = np.stack(gridResp7by7_nmi_var_all, axis=0)  # add near grid_stack
+
+    # all_nmi = []
+    #
+    # for i in range(N):
+    #     g = grid_stack[i].copy()
+    #
+    #     if BASELINE_SUBTRACT:
+    #         spon = g[6, 6]
+    #         if np.isfinite(spon):
+    #             g = g - spon
+    #
+    #     # all 36 paired combinations
+    #     for r in range(6):
+    #         for c in range(6):
+    #             PN = g[r, c]
+    #             P  = g[6, c]
+    #             Nl = g[r, 6]
+    #
+    #             denom = (P + Nl) + PN
+    #             num   = (P + Nl) - PN
+    #
+    #             if np.isfinite(num) and np.isfinite(denom) and (denom > EPS):
+    #                 all_nmi.append(num / denom)
+    #
+    # all_nmi = np.asarray(all_nmi, float)
+    # all_nmi = all_nmi[np.isfinite(all_nmi)]
+
+    print(f"Neurons: {N}")
+    print(f"Total NMI points (<= 36*N): {all_nmi.size}")
+    if all_nmi.size > 0:
+        print(f"mean={np.mean(all_nmi):.4f}  median={np.median(all_nmi):.4f}  "
+              f"SD={np.std(all_nmi, ddof=1):.4f}  "
+              f"p10={np.percentile(all_nmi,10):.4f}  p90={np.percentile(all_nmi,90):.4f}")
+
+    # ---------- plot ----------
+    fig, ax = plt.subplots(1, 1, figsize=(1.9, 1.9))
+
+    bins = np.linspace(-1, 1, 41)  # coarser bins look cleaner at small size
+
+    ax.hist(all_nmi, bins=bins,
+            color='#4C72B0',        # clean blue
+            edgecolor='white',      # white bin edges reduce clutter
+            linewidth=0.3,
+            zorder=2)
+
+    # --- perfect linear summation: NMI = 0 (paired == sum of singles) ---
+    ax.axvline(0, color='black', linewidth=0.8, linestyle='-', zorder=3,
+               label='Linear sum')
+    ax.axvline(.33, color='black', linewidth=0.8, linestyle='--', zorder=3,
+               label='Average')
+
+    # --- median ---
+    if all_nmi.size > 0:
+        ax.axvline(np.median(all_nmi), color='crimson', linewidth=0.8,
+                   linestyle='--', zorder=4, label=f'Median ({np.median(all_nmi):.2f})')
+
+    # --- noise-only curves ---
+    x_gauss = np.linspace(-1, 1, 300)
+    bin_width = bins[1] - bins[0]
+
+    # gauss_pooled = (stats.norm.pdf(x_gauss, nmi_wmean, np.sqrt(var_meas_mean))
+    #                 * len(all_nmi) * bin_width)
+    # ax.plot(x_gauss, gauss_pooled, color='orange', linewidth=0.8, linestyle='-',
+    #         zorder=5, label=f'Noise pooled (SD={np.sqrt(var_meas_mean):.2f})')
+
+    gauss_neuron = (stats.norm.pdf(x_gauss, np.mean(nmi_mean_arr), sd_meas_n)
+                    * len(all_nmi) * bin_width)
+    ax.plot(x_gauss, gauss_neuron, color='green', linewidth=0.8, linestyle='-',
+            zorder=5, label=f'Noise neuron-level (SD={sd_meas_n:.2f})')
+
+    # --- axes formatting ---
+    ax.set_xlabel("Normalization Modulation Index", **hfont, fontsize=fontSize)
+    ax.set_ylabel("Count", **hfont, fontsize=fontSize)
+    ax.set_xlim([-1, 1])
+    ax.set_xticks([-1, -0.5, 0, 0.5, 1])
+    ax.set_xticklabels(['-1', '-0.5', '0', '0.5', '1'], **hfont, fontsize=fontSize)
+    ax.tick_params(axis='both', labelsize=fontSize, length=2, pad=2)
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+    ax.spines['left'].set_linewidth(0.6)
+    ax.spines['bottom'].set_linewidth(0.6)
+
+    # --- legend ---
+    ax.legend(fontsize=fontSize - 1, frameon=False, loc='upper left',
+              handlelength=1.2, handletextpad=0.4)
+
+    plt.tight_layout()
+    # plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Correlations/PythonMainFigures/NMI_distribution.pdf',
+    #             bbox_inches='tight', dpi=500)
+    # plt.close('all')
+
+    plt.show()
+
+    # --- Neuron-level sorted plot ---
+    sort_idx = np.argsort(nmi_mean_arr)
+    sorted_means = nmi_mean_arr[sort_idx]
+    sorted_ses = nmi_se_arr[sort_idx]
+
+    fig2, ax2 = plt.subplots(1, 1, figsize=(3.5, 1.9))
+    ax2.errorbar(np.arange(n_neurons), sorted_means, yerr=sorted_ses,
+                 fmt='none', ecolor='#4C72B0', elinewidth=0.4, capsize=0, zorder=2)
+    ax2.scatter(np.arange(n_neurons), sorted_means,
+                color='#4C72B0', s=3, zorder=3)
+    ax2.axhline(0, color='black', linewidth=0.8, linestyle='-', label='Linear sum')
+    ax2.axhline(0.33, color='black', linewidth=0.8, linestyle='--', label='Average')
+    ax2.axhline(np.mean(nmi_mean_arr), color='crimson', linewidth=0.8,
+                linestyle='--', label=f'Mean ({np.mean(nmi_mean_arr):.2f})')
+    ax2.axhspan(nmi_wmean_n - sd_meas_n, nmi_wmean_n + sd_meas_n,
+                alpha=0.15, color='orange', zorder=1,
+                label=f'Noise-only ±1 SD ({sd_meas_n:.2f})')
+    ax2.set_xlabel("Neuron (sorted by mean NMI)", **hfont, fontsize=fontSize)
+    ax2.set_ylabel("Mean NMI", **hfont, fontsize=fontSize)
+    ax2.set_xlim([-1, n_neurons])
+    ax2.set_ylim([-1, 1])
+    ax2.tick_params(axis='both', labelsize=fontSize, length=2, pad=2)
+    for spine in ['top', 'right']:
+        ax2.spines[spine].set_visible(False)
+    ax2.spines['left'].set_linewidth(0.6)
+    ax2.spines['bottom'].set_linewidth(0.6)
+    ax2.legend(fontsize=fontSize - 1, frameon=False, loc='upper left',
+               handlelength=1.2, handletextpad=0.4)
+    plt.tight_layout()
+    # plt.savefig(
+    #     '/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Correlations/PythonMainFigures/NMI_neuron_level.pdf',
+    #     bbox_inches='tight', dpi=500)
+    # plt.close('all')
+
     plt.show()
 
 ########################################################################################################################

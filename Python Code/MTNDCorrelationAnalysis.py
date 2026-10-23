@@ -100,6 +100,25 @@ masterCorrPairNum = []
 masterCorrUnitsSpikeCountMat = []
 masterCorrUnitsSpikeCountMatTransient = []
 masterCorrUnitsSpikeCountMatSustained = []
+# NEW: sliding-window spike counts (per unit: [n_windows, blocksDone, nConds])
+masterCorrUnitsSpikeCountMatSliding = []
+slidingWindowsMS = None  # will be set per session (and should be consistent)
+
+# ================= GLOBAL PSTH AGGREGATION (across sessions) =================
+# Will accumulate normalized and raw PSTHs across (good unit × condition)
+masterPSTH_norm_list = []     # each entry: [T] normalized PSTH for one (unit, stimIndex)
+masterPSTH_raw_list  = []     # each entry: [T] raw spikes/s PSTH for one (unit, stimIndex)
+
+# Max firing rates (spikes/s) for each (unit, stimIndex)
+masterPSTH_maxFR = []         # float
+masterPSTH_unitKeys = []      # string like '230607_149'
+masterPSTH_stimIdx = []       # int stimIndex
+
+# (optional) store metadata
+masterPSTH_histPrePostMS = None
+masterPSTH_trueStimDurMS = None
+# ============================================================================
+
 popGaborSD = []
 popGaborOffsetDeg = []
 akshanFixWindow = []
@@ -214,6 +233,25 @@ for file in fileList:
     spikeCountMatTransient = np.zeros((len(units), blocksDone + 1, numSteps * 7 + 3))
     spikeCountMatSustained = np.zeros((len(units), blocksDone + 1, numSteps * 7 + 3))
 
+    # ================= NEW: SLIDING WINDOWS =================
+    # Settings (ms)
+    SLIDE_ONSET_MS = 50  # onset latency
+    SLIDE_WIN_MS = 80  # fixed window length
+    SLIDE_STEP_MS = 20  # step size
+    # stimulus + offLatency locked end time (ms relative to stim onset)
+    offLatencyMS = int(round(offLatency * 1000))
+    maxEndMS = int(trueStimDurMS) + offLatencyMS  # windows can extend into offLatency
+    # window starts (ms) from 50ms to maxEndMS - 50ms inclusive, step 10ms
+    startsMS = np.arange(SLIDE_ONSET_MS, maxEndMS - SLIDE_WIN_MS + 1, SLIDE_STEP_MS, dtype=int)
+    endsMS = startsMS + SLIDE_WIN_MS
+    nWin = len(startsMS)
+    # Save window definitions (ms) for later use/metadata
+    slidingWindowsMS = np.column_stack([startsMS, endsMS])  # shape (nWin, 2)
+    # Allocate sliding-window spike count matrix:
+    # shape = (nWin, nUnits, blocksDone+1, nConds)
+    spikeCountMatSliding = np.zeros((nWin, len(units), blocksDone + 1, numSteps * 7 + 3), dtype=np.float32)
+    # =======================================================
+
     # insert spikes from valid stimulus presentations into spike count matrices
     for corrTrial in corrTrials:
         currTrial = allTrials[corrTrial]
@@ -270,6 +308,20 @@ for file in fileList:
                             stimSpikes_sus = np.where((unitTimeStamps >= win_sus_start) &
                                                       (unitTimeStamps <= win_sus_end))[0]
                             spikeCountMatSustained[unitCount][stCount][stimIndex] = len(stimSpikes_sus)
+
+                            # ================= NEW: SLIDING WINDOW COUNTS =================
+                            # Compute once per stim presentation (speed): absolute edges in seconds
+                            # Use stimulus+offLatency locked windows (relative to stimOnTimeS)
+                            # Count spikes in each window [start, end] (same inclusive convention as your existing code)
+                            for w in range(nWin):
+                                w_start_s = stimOnTimeS + (startsMS[w] / 1000.0)
+                                w_end_s = stimOnTimeS + (endsMS[w] / 1000.0)
+
+                                # Count spikes in this sliding window
+                                stimSpikes_w = np.where((unitTimeStamps >= w_start_s) &
+                                                        (unitTimeStamps <= w_end_s))[0]
+                                spikeCountMatSliding[w, unitCount, stCount, stimIndex] = len(stimSpikes_w)
+                            # ==============================================================
 
                             # PSTHs
                             stimOnPreSNEV = stimOnTimeS - (histPrePostMS / 1000)
@@ -501,6 +553,8 @@ for file in fileList:
             masterCorrUnitsSpikeCountMat.append(spikeCountMat[idx, :blocksDone, :])
             masterCorrUnitsSpikeCountMatTransient.append(spikeCountMatTransient[idx, :blocksDone, :])
             masterCorrUnitsSpikeCountMatSustained.append(spikeCountMatSustained[idx, :blocksDone, :])
+            # NEW: sliding windows -> per unit array shape (nWin, blocksDone, nConds)
+            masterCorrUnitsSpikeCountMatSliding.append(spikeCountMatSliding[:, idx, :blocksDone, :])
 
         corrUnits = np.array(corrUnits)
         # the different combinations of neuron pairs from total units
@@ -525,6 +579,48 @@ for file in fileList:
 
                 indx = (i - 19) // 2
                 corrLists[indx].append(pairStimCorr)
+
+        # ================= GRAND PSTH (blocksDone division; 1 presentation/cond/block) =================
+        nConds = numSteps * 7 + 3
+
+        # Save metadata once (assumes consistent across sessions; if not, you’ll want to resample)
+        if masterPSTH_histPrePostMS is None:
+            masterPSTH_histPrePostMS = histPrePostMS
+            masterPSTH_trueStimDurMS = int(trueStimDurMS)
+
+        stim_start = histPrePostMS
+        stim_end = histPrePostMS + int(trueStimDurMS)
+
+        for uid in corrUnits:
+                uidx = np.where(units == uid)[0][0]
+                unitKey = f"{seshDate}_{uid}"
+
+                for stimIdx in range(nConds):
+                    # counts per 1 ms bin across all blocks (since 1 presentation per block)
+                    hist_counts = spikeHists[uidx, stimIdx, :].astype(np.float32)
+
+                    # Convert -> spikes/s (per-bin)
+                    psth_rate = hist_counts * 1000.0 / float(blocksDone)
+
+                    # max FR within stimulus window (exclude pre-period)
+                    if stim_end <= psth_rate.size:
+                        maxFR = float(np.max(psth_rate[stim_start:stim_end]))
+                    else:
+                        maxFR = float(np.max(psth_rate))
+
+                    masterPSTH_maxFR.append(maxFR)
+                    masterPSTH_unitKeys.append(unitKey)
+                    masterPSTH_stimIdx.append(int(stimIdx))
+
+                    # Normalize by per-(unit,condition) max
+                    if maxFR > 0:
+                        psth_norm = psth_rate / maxFR
+                    else:
+                        psth_norm = np.full_like(psth_rate, np.nan, dtype=np.float32)
+
+                    masterPSTH_raw_list.append(psth_rate.astype(np.float32))
+                    masterPSTH_norm_list.append(psth_norm.astype(np.float32))
+        # =============================================================================
 
     # to open another file in the loop
     os.chdir('../../Python Code')
@@ -662,6 +758,66 @@ stim_type_peripherySpon = np.array([-1, 1, 1, 1, 1,
                                     1, 1, 1, 1,
                                     0, 0, 0, 0,
                                     1])
+
+# ================= FINAL GRAND AVERAGES =================
+masterPSTH_norm_arr = np.array(masterPSTH_norm_list)  # shape: [NunitCond, T]
+masterPSTH_raw_arr  = np.array(masterPSTH_raw_list)   # shape: [NunitCond, T]
+
+grandAvgPSTH_norm = np.nanmean(masterPSTH_norm_arr, axis=0)  # [T]
+grandAvgPSTH_raw  = np.nanmean(masterPSTH_raw_arr,  axis=0)  # [T]
+
+print("Grand PSTH computed from N (unit×condition) =", masterPSTH_norm_arr.shape[0])
+print("PSTH length T =", grandAvgPSTH_norm.shape[0])
+
+# Also useful summaries of max firing rates
+masterPSTH_maxFR = np.array(masterPSTH_maxFR, dtype=float)
+print("Mean max FR (sp/s) across unit×condition =", np.nanmean(masterPSTH_maxFR))
+print("Median max FR (sp/s) across unit×condition =", np.nanmedian(masterPSTH_maxFR))
+# =========================================================
+
+########################################################################################################################
+################################################ Grand Avg  PSTH #######################################################
+########################################################################################################################
+print('test')
+# smoothValue = 4
+# lineWidth = 1
+#
+# gaussSmoothGrand = gaussian_filter1d(grandAvgPSTH_norm, smoothValue)
+# gaussSmoothGrandRaw = gaussian_filter1d(grandAvgPSTH_raw, smoothValue)
+#
+# fig, axs = plt.subplots(1, 2, figsize=(7, 3))
+#
+# # Normalized grand average
+# axs[0].plot(gaussSmoothGrand, color='black', linewidth=lineWidth)
+# axs[0].set_title("Grand Avg PSTH (normalized)")
+#
+# # Raw grand average (spikes/s)
+# axs[1].plot(gaussSmoothGrandRaw, color='black', linewidth=lineWidth)
+# axs[1].set_title("Grand Avg PSTH (raw sp/s)")
+#
+# for ax in axs:
+#     ax.set_xticks([0, masterPSTH_histPrePostMS, masterPSTH_histPrePostMS + 250,
+#                    2 * masterPSTH_histPrePostMS + 250])
+#     ax.set_xticklabels([-masterPSTH_histPrePostMS, 0, 250,
+#                         250 + masterPSTH_histPrePostMS])
+#     ax.axvspan(masterPSTH_histPrePostMS,
+#                masterPSTH_histPrePostMS + masterPSTH_trueStimDurMS,
+#                color='grey', alpha=0.2)
+#
+#     ax.set_xlabel("Time (ms)")
+#     ax.spines['top'].set_visible(False)
+#     ax.spines['right'].set_visible(False)
+#     ax.spines['bottom'].set_linewidth(lineWidth)
+#     ax.spines['left'].set_linewidth(lineWidth)
+#     ax.tick_params(axis='both', width=1, length=4, direction='out', pad=3)
+#
+# axs[0].set_ylabel("Norm firing rate")
+# axs[1].set_ylabel("Firing rate (sp/s)")
+#
+# plt.tight_layout()
+# plt.show()
+
+print('test')
 
 ########################################################################################################################
 ####################################### RF Weighted Normalization with baseline ########################################
@@ -910,6 +1066,15 @@ for date in date_labels:
         pmfs.append(p)
     pmfs = np.vstack(pmfs)
 
+    # ----- Signal correlation: Pearson r on mean tuning curves -----
+    # Each row of tuning_mat is the mean response vector for a good unit
+    tuning_mat = np.array([dirData[unit_to_row[u], :].astype(float)
+                           for u in goodUnits_today])  # shape: (ngood, n_dirs)
+
+    # Pearson r between all pairs; np.corrcoef returns (ngood x ngood) matrix
+    sig_corr_mat = np.corrcoef(tuning_mat)  # NaN-safe as long as no zero-variance rows
+
+
     # ----- Record only unique pairs (i < j) -----
     for i, j in combinations(range(len(goodUnits_today)), 2):
         # Bhattacharyya coefficient & distance
@@ -925,6 +1090,7 @@ for date in date_labels:
             "PD_j_deg": float(pref_dirs_deg[j]),
             "SI": float(SI[i, j]),
             "SI01": float(SI01[i, j]),
+            "sig_corr": float(sig_corr_mat[i, j]),  # Pearson r on mean tuning curves
             "BC_dir_tuning": bc,      # Bhattacharyya coefficient (0..1)
             "BDir": bd,               # Bhattacharyya distance (-log(BC))
             "R2_i": float(r2_list[i]),  # NEW: von Mises fit R^2 for unit_i
@@ -1000,6 +1166,15 @@ def build_monkey_lookup(similarity_records):
     return monkey_lookup
 
 
+def build_sig_corr_lookup(similarity_records):
+    sig_corr_lookup = {}
+    for r in similarity_records:
+        a, b = r["unit_i"], r["unit_j"]
+        key = tuple(sorted((a, b)))
+        sig_corr_lookup[key] = r.get("sig_corr")
+    return sig_corr_lookup
+
+
 # === NEW: BC/BD lookup from similarity_records (order-agnostic) ===
 def build_bcbd_lookup(similarity_records):
     bc_lookup = {}
@@ -1038,6 +1213,8 @@ def single_indices_for_pair(i):
 
 
 # Helper to add a record (now includes each neuron's site-specific weight)
+import numpy as np
+
 def add_record(block, i, comb, pairStimCorr, pairWeightGeomMean, n1Sel, n2Sel,
                sim_SI=None, sim_SI01=None, delta_PD_abs_deg=None, avg_pair_weight_2w=None,
                monkey=None, singleCorr_center=None, singleCorr_periph=None,
@@ -1051,67 +1228,181 @@ def add_record(block, i, comb, pairStimCorr, pairWeightGeomMean, n1Sel, n2Sel,
                BC_dir_tuning=None, BDir=None,
                n1w=None, n2w=None,
                pairMinShareGeom=None, n1MinShare=None, n2MinShare=None,
-               n1Sig=None, n2Sig=None, pairCov=None, singleCCov=None,
-               singlePCov=None,
+               n1Sig=None, n2Sig=None,
+               pairCov=None, singleCCov=None, singlePCov=None,
+               pairVar1=None, pairVar2=None,
+               singleCenterVar1=None, singleCenterVar2=None,
+               singlePeriphVar1=None, singlePeriphVar2=None,
                pairMeanFR_paired_hz=None,
                pairMeanFR_single_center_hz=None,
-               pairMeanFR_single_periph_hz=None):
+               pairMeanFR_single_periph_hz=None,
+               sig_corr=None,
+               site=None,
+               center_single_idx=None,
+               periph_single_idx=None,
+               single_center_isPref=None,
+               single_periph_isPref=None,
+               paired_center_isPref=None):
+
     u1, u2 = comb
-    date = u1.split("_")[0]  # both units should share the same date
+    date = u1.split("_")[0]
+
+    def _f(x):
+        return None if x is None else float(x)
+
+    def _i(x):
+        return None if x is None else int(x)
+
+    def _b(x):
+        return None if x is None else bool(x)
+
+    def _den(v1, v2):
+        # denom = sqrt(var1*var2) if both valid and positive
+        if (v1 is None) or (v2 is None):
+            return None
+        try:
+            v1 = float(v1); v2 = float(v2)
+        except Exception:
+            return None
+        if not (np.isfinite(v1) and np.isfinite(v2)) or (v1 <= 0) or (v2 <= 0):
+            return None
+        return float(np.sqrt(v1 * v2))
+
     corr_records.append({
         "date": date,
         "unit_i": u1,
         "unit_j": u2,
-        "block": block,              # e.g., "centerN_offsetsPN" or "centerP_offsetsPN"
-        "cond_index": i,             # 10..17 or 19..26
+        "block": block,
+        "cond_index": i,
+
+        # --- correlations ---
         "corr": float(pairStimCorr),
-        # NEW: paired corr (transient / sustained)
         "corr_transient": (None if pairStimCorr_transient is None else float(pairStimCorr_transient)),
         "corr_sustained": (None if pairStimCorr_sustained is None else float(pairStimCorr_sustained)),
-        # NEW singles (transient / sustained)
-        "singleCorr_center_transient": (
-            None if singleCorr_center_transient is None else float(singleCorr_center_transient)),
-        "singleCorr_periph_transient": (
-            None if singleCorr_periph_transient is None else float(singleCorr_periph_transient)),
-        "singleCorr_center_sustained": (
-            None if singleCorr_center_sustained is None else float(singleCorr_center_sustained)),
-        "singleCorr_periph_sustained": (
-            None if singleCorr_periph_sustained is None else float(singleCorr_periph_sustained)),
+
+        "singleCorr_center": _f(singleCorr_center),
+        "singleCorr_periph": _f(singleCorr_periph),
+        "singleCorr_center_transient": _f(singleCorr_center_transient),
+        "singleCorr_periph_transient": _f(singleCorr_periph_transient),
+        "singleCorr_center_sustained": _f(singleCorr_center_sustained),
+        "singleCorr_periph_sustained": _f(singleCorr_periph_sustained),
+
+        # --- weights / similarity ---
         "pair_weight_geommean": float(pairWeightGeomMean),
+        "singleWeightGeom_center": _f(singleWeightGeom_center),
+        "singleWeightGeom_periph": _f(singleWeightGeom_periph),
+
         "n1Sel": float(n1Sel),
         "n2Sel": float(n2Sel),
-        "pairSel_geom": float(np.sign(n1Sel)*np.sign(n2Sel)*np.sqrt(abs(n1Sel)*abs(n2Sel))),
-        "similarity_SI": (None if sim_SI is None else float(sim_SI)),
-        "similarity_SI01": (None if sim_SI01 is None else float(sim_SI01)),
-        "delta_PD_abs_deg": (None if delta_PD_abs_deg is None else float(delta_PD_abs_deg)),
-        "avg_pair_weight_2w": (None if avg_pair_weight_2w is None else float(avg_pair_weight_2w)),
+        "pairSel_geom": float(np.sign(n1Sel) * np.sign(n2Sel) * np.sqrt(abs(n1Sel) * abs(n2Sel))),
+
+        "similarity_SI": _f(sim_SI),
+        "similarity_SI01": _f(sim_SI01),
+        "delta_PD_abs_deg": _f(delta_PD_abs_deg),
+        "avg_pair_weight_2w": _f(avg_pair_weight_2w),
         "monkey": (None if monkey is None else str(monkey)),
-        # Singles:
-        "singleCorr_center": (None if singleCorr_center is None else float(singleCorr_center)),
-        "singleCorr_periph": (None if singleCorr_periph is None else float(singleCorr_periph)),
-        "singleWeightGeom_center": (None if singleWeightGeom_center is None else float(singleWeightGeom_center)),
-        "singleWeightGeom_periph": (None if singleWeightGeom_periph is None else float(singleWeightGeom_periph)),
-        # Bhattacharyya metrics
-        "BC_dir_tuning": (None if BC_dir_tuning is None else float(BC_dir_tuning)),
-        "BDir": (None if BDir is None else float(BDir)),
-        # Per-neuron weight used in this paired condition
-        "n1w": (None if n1w is None else float(n1w)),
-        "n2w": (None if n2w is None else float(n2w)),
-        # NEW: min-share metric
-        "pairMinShareGeom": (None if pairMinShareGeom is None else float(pairMinShareGeom)),
-        "n1MinShare": (None if n1MinShare is None else float(n1MinShare)),
-        "n2MinShare": (None if n2MinShare is None else float(n2MinShare)),
-        "n1Sigma": (None if n1Sig is None else float(n1Sig)),
-        "n2Sigma": (None if n2Sig is None else float(n2Sig)),
-        "pairCov": (None if pairCov is None else float(pairCov)),
-        "singleCenterCov": (None if singleCCov is None else float(singleCCov)),
-        "singlePeriphCov": (None if singlePCov is None else float(singlePCov)),
-        "pairMeanFR_paired_hz": (None if pairMeanFR_paired_hz is None else float(pairMeanFR_paired_hz)),
-        "pairMeanFR_single_center_hz": (
-            None if pairMeanFR_single_center_hz is None else float(pairMeanFR_single_center_hz)),
-        "pairMeanFR_single_periph_hz": (
-            None if pairMeanFR_single_periph_hz is None else float(pairMeanFR_single_periph_hz)),
+
+        "BC_dir_tuning": _f(BC_dir_tuning),
+        "BDir": _f(BDir),
+        "sig_corr": _f(sig_corr),
+
+        # --- metadata ---
+        "site": _i(site),
+        "center_single_idx": _i(center_single_idx),
+        "periph_single_idx": _i(periph_single_idx),
+        "single_center_isPref": _b(single_center_isPref),
+        "single_periph_isPref": _b(single_periph_isPref),
+        "paired_center_isPref": _b(paired_center_isPref),
+
+        # --- per-neuron weights/sigmas ---
+        "n1w": _f(n1w),
+        "n2w": _f(n2w),
+        "pairMinShareGeom": _f(pairMinShareGeom),
+        "n1MinShare": _f(n1MinShare),
+        "n2MinShare": _f(n2MinShare),
+        "n1Sigma": _f(n1Sig),
+        "n2Sigma": _f(n2Sig),
+
+        # --- covariance + variances (counts^2) ---
+        "pairCov": _f(pairCov),
+        "pairVar1": _f(pairVar1),
+        "pairVar2": _f(pairVar2),
+        "pairDenom": _den(pairVar1, pairVar2),
+
+        "singleCenterCov": _f(singleCCov),
+        "singleCenterVar1": _f(singleCenterVar1),
+        "singleCenterVar2": _f(singleCenterVar2),
+        "singleCenterDenom": _den(singleCenterVar1, singleCenterVar2),
+
+        "singlePeriphCov": _f(singlePCov),
+        "singlePeriphVar1": _f(singlePeriphVar1),
+        "singlePeriphVar2": _f(singlePeriphVar2),
+        "singlePeriphDenom": _den(singlePeriphVar1, singlePeriphVar2),
+
+        # --- rates (Hz) ---
+        "pairMeanFR_paired_hz": _f(pairMeanFR_paired_hz),
+        "pairMeanFR_single_center_hz": _f(pairMeanFR_single_center_hz),
+        "pairMeanFR_single_periph_hz": _f(pairMeanFR_single_periph_hz),
     })
+
+
+# =========================
+# SLIDING WINDOW RECORDS (PAIRED + SINGLES)
+# =========================
+def cov_var_mean_from_vectors(x, y):
+    """
+    x,y: 1D arrays (trials).
+    Returns: cov12, var1, var2, mean1, mean2 using sample cov (ddof=1).
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+
+    mean1 = np.nanmean(x)
+    mean2 = np.nanmean(y)
+
+    # np.cov uses ddof=1 by default (bias=False)
+    C = np.cov(x, y, bias=False)
+    cov12 = float(C[0, 1])
+    var1  = float(C[0, 0])
+    var2  = float(C[1, 1])
+
+    return cov12, var1, var2, float(mean1), float(mean2)
+
+
+def add_slide_record(slide_records, comb, block, cond_i,
+                     stim_type,  # "paired" | "single_center" | "single_periph"
+                     win_idx, win_start_ms, win_end_ms,
+                     bc_val, weight_fraction_val,
+                     corr_val, cov12_val, var1, var2, mean1, mean2,
+                     monkey=None):
+    u1, u2 = comb
+    date = u1.split("_")[0]
+
+    slide_records.append({
+        "date": date,
+        "unit_i": u1,
+        "unit_j": u2,
+        "block": block,
+        "cond_index": int(cond_i),
+        "stim_type": str(stim_type),
+
+        "win_idx": int(win_idx),
+        "win_start_ms": float(win_start_ms),
+        "win_end_ms": float(win_end_ms),
+
+        "monkey": (None if monkey is None else str(monkey)),
+
+        "BC_dir_tuning": (None if bc_val is None else float(bc_val)),
+        "weight_fraction": (None if weight_fraction_val is None else float(weight_fraction_val)),
+
+        "corr": (None if corr_val is None else float(corr_val)),
+        "cov12": (None if cov12_val is None else float(cov12_val)),
+        "var1": (None if var1 is None else float(var1)),
+        "var2": (None if var2 is None else float(var2)),
+        "mean1": (None if mean1 is None else float(mean1)),
+        "mean2": (None if mean2 is None else float(mean2)),
+    })
+
 
 # stim index mat (reference)
 stimIndexMat = np.arange(0, 27).reshape(3, 9)
@@ -1135,10 +1426,45 @@ pd_lookup = build_pd_lookup(similarity_records)
 monkey_lookup = build_monkey_lookup(similarity_records)
 bc_lookup, bd_lookup = build_bcbd_lookup(similarity_records)
 r2_lookup = build_r2_lookup(similarity_records)
+sig_corr_lookup = build_sig_corr_lookup(similarity_records)
 
 # Faster index maps for master arrays to avoid repeated np.where calls
 good_index = {u: i for i, u in enumerate(masterGoodUnits)}
 corr_index = {u: i for i, u in enumerate(masterCorrUnits)}
+
+# =========================
+# SLIDING WINDOW SETUP
+# =========================
+if "masterCorrUnitsSpikeCountMatSliding" not in globals():
+    raise ValueError("masterCorrUnitsSpikeCountMatSliding not found. Did you build/append it in the counting step?")
+
+if len(masterCorrUnitsSpikeCountMatSliding) == 0:
+    raise ValueError("masterCorrUnitsSpikeCountMatSliding is empty.")
+
+# Ensure all units have same nWin
+nWin0 = masterCorrUnitsSpikeCountMatSliding[0].shape[0]
+for k, arr in enumerate(masterCorrUnitsSpikeCountMatSliding):
+    if arr.shape[0] != nWin0:
+        raise ValueError(
+            f"Inconsistent nWin across units: unit0={nWin0}, unit{k}={arr.shape[0]}. "
+            "This usually means session-to-session differences in how you generated sliding windows."
+        )
+nWin = int(nWin0)
+
+# Use saved slidingWindowsMS if you created it during spike counting (recommended)
+# slidingWindowsMS expected shape (nWin, 2): [start_ms, end_ms]
+if "slidingWindowsMS" in globals():
+    win_starts_ms = np.asarray(slidingWindowsMS[:, 0], dtype=float)
+    win_ends_ms   = np.asarray(slidingWindowsMS[:, 1], dtype=float)
+    if len(win_starts_ms) != nWin:
+        raise ValueError("slidingWindowsMS length does not match nWin in masterCorrUnitsSpikeCountMatSliding.")
+else:
+    # Fallback: store indices only (still works, but less interpretable)
+    win_starts_ms = np.arange(nWin, dtype=float)
+    win_ends_ms   = np.arange(nWin, dtype=float)
+
+# Accumulator for the sliding analysis
+slide_records = []
 
 # ===== R^2 gate (toggle this as you like) =====
 R2_MIN = 0.0  # e.g., 0.80 means 80%; set to 0.70, 0.90, etc.
@@ -1167,6 +1493,7 @@ for comb in all_combs:
     sim01_val = sim_SI01_lookup.get(key)
     bc_val = bc_lookup.get(key)   # may be None if not in similarity_records
     bd_val = bd_lookup.get(key)
+    sig_corr_val = sig_corr_lookup.get(key)
 
     # R² gate for this pair
     r2_i, r2_j = r2_lookup.get(key, (np.nan, np.nan))
@@ -1184,6 +1511,7 @@ for comb in all_combs:
     # Block 1: i = 10..17 (center=N offsets P or N)
     # =========================
     for i in range(10, 18):
+        block = "centerN_offsetsPN"
         n1SpkMatIdx = corr_index[comb[0]]
         n2SpkMatIdx = corr_index[comb[1]]
         n1SpikeMat = masterCorrUnitsSpikeCountMat[n1SpkMatIdx][:, i]
@@ -1211,6 +1539,13 @@ for comb in all_combs:
 
         # Correct single indices and site
         center_single_idx, periph_single_idx, site = single_indices_for_pair(i)
+
+        # For paired blocks: whether CENTER stimulus is preferred
+        paired_center_isPref = (block == "centerP_offsetsPN")
+        # For singles: infer preference from i parity if that’s how your indices are defined
+        # (If you’re not 100% sure, set these to None for now and we’ll derive later from index maps)
+        single_center_isPref = (i % 2 == 1)  # <-- ONLY if your single_indices_for_pair follows this convention
+        single_periph_isPref = (i % 2 == 1)  # adjust if needed
 
         # Weights / sigmas for this site
         w0 = 1.0
@@ -1249,6 +1584,11 @@ for comb in all_combs:
         n2_single_periph = masterCorrUnitsSpikeCountMat[n2SpkMatIdx][:, periph_single_idx]
         singleCorr_periph, singlePeriCov, _ = pairCorrExclude3SD(n1_single_periph, n2_single_periph,
                                                                  method='pearson')
+
+        if (any(v < 0 for v in (pairStimCorr, singleCorr_center, singleCorr_periph))
+                and pairWeightGeomMean > 0.5
+                and bc_val < 0.5):
+            print(comb, pairWeightGeomMean, bc_val, pairStimCorr, singleCorr_center, singleCorr_periph)
 
         # --- TRANSIENT singles ---
         n1_single_center_T = masterCorrUnitsSpikeCountMatTransient[n1SpkMatIdx][:, center_single_idx]
@@ -1332,6 +1672,15 @@ for comb in all_combs:
         bc_keep = bc_val if r2_ok else np.nan
         bd_keep = bd_val if r2_ok else np.nan
 
+        pairVar1 = float(pairDCov[0][0])
+        pairVar2 = float(pairDCov[1][1])
+
+        singleCenterVar1 = float(singleCenterCov[0][0])
+        singleCenterVar2 = float(singleCenterCov[1][1])
+
+        singlePeriphVar1 = float(singlePeriCov[0][0])
+        singlePeriphVar2 = float(singlePeriCov[1][1])
+
         # ---- add_record call (Block 1 example) ----
         add_record(block="centerN_offsetsPN", i=i, comb=comb,
                    pairStimCorr=pairStimCorr,
@@ -1347,6 +1696,7 @@ for comb in all_combs:
                    singleWeightGeom_periph=singleWeightGeom_periph,
                    BC_dir_tuning=bc_keep,  # <— gated
                    BDir=bd_keep,  # <— gated
+                   sig_corr=sig_corr_val,
                    n1w=n1w,
                    n2w=n2w,
                    pairMinShareGeom=pairMinShareGeom,
@@ -1365,8 +1715,125 @@ for comb in all_combs:
                    singleCorr_center_sustained=singleCorr_center_S,
                    singleCorr_periph_sustained=singleCorr_periph_S,
                    pairMeanFR_single_center_hz=pairMeanFR_single_center_hz,
-                   pairMeanFR_single_periph_hz=pairMeanFR_single_periph_hz
-                   )
+                   pairMeanFR_single_periph_hz=pairMeanFR_single_periph_hz,
+                   site=site,
+                   center_single_idx=center_single_idx,
+                   periph_single_idx=periph_single_idx,
+                   single_center_isPref=single_center_isPref,
+                   single_periph_isPref=single_periph_isPref,
+                   paired_center_isPref=paired_center_isPref,
+                   pairVar1=pairVar1,
+                   pairVar2=pairVar2,
+                   singleCenterVar1=singleCenterVar1,
+                   singleCenterVar2=singleCenterVar2,
+                   singlePeriphVar1=singlePeriphVar1,
+                   singlePeriphVar2=singlePeriphVar2)
+
+        # =========================
+        # NEW: SLIDING WINDOW metrics (PAIRED + SINGLES)
+        # Attach each window's corr/cov/var to the same BC & weight-fraction coordinates
+        # =========================
+        n1SpkMatIdx = corr_index[comb[0]]
+        n2SpkMatIdx = corr_index[comb[1]]
+
+        # R²-gated BC (same logic you already use)
+        bc_keep = bc_val if r2_ok else np.nan
+
+        # --- get sliding matrices for this condition (paired) ---
+        # Each: shape (nWin, blocksDone)
+        n1_paired_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, i]
+        n2_paired_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, i]
+
+        # --- sliding for the singles indices that correspond to this paired condition ---
+        # These are whole-stim "single indices" derived from i
+        n1_singleC_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, center_single_idx]
+        n2_singleC_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, center_single_idx]
+
+        n1_singleP_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, periph_single_idx]
+        n2_singleP_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, periph_single_idx]
+
+        # For each window, compute corr/cov/var for each stim_type
+        for w in range(nWin):
+            # ---------- PAIRED ----------
+            xw = n1_paired_slide[w, :]
+            yw = n2_paired_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="paired",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=pairWeightGeomMean,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="paired",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=pairWeightGeomMean,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
+
+            # ---------- SINGLE: CENTER ----------
+            xw = n1_singleC_slide[w, :]
+            yw = n2_singleC_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_center",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_center,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_center",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_center,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
+
+            # ---------- SINGLE: PERIPH ----------
+            xw = n1_singleP_slide[w, :]
+            yw = n2_singleP_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_periph",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_periph,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_periph",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_periph,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
 
     # =========================
     # Block 2: i = 19..26 (center=P offsets P or N)
@@ -1399,6 +1866,12 @@ for comb in all_combs:
 
         # Correct single indices and site
         center_single_idx, periph_single_idx, site = single_indices_for_pair(i)
+        # For paired blocks: whether CENTER stimulus is preferred
+        paired_center_isPref = (block == "centerP_offsetsPN")
+        # For singles: infer preference from i parity if that’s how your indices are defined
+        # (If you’re not 100% sure, set these to None for now and we’ll derive later from index maps)
+        single_center_isPref = (i % 2 == 1)  # <-- ONLY if your single_indices_for_pair follows this convention
+        single_periph_isPref = (i % 2 == 1)  # adjust if needed
 
         w0 = 1.0
         n1w = rfWeightNeuronFits[n1][2 + site]
@@ -1435,6 +1908,11 @@ for comb in all_combs:
         n2_single_periph = masterCorrUnitsSpikeCountMat[n2SpkMatIdx][:, periph_single_idx]
         singleCorr_periph, singlePeriCov, _ = pairCorrExclude3SD(n1_single_periph, n2_single_periph,
                                                                  method='pearson')
+
+        if (any(v < 0.0 for v in (pairStimCorr, singleCorr_center, singleCorr_periph))
+                and pairWeightGeomMean > 0.5
+                and bc_val < 0.5):
+            print(comb, pairWeightGeomMean, bc_val, pairStimCorr, singleCorr_center, singleCorr_periph)
 
         # --- TRANSIENT singles ---
         n1_single_center_T = masterCorrUnitsSpikeCountMatTransient[n1SpkMatIdx][:, center_single_idx]
@@ -1517,6 +1995,15 @@ for comb in all_combs:
         bc_keep = bc_val if r2_ok else np.nan
         bd_keep = bd_val if r2_ok else np.nan
 
+        pairVar1 = float(pairDCov[0][0])
+        pairVar2 = float(pairDCov[1][1])
+
+        singleCenterVar1 = float(singleCenterCov[0][0])
+        singleCenterVar2 = float(singleCenterCov[1][1])
+
+        singlePeriphVar1 = float(singlePeriCov[0][0])
+        singlePeriphVar2 = float(singlePeriCov[1][1])
+
         # ---- add_record call (Block 1 example) ----
         add_record(block="centerP_offsetsPN", i=i, comb=comb,
                    pairStimCorr=pairStimCorr,
@@ -1532,6 +2019,7 @@ for comb in all_combs:
                    singleWeightGeom_periph=singleWeightGeom_periph,
                    BC_dir_tuning=bc_keep,  # <— gated
                    BDir=bd_keep,  # <— gated
+                   sig_corr=sig_corr_val,
                    n1w=n1w,
                    n2w=n2w,
                    pairMinShareGeom=pairMinShareGeom,
@@ -1550,8 +2038,127 @@ for comb in all_combs:
                    singleCorr_periph_sustained=singleCorr_periph_S,
                    pairMeanFR_paired_hz=pairMeanFR_paired_hz,
                    pairMeanFR_single_center_hz=pairMeanFR_single_center_hz,
-                   pairMeanFR_single_periph_hz=pairMeanFR_single_periph_hz
-                   )
+                   pairMeanFR_single_periph_hz=pairMeanFR_single_periph_hz,
+                   site=site,
+                   center_single_idx=center_single_idx,
+                   periph_single_idx=periph_single_idx,
+                   single_center_isPref=single_center_isPref,
+                   single_periph_isPref=single_periph_isPref,
+                   paired_center_isPref=paired_center_isPref,
+                   pairVar1=pairVar1,
+                   pairVar2=pairVar2,
+                   singleCenterVar1=singleCenterVar1,
+                   singleCenterVar2=singleCenterVar2,
+                   singlePeriphVar1=singlePeriphVar1,
+                   singlePeriphVar2=singlePeriphVar2)
+
+        # =========================
+        # NEW: SLIDING WINDOW metrics (PAIRED + SINGLES)
+        # Attach each window's corr/cov/var to the same BC & weight-fraction coordinates
+        # =========================
+        block = "centerP_offsetsPN"
+        n1SpkMatIdx = corr_index[comb[0]]
+        n2SpkMatIdx = corr_index[comb[1]]
+
+        # R²-gated BC (same logic you already use)
+        bc_keep = bc_val if r2_ok else np.nan
+
+        # --- get sliding matrices for this condition (paired) ---
+        # Each: shape (nWin, blocksDone)
+        n1_paired_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, i]
+        n2_paired_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, i]
+
+        # --- sliding for the singles indices that correspond to this paired condition ---
+        # These are whole-stim "single indices" derived from i
+        n1_singleC_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, center_single_idx]
+        n2_singleC_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, center_single_idx]
+
+        n1_singleP_slide = masterCorrUnitsSpikeCountMatSliding[n1SpkMatIdx][:, :, periph_single_idx]
+        n2_singleP_slide = masterCorrUnitsSpikeCountMatSliding[n2SpkMatIdx][:, :, periph_single_idx]
+
+        # For each window, compute corr/cov/var for each stim_type
+        for w in range(nWin):
+            # ---------- PAIRED ----------
+            xw = n1_paired_slide[w, :]
+            yw = n2_paired_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="paired",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=pairWeightGeomMean,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="paired",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=pairWeightGeomMean,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
+
+            # ---------- SINGLE: CENTER ----------
+            xw = n1_singleC_slide[w, :]
+            yw = n2_singleC_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_center",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_center,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_center",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_center,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
+
+            # ---------- SINGLE: PERIPH ----------
+            xw = n1_singleP_slide[w, :]
+            yw = n2_singleP_slide[w, :]
+            try:
+                corr_w, cov_w, _ = pairCorrExclude3SD(xw, yw, method='pearson')
+                cov12 = float(cov_w[0][1])
+                cov12_raw, var1, var2, mean1, mean2 = cov_var_mean_from_vectors(xw, yw)
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_periph",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_periph,
+                    corr_val=corr_w, cov12_val=cov12,
+                    var1=var1, var2=var2, mean1=mean1, mean2=mean2,
+                    monkey=monkey_name
+                )
+            except Exception:
+                add_slide_record(
+                    slide_records=slide_records, comb=comb,
+                    block=block, cond_i=i, stim_type="single_periph",
+                    win_idx=w, win_start_ms=win_starts_ms[w], win_end_ms=win_ends_ms[w],
+                    bc_val=bc_keep, weight_fraction_val=singleWeightGeom_periph,
+                    corr_val=np.nan, cov12_val=np.nan,
+                    var1=np.nan, var2=np.nan, mean1=np.nan, mean2=np.nan,
+                    monkey=monkey_name
+                )
+
 
 # Wrap up: arrays if you still need them
 masterCorr = np.array(masterCorr)
@@ -1564,12 +2171,12 @@ oppositeSelWeight = np.array(oppositeSelWeight)
 
 # DataFrame for analysis/joins/plots
 corr_df = pd.DataFrame(corr_records)
-
 savemat("corr_dataMTND.mat", {
     "nonPrefSupp": corr_df["pair_weight_geommean"].values,
     "selectivity": corr_df["pairSel_geom"].values,
     "bhattCoef": corr_df["BC_dir_tuning"].values,
     "deltaPD": corr_df["delta_PD_abs_deg"].values,
+    "sigCorr": corr_df["sig_corr"].values,
     "pairedCorr": corr_df['corr'].values,
     "pairedCorr_transient": corr_df["corr_transient"].values,
     "pairedCorr_sustained": corr_df["corr_sustained"].values,
@@ -1589,7 +2196,633 @@ savemat("corr_dataMTND.mat", {
     "pairMeanFR_paired_hz": corr_df["pairMeanFR_paired_hz"].values,
     "pairMeanFR_single_center_hz": corr_df["pairMeanFR_single_center_hz"].values,
     "pairMeanFR_single_periph_hz": corr_df["pairMeanFR_single_periph_hz"].values,
+    "pairVar1": corr_df["pairVar1"].values,
+    "pairVar2": corr_df["pairVar2"].values,
+    "pairDenom": corr_df["pairDenom"].values,
+    "singleCenterVar1": corr_df["singleCenterVar1"].values,
+    "singleCenterVar2": corr_df["singleCenterVar2"].values,
+    "singleCenterDenom": corr_df["singleCenterDenom"].values,
+    "singlePeriphVar1": corr_df["singlePeriphVar1"].values,
+    "singlePeriphVar2": corr_df["singlePeriphVar2"].values,
+    "singlePeriphDenom": corr_df["singlePeriphDenom"].values,
+
+
 })
+
+# =========================
+# SAVE SLIDING WINDOW RESULTS
+# =========================
+slide_df = pd.DataFrame(slide_records)
+savemat("corr_dataMTND_sliding.mat", {
+    "unit_i": slide_df["unit_i"].values.astype("U"),
+    "unit_j": slide_df["unit_j"].values.astype("U"),
+    "block":  slide_df["block"].values.astype("U"),
+    "cond_index": slide_df["cond_index"].values.astype(int),
+
+    "stim_type": slide_df["stim_type"].values.astype("U"),  # paired / single_center / single_periph
+
+    "win_idx": slide_df["win_idx"].values.astype(int),
+    "win_start_ms": slide_df["win_start_ms"].values.astype(float),
+    "win_end_ms": slide_df["win_end_ms"].values.astype(float),
+
+    "monkey": slide_df["monkey"].values.astype("U"),
+
+    "bhattCoef": slide_df["BC_dir_tuning"].values.astype(float),
+    "weightFraction": slide_df["weight_fraction"].values.astype(float),
+
+    "corr_sliding": slide_df["corr"].values.astype(float),
+    "cov12_sliding": slide_df["cov12"].values.astype(float),
+    "var1_sliding": slide_df["var1"].values.astype(float),
+    "var2_sliding": slide_df["var2"].values.astype(float),
+    "mean1_sliding": slide_df["mean1"].values.astype(float),
+    "mean2_sliding": slide_df["mean2"].values.astype(float),
+
+    "nWin": np.array([int(nWin)], dtype=int),
+})
+
+units = ['240611_37', '240611_42']
+units = ['230627_71', '230627_114']
+hfont = {'fontname': 'Arial'}
+fontSize = 5
+############### FIGURE 3B and 3C ###########
+# plot Von mises overlapping tuning Curves
+for fller in range(1):
+    units = ['230627_71', '230627_114']
+    locations = [0, 1, 2, 3, 4]
+    base_dir = "/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN"
+    eps = 1e-12
+
+    # --- Infer session date and monkey from unit name ---
+    sessionDate = units[0].split('_')[0]
+    monkeyName = "Meetz" if sessionDate.startswith("23") else "Akshan"
+
+    # --- Load dirData and SEM for this session ---
+    sesh_dir = os.path.join(base_dir, monkeyName, sessionDate, "Direction Tuning")
+    os.chdir(sesh_dir)
+    dirData = np.load('unitsDirTuningMat.npy')  # already in spikes/s
+    semData = np.load('unitsDirTuningSEM.npy')  # already in spikes/s
+    os.chdir(base_dir)
+
+    # --- Build unit -> row index mapping from masterAllUnits ---
+    units_today = [u for u in masterAllUnits if u.startswith(sessionDate + "_")]
+    unit_to_row = {u: i for i, u in enumerate(units_today)}
+
+    # --- Angle grid ---
+    n_dirs = dirData.shape[1]
+    angles_deg = np.linspace(0, 360, n_dirs, endpoint=False)
+    angles_rad = np.deg2rad(angles_deg)
+    angles_rad_fine = np.linspace(0, 2 * np.pi, 1000)  # for smooth von Mises curve
+
+    # --- Compute PMFs and BC ---
+    pmfs = []
+    for unit in units:
+        idx = unit_to_row[unit]
+        y = dirData[idx, :].astype(float)
+        y = np.clip(y, 0.0, None)
+        p = (y + eps) / (np.sum(y + eps))
+        pmfs.append(p)
+
+    bc = float(np.sum(np.sqrt(pmfs[0] * pmfs[1])))
+
+    # --- Plot ---
+    fig = plt.figure(figsize=(2.5, 2.5))
+
+    ax1 = fig.add_subplot(2, 1, 1, projection='polar')
+    for unit in units:
+        idx = unit_to_row[unit]
+        r = dirData[idx, :].astype(float)
+
+        # Fit von Mises
+        b, A, prefD, k = fit_von_mises_single(r, angles_rad)
+
+        if np.isfinite(b) and np.isfinite(A) and np.isfinite(prefD) and np.isfinite(k):
+            r2 = r2_score_safe(r, von_mises_func(angles_rad, b, A, prefD, k))
+            vm_fit = von_mises_func(angles_rad_fine, b, A, prefD, k)
+            ax1.plot(angles_rad_fine, vm_fit, linewidth=2,
+                     label=f'Unit {unit}')
+        else:
+            ax1.plot([], [], label=f'Unit {unit} (fit failed)')
+
+    ax1.set_theta_zero_location('W')
+    ax1.set_theta_direction(1)
+    ax1.set_title(f'BC = {bc:.3f}', pad=15, fontsize=fontSize, **hfont)
+    for label in ax1.get_xticklabels():
+        label.set_fontname(hfont['fontname'])
+        label.set_fontsize(fontSize)
+    # ax1.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+
+    # 2nd unit comparison
+    units = ['240611_37', '240611_42']
+    base_dir = "/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN"
+    eps = 1e-12
+
+    # --- Infer session date and monkey from unit name ---
+    sessionDate = units[0].split('_')[0]
+    monkeyName = "Meetz" if sessionDate.startswith("23") else "Akshan"
+
+    # --- Load dirData and SEM for this session ---
+    sesh_dir = os.path.join(base_dir, monkeyName, sessionDate, "Direction Tuning")
+    os.chdir(sesh_dir)
+    dirData = np.load('unitsDirTuningMat.npy')  # already in spikes/s
+    semData = np.load('unitsDirTuningSEM.npy')  # already in spikes/s
+    os.chdir(base_dir)
+
+    # --- Build unit -> row index mapping from masterAllUnits ---
+    units_today = [u for u in masterAllUnits if u.startswith(sessionDate + "_")]
+    unit_to_row = {u: i for i, u in enumerate(units_today)}
+
+    # --- Angle grid ---
+    n_dirs = dirData.shape[1]
+    angles_deg = np.linspace(0, 360, n_dirs, endpoint=False)
+    angles_rad = np.deg2rad(angles_deg)
+    angles_rad_fine = np.linspace(0, 2 * np.pi, 1000)  # for smooth von Mises curve
+
+    # --- Compute PMFs and BC ---
+    pmfs = []
+    for unit in units:
+        idx = unit_to_row[unit]
+        y = dirData[idx, :].astype(float)
+        y = np.clip(y, 0.0, None)
+        p = (y + eps) / (np.sum(y + eps))
+        pmfs.append(p)
+
+    bc = float(np.sum(np.sqrt(pmfs[0] * pmfs[1])))
+
+    ax2 = fig.add_subplot(2, 1, 2, projection='polar')
+    for unit in units:
+        idx = unit_to_row[unit]
+        r = dirData[idx, :].astype(float)
+
+        # Fit von Mises
+        b, A, prefD, k = fit_von_mises_single(r, angles_rad)
+
+        if np.isfinite(b) and np.isfinite(A) and np.isfinite(prefD) and np.isfinite(k):
+            r2 = r2_score_safe(r, von_mises_func(angles_rad, b, A, prefD, k))
+            vm_fit = von_mises_func(angles_rad_fine, b, A, prefD, k)
+            ax2.plot(angles_rad_fine, vm_fit, linewidth=2,
+                     label=f'Unit {unit}')
+        else:
+            ax2.plot([], [], label=f'Unit {unit} (fit failed)')
+
+    ax2.set_theta_zero_location('W')
+    ax2.set_theta_direction(1)
+    ax2.set_title(f'BC = {bc:.3f}', **hfont, fontsize=fontSize, pad=15)
+    for label in ax2.get_xticklabels():
+        label.set_fontname(hfont['fontname'])
+        label.set_fontsize(fontSize)
+    # ax2.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+
+    plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Correlations/PythonMainFigures/exampleBC.pdf',
+        bbox_inches='tight', dpi=500)
+    plt.close('all')
+
+
+# plot example neuron weights vs location and the von mises overlapping tuning curves
+for filler in range(1):
+    units = ['230627_71', '230627_114']
+    locations = [0, 1, 2, 3, 4]
+    base_dir = "/Users/chery/Documents/Grad School/Maunsell Lab/Analysis/MTCAN"
+    eps = 1e-12
+
+    # --- Infer session date and monkey from unit name ---
+    sessionDate = units[0].split('_')[0]
+    monkeyName = "Meetz" if sessionDate.startswith("23") else "Akshan"
+
+    # --- Load dirData and SEM for this session ---
+    sesh_dir = os.path.join(base_dir, monkeyName, sessionDate, "Direction Tuning")
+    os.chdir(sesh_dir)
+    dirData = np.load('unitsDirTuningMat.npy')  # already in spikes/s
+    semData = np.load('unitsDirTuningSEM.npy')  # already in spikes/s
+    os.chdir(base_dir)
+
+    # --- Build unit -> row index mapping from masterAllUnits ---
+    units_today = [u for u in masterAllUnits if u.startswith(sessionDate + "_")]
+    unit_to_row = {u: i for i, u in enumerate(units_today)}
+
+    # --- Angle grid ---
+    n_dirs = dirData.shape[1]
+    angles_deg = np.linspace(0, 360, n_dirs, endpoint=False)
+    angles_rad = np.deg2rad(angles_deg)
+    angles_rad_fine = np.linspace(0, 2 * np.pi, 1000)  # for smooth von Mises curve
+
+    # --- Compute PMFs and BC ---
+    pmfs = []
+    for unit in units:
+        idx = unit_to_row[unit]
+        y = dirData[idx, :].astype(float)
+        y = np.clip(y, 0.0, None)
+        p = (y + eps) / (np.sum(y + eps))
+        pmfs.append(p)
+
+    bc = float(np.sum(np.sqrt(pmfs[0] * pmfs[1])))
+
+    # --- Plot ---
+    fig = plt.figure(figsize=(14, 5))
+
+    # Panel 1: RF weights line plot
+    ax1 = fig.add_subplot(1, 2, 1)
+    for unit in units:
+        unit_id = good_index[unit]
+        fits = rfWeightNeuronFits[unit_id]
+        weights = [1, fits[2], fits[3], fits[4], fits[5]]
+        ib = fits[6]
+        ax1.plot(locations, weights, marker='o', linewidth=2, markersize=6,
+                 label=f'Unit {unit} (ib={ib:.3f})')
+
+    ax1.set_xlabel('Location')
+    ax1.set_ylabel('Weight')
+    ax1.set_xticks(locations)
+    ax1.set_xticklabels(['Center', 'Loc 1', 'Loc 2', 'Loc 3', 'Loc 4'])
+    ax1.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    ax1.set_title('RF Weight Neuron Fits')
+
+    # Panel 2: Polar direction tuning (von Mises fits only)
+    ax2 = fig.add_subplot(1, 2, 2, projection='polar')
+    for unit in units:
+        idx = unit_to_row[unit]
+        r = dirData[idx, :].astype(float)
+
+        # Fit von Mises
+        b, A, prefD, k = fit_von_mises_single(r, angles_rad)
+
+        if np.isfinite(b) and np.isfinite(A) and np.isfinite(prefD) and np.isfinite(k):
+            r2 = r2_score_safe(r, von_mises_func(angles_rad, b, A, prefD, k))
+            vm_fit = von_mises_func(angles_rad_fine, b, A, prefD, k)
+            ax2.plot(angles_rad_fine, vm_fit, linewidth=2,
+                     label=f'Unit {unit} (R²={r2:.2f})')
+        else:
+            ax2.plot([], [], label=f'Unit {unit} (fit failed)')
+
+    ax2.set_theta_zero_location('W')
+    ax2.set_theta_direction(1)
+    ax2.set_title(f'Direction Tuning (spikes/s)\nBC = {bc:.3f}', pad=15)
+    ax2.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+
+    plt.tight_layout()
+    plt.show()
+
+# plot how cov and rsc change with mean firing rate
+for filler in range(1):
+    # ============================================================
+    # Build df from corr_records (already filled by add_record)
+    # ============================================================
+    df = pd.DataFrame(corr_records)
+
+    # --- Long-form: one row per (pair, condition_type) ---
+    rows = []
+
+    def _push(cond_type, mean_col, cov_col, rsc_col):
+        sub = df[[mean_col, cov_col, rsc_col,
+                  "BC_dir_tuning", "unit_i", "unit_j", "block", "cond_index", "date", "monkey"]].copy()
+        sub = sub.rename(columns={mean_col: "pairMeanFR_hz", cov_col: "cov", rsc_col: "rsc"})
+        sub["cond_type"] = cond_type
+        rows.append(sub)
+
+    # Paired + singles
+    _push("paired",        "pairMeanFR_paired_hz",        "pairCov",         "corr")
+    _push("single_center", "pairMeanFR_single_center_hz", "singleCenterCov",  "singleCorr_center")
+    _push("single_periph", "pairMeanFR_single_periph_hz", "singlePeriphCov",  "singleCorr_periph")
+
+    long = pd.concat(rows, ignore_index=True)
+
+    # numeric cleanup
+    for c in ["pairMeanFR_hz", "cov", "rsc", "BC_dir_tuning"]:
+        long[c] = pd.to_numeric(long[c], errors="coerce")
+
+    # ============================================================
+    # USER KNOBS
+    # ============================================================
+    BC_THR  = 0.65
+    BC_MODE = "hi"   # "all", "hi", "lo"
+    N_BINS  = 10      # bins for median trend line
+
+    # ============================================================
+    # Helpers
+    # ============================================================
+    def apply_bc_filter(d):
+        if BC_MODE == "all":
+            return d
+        d = d.dropna(subset=["BC_dir_tuning"])
+        if BC_MODE == "hi":
+            return d[d["BC_dir_tuning"] > BC_THR]
+        if BC_MODE == "lo":
+            return d[d["BC_dir_tuning"] < BC_THR]
+        raise ValueError("BC_MODE must be one of: 'all', 'hi', 'lo'")
+
+    def add_median_trend(ax, x, y, n_bins=12, label="Median", linewidth=3):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        m = np.isfinite(x) & np.isfinite(y)
+        x = x[m]; y = y[m]
+
+        if len(x) < max(20, n_bins * 5):
+            order = np.argsort(x)
+            ax.plot(
+                x[order],
+                pd.Series(y[order]).rolling(15, min_periods=5).median(),
+                linewidth=linewidth,
+                label=label,
+            )
+            return
+
+        bins = pd.qcut(x, q=n_bins, duplicates="drop")
+        tmp = pd.DataFrame({"x": x, "y": y, "bin": bins})
+        g = tmp.groupby("bin", observed=True)
+        x_med = g["x"].median().to_numpy()
+        y_med = g["y"].median().to_numpy()
+        order = np.argsort(x_med)
+        ax.plot(x_med[order], y_med[order], linewidth=linewidth, label=label)
+
+    def pearson_r(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        m = np.isfinite(x) & np.isfinite(y)
+        if m.sum() < 3:
+            return np.nan, np.nan, int(m.sum())
+        r, p = pearsonr(x[m], y[m])
+        return float(r), float(p), int(m.sum())
+
+    # ============================================================
+    # Apply BC filter
+    # ============================================================
+    long_f = apply_bc_filter(long)
+
+    # ============================================================
+    # 1) Covariance vs mean rate + Pearson r
+    # ============================================================
+    sub_cov = long_f.dropna(subset=["pairMeanFR_hz", "cov"]).copy()
+    r_cov, p_cov, n_cov = pearson_r(sub_cov["pairMeanFR_hz"], sub_cov["cov"])
+
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+
+    for ct, sub in sub_cov.groupby("cond_type"):
+        ax.scatter(sub["pairMeanFR_hz"], sub["cov"], s=10, alpha=0.25, label=ct)
+
+    add_median_trend(
+        ax,
+        sub_cov["pairMeanFR_hz"].to_numpy(),
+        sub_cov["cov"].to_numpy(),
+        n_bins=N_BINS,
+        label=f"Median (all conds, BC_MODE={BC_MODE})",
+        linewidth=3,
+    )
+
+    ax.set_xlabel("Pair mean firing rate (Hz)")
+    ax.set_ylabel("Covariance")
+    ax.set_title(
+        f"Covariance vs pair mean rate | BC_MODE={BC_MODE} (thr={BC_THR}) | "
+        f"Pearson r={r_cov:.3f}, p={p_cov:.2e}, n={n_cov}"
+    )
+    ax.legend(frameon=False)
+    plt.tight_layout()
+
+    # ============================================================
+    # 2) r_sc vs mean rate + Pearson r
+    # ============================================================
+    sub_rsc = long_f.dropna(subset=["pairMeanFR_hz", "rsc"]).copy()
+    r_rsc, p_rsc, n_rsc = pearson_r(sub_rsc["pairMeanFR_hz"], sub_rsc["rsc"])
+
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+
+    for ct, sub in sub_rsc.groupby("cond_type"):
+        ax.scatter(sub["pairMeanFR_hz"], sub["rsc"], s=10, alpha=0.25, label=ct)
+
+    add_median_trend(
+        ax,
+        sub_rsc["pairMeanFR_hz"].to_numpy(),
+        sub_rsc["rsc"].to_numpy(),
+        n_bins=N_BINS,
+        label=f"Median (all conds, BC_MODE={BC_MODE})",
+        linewidth=3,
+    )
+
+    ax.set_xlabel("Pair mean firing rate (Hz)")
+    ax.set_ylabel("r_sc")
+    ax.axhline(0, linewidth=1)
+    ax.set_title(
+        f"r_sc vs pair mean rate | BC_MODE={BC_MODE} (thr={BC_THR}) | "
+        f"Pearson r={r_rsc:.3f}, p={p_rsc:.2e}, n={n_rsc}"
+    )
+    ax.legend(frameon=False)
+    plt.tight_layout()
+    plt.show()
+
+hfont = {'fontname': 'Arial'}
+fontSize = 5
+############### FIGURE 4A ###########
+# plot how weight fraction changes with mean firing rate
+for filler in range(1):
+    # ============================================================
+    # Build df from corr_records (already filled by add_record)
+    # ============================================================
+    df = pd.DataFrame(corr_records)
+
+    # ============================================================
+    # USER KNOBS
+    # ============================================================
+    BC_THR = 0.0
+    BC_MODE = "all"  # "all", "hi", "lo"
+    N_BINS = 12  # bins for median trend line
+
+
+    # ============================================================
+    # Helpers
+    # ============================================================
+    def apply_bc_filter(d):
+        if BC_MODE == "all":
+            return d
+        d = d.dropna(subset=["BC_dir_tuning"])
+        if BC_MODE == "hi":
+            return d[d["BC_dir_tuning"] > BC_THR]
+        if BC_MODE == "lo":
+            return d[d["BC_dir_tuning"] < BC_THR]
+        raise ValueError("BC_MODE must be one of: 'all', 'hi', 'lo'")
+
+
+    def add_median_trend(ax, x, y, n_bins=12, label="Median", linewidth=3):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        m = np.isfinite(x) & np.isfinite(y)
+        x = x[m];
+        y = y[m]
+
+        if len(x) < max(20, n_bins * 5):
+            order = np.argsort(x)
+            ax.plot(
+                x[order],
+                pd.Series(y[order]).rolling(15, min_periods=5).median(),
+                linewidth=linewidth,
+                label=label,
+            )
+            return
+
+        bins = pd.qcut(x, q=n_bins, duplicates="drop")
+        tmp = pd.DataFrame({"x": x, "y": y, "bin": bins})
+        g = tmp.groupby("bin", observed=True)
+        x_med = g["x"].median().to_numpy()
+        y_med = g["y"].median().to_numpy()
+        order = np.argsort(x_med)
+        ax.plot(x_med[order], y_med[order], linewidth=linewidth, label=label)
+
+
+    def pearson_r(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        m = np.isfinite(x) & np.isfinite(y)
+        if m.sum() < 3:
+            return np.nan, np.nan, int(m.sum())
+        r, p = stats.pearsonr(x[m], y[m])
+        return float(r), p, int(m.sum())
+
+
+    # ============================================================
+    # Plot: pairWeightGeomMean (weight fraction proxy) vs mean rate
+    # We plot it against each available mean-rate field (paired + singles),
+    # then concatenate all points and add ONE median trend line.
+    # ============================================================
+
+    # Make three copies with a unified x-axis field
+    rows = []
+
+
+    def _push_weight_vs_rate(cond_type, mean_col):
+        sub = df[[mean_col, "pair_weight_geommean", "BC_dir_tuning",
+                  "unit_i", "unit_j", "block", "cond_index", "date", "monkey"]].copy()
+        sub = sub.rename(columns={mean_col: "pairMeanFR_hz", "pair_weight_geommean": "pairWeightGeomMean"})
+        sub["cond_type"] = cond_type
+        rows.append(sub)
+
+
+    _push_weight_vs_rate("paired", "pairMeanFR_paired_hz")
+    _push_weight_vs_rate("single_center", "pairMeanFR_single_center_hz")
+    _push_weight_vs_rate("single_periph", "pairMeanFR_single_periph_hz")
+
+    wlong = pd.concat(rows, ignore_index=True)
+
+    # numeric cleanup
+    for c in ["pairMeanFR_hz", "pairWeightGeomMean", "BC_dir_tuning"]:
+        wlong[c] = pd.to_numeric(wlong[c], errors="coerce")
+
+    # apply BC filter
+    wlong_f = apply_bc_filter(wlong)
+
+    # drop NaNs for correlation/plot
+    sub_w = wlong_f.dropna(subset=["pairMeanFR_hz", "pairWeightGeomMean"]).copy()
+    r_w, p_w, n_w = pearson_r(sub_w["pairMeanFR_hz"], sub_w["pairWeightGeomMean"])
+
+    # --- color palette (colorblind-friendly) ---
+    cond_colors = {
+        'paired':        '#4C72B0',
+        'single_center': '#DD4444',
+        'single_periph': '#2CA02C',
+    }
+    cond_labels = {
+        'paired':        'Paired',
+        'single_center': 'Single (center)',
+        'single_periph': 'Single (periph)',
+    }
+
+    fig, ax = plt.subplots(figsize=(4.5, 2))
+
+    # # --- scatter per condition ---
+    # for ct, sub in sub_w.groupby("cond_type"):
+    #     ax.scatter(sub["pairMeanFR_hz"], sub["pairWeightGeomMean"],
+    #                s=2, alpha=0.15, color=cond_colors.get(ct, 'gray'),
+    #                linewidths=0, rasterized=True)
+
+
+    def add_median_trend(ax, x, y, n_bins=12, label="Median", linewidth=3,
+                         n_boot=1000, ci=95):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        m = np.isfinite(x) & np.isfinite(y)
+        x = x[m]
+        y = y[m]
+
+        if len(x) < max(20, n_bins * 5):
+            order = np.argsort(x)
+            ax.plot(
+                x[order],
+                pd.Series(y[order]).rolling(15, min_periods=5).median(),
+                linewidth=linewidth, label=label,
+            )
+            return
+
+        bins = pd.qcut(x, q=n_bins, duplicates="drop")
+        tmp = pd.DataFrame({"x": x, "y": y, "bin": bins})
+        g = tmp.groupby("bin", observed=True)
+        x_med = g["x"].median().to_numpy()
+        y_med = g["y"].median().to_numpy()
+
+        # Bootstrap 95% CI of the median for each bin
+        alpha = (100 - ci) / 2
+        y_lo = np.empty(len(y_med))
+        y_hi = np.empty(len(y_med))
+        rng = np.random.default_rng(42)
+
+        for i, (_, grp) in enumerate(g):
+            vals = grp["y"].to_numpy()
+            boot_medians = np.median(
+                rng.choice(vals, size=(n_boot, len(vals)), replace=True),
+                axis=1
+            )
+            y_lo[i] = np.percentile(boot_medians, alpha)
+            y_hi[i] = np.percentile(boot_medians, 100 - alpha)
+
+        yerr = np.array([y_med - y_lo, y_hi - y_med])
+
+        order = np.argsort(x_med)
+        ax.errorbar(
+            x_med[order], y_med[order],
+            yerr=yerr[:, order],
+            linewidth=linewidth, label=label,
+            fmt='-o', markersize=3,
+            capsize=2, capthick=0.6, elinewidth=0.6,
+        )
+
+
+    add_median_trend(
+        ax,
+        sub_w["pairMeanFR_hz"].to_numpy(),
+        sub_w["pairWeightGeomMean"].to_numpy(),
+        n_bins=N_BINS,
+        label=f'Median  r={r_w:.2f}, p={p_w:.2e}',
+        linewidth=1,
+    )
+
+    # --- legend: condition dots + median line ---
+    # from matplotlib.lines import Line2D
+    # legend_handles = [
+    #     Line2D([0], [0], marker='o', color='w', markerfacecolor=cond_colors[ct],
+    #            markersize=3, label=cond_labels[ct])
+    #     for ct in cond_colors
+    # ]
+    #
+    # ax.legend(handles=legend_handles, fontsize=fontSize - 1,
+    #           frameon=False, loc='upper right',
+    #           handlelength=1, handletextpad=0.4, labelspacing=0.3)
+    ax.legend(fontsize=fontSize - 1, frameon=False, loc='lower right',
+              handlelength=1, handletextpad=0.4, labelspacing=0.3)
+
+    # --- axes ---
+    ax.set_xlabel("Pair mean firing rate (Hz)", **hfont, fontsize=fontSize)
+    ax.set_ylabel("RF weight fraction (geom. mean)", **hfont, fontsize=fontSize)
+    ax.tick_params(axis='both', labelsize=fontSize, length=2, pad=2)
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+    ax.spines['left'].set_linewidth(0.6)
+    ax.spines['bottom'].set_linewidth(0.6)
+    ax.set_xlim([0, 60])
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname(hfont['fontname'])
+
+    plt.tight_layout()
+
+    plt.savefig('/Users/chery/Documents/Grad School/Maunsell Lab/Manuscripts/Correlations/PythonMainFigures/weightFR_scatterV2.pdf',
+                bbox_inches='tight', dpi=500)
+    plt.close('all')
 
 # paired
 x = corr_df['pair_weight_geommean'].values
@@ -1921,6 +3154,620 @@ for filler in range(1):
         plt.title("Raw scatter with equal-count binned means ± SEM")
         plt.legend()
         plt.show()
+
+
+# linear mixed effects model
+for filler in range(1):
+    """
+    fit_rsc_lme_v5.py
+    =================
+    Clean hierarchical LME comparison starting from BC-only baseline.
+
+    Four models, each building on the previous:
+      M0_bc     : bc_c + bc2                               (baseline)
+      M1_weight : bc_c + bc2 + w_c + bc_w + w2            (+ weight)
+      M2_fr     : bc_c + bc2 + fr_c + bc_fr + fr2         (+ FR)
+      M3_both   : bc_c + bc2 + w_c + fr_c                 (+ both)
+                    + bc_w + bc_fr + w2 + fr2
+
+    Random structure (identical across all models):
+      (1 + w_c | pair_id)
+
+    Each model gets a 2-panel scatter:
+      Left  — fixed-effects-only prediction  (honest, matches marginal R²)
+      Right — full prediction incl. random   (matches conditional R²)
+
+    Points coloured by stim_type:
+      green  = paired
+      blue   = single_center
+      orange = single_periph
+    """
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import statsmodels.formula.api as smf
+    from scipy.stats import pearsonr
+
+    # ── column aliases ─────────────────────────────────────────────────────────────
+    BC_COL = "BC_dir_tuning"
+    PAIRED_CORR = "corr"
+    PAIRED_WEIGHT = "pair_weight_geommean"
+    SINGLE_C_CORR = "singleCorr_center"
+    SINGLE_C_WEIGHT = "singleWeightGeom_center"
+    SINGLE_P_CORR = "singleCorr_periph"
+    SINGLE_P_WEIGHT = "singleWeightGeom_periph"
+    PAIRED_FR = "pairMeanFR_paired_hz"
+    SINGLE_C_FR = "pairMeanFR_single_center_hz"
+    SINGLE_P_FR = "pairMeanFR_single_periph_hz"
+    UNIT_I = "unit_i"
+    UNIT_J = "unit_j"
+
+    RE_FORMULA = "~ w_c"  # held constant across all models
+
+    STIM_COLORS = {"paired": "#2ca02c",
+                   "single_center": "#1f77b4",
+                   "single_periph": "#ff7f0e"}
+
+    MODEL_COLORS = {"M0_bc": "#7f7f7f",
+                    "M1_weight": "#2ca02c",
+                    "M2_fr": "#ff7f0e",
+                    "M3_both": "#9467bd"}
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Build stacked dataframe
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    def build_stacked(corr_df):
+        needed = [BC_COL, PAIRED_CORR, PAIRED_WEIGHT, SINGLE_C_CORR,
+                  SINGLE_C_WEIGHT, SINGLE_P_CORR, SINGLE_P_WEIGHT,
+                  PAIRED_FR, SINGLE_C_FR, SINGLE_P_FR,
+                  UNIT_I, UNIT_J]
+
+        df = corr_df[needed].copy().dropna(subset=needed)
+        df["pair_id"] = df.apply(
+            lambda r: "_".join(sorted([str(r[UNIT_I]), str(r[UNIT_J])])), axis=1
+        )
+
+        frames = []
+        for stim_type, corr_col, weight_col, fr_col in [
+            ("paired", PAIRED_CORR, PAIRED_WEIGHT, PAIRED_FR),
+            ("single_center", SINGLE_C_CORR, SINGLE_C_WEIGHT, SINGLE_C_FR),
+            ("single_periph", SINGLE_P_CORR, SINGLE_P_WEIGHT, SINGLE_P_FR),
+        ]:
+            tmp = df[["pair_id", BC_COL, corr_col,
+                      weight_col, fr_col]].copy()
+            tmp.columns = ["pair_id", "bc", "rsc", "weight", "fr"]
+            tmp["stim_type"] = stim_type
+            frames.append(tmp)
+
+        stacked = pd.concat(frames, ignore_index=True).dropna()
+
+        # center
+        bc_mean = stacked["bc"].mean()
+        w_mean = stacked["weight"].mean()
+        fr_mean = stacked["fr"].mean()
+
+        stacked["bc_c"] = stacked["bc"] - bc_mean
+        stacked["w_c"] = stacked["weight"] - w_mean
+        stacked["fr_c"] = stacked["fr"] - fr_mean
+        stacked["bc_w"] = stacked["bc_c"] * stacked["w_c"]
+        stacked["bc_fr"] = stacked["bc_c"] * stacked["fr_c"]
+        stacked["bc2"] = stacked["bc_c"] ** 2
+        stacked["w2"] = stacked["w_c"] ** 2
+        stacked["fr2"] = stacked["fr_c"] ** 2
+
+        stacked["stim_type"] = pd.Categorical(
+            stacked["stim_type"],
+            categories=["paired", "single_center", "single_periph"]
+        )
+
+        n_pairs = stacked["pair_id"].nunique()
+        print(f"Stacked rows  : {len(stacked):,}  ({n_pairs} unique pairs)")
+        print(f"Mean BC       : {bc_mean:.3f}  |  "
+              f"Mean weight : {w_mean:.3f}  |  "
+              f"Mean FR : {fr_mean:.2f} Hz")
+        return stacked
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Pseudo-R²
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    def pseudo_r2(res):
+        var_fe = np.var(res.fittedvalues)
+        var_res = res.scale
+        var_re = float(np.diag(res.cov_re).sum())
+        r2_m = var_fe / (var_fe + var_re + var_res)
+        r2_c = (var_fe + var_re) / (var_fe + var_re + var_res)
+        return r2_m, r2_c, var_fe, var_re, var_res
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Fixed-effects-only prediction
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    def fixed_pred(res, df):
+        """
+        Manually compute fixed-effects prediction without random effects.
+        Handles any combination of terms present in the model.
+        """
+        fe = res.fe_params
+        pred = pd.Series(0.0, index=df.index)
+        for term, coef in fe.items():
+            if term == "Intercept":
+                pred += coef
+            elif term in df.columns:
+                pred += coef * df[term]
+            # stim_type dummies — not used in these models but guard anyway
+            elif "single_center" in term:
+                pred += coef * (df["stim_type"] == "single_center").astype(float)
+            elif "single_periph" in term:
+                pred += coef * (df["stim_type"] == "single_periph").astype(float)
+        return pred
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Fit one model — print summary, return result + predictions
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    def fit_model(formula, df, label):
+        md = smf.mixedlm(formula, df, groups=df["pair_id"],
+                         re_formula=RE_FORMULA)
+        res = md.fit(reml=False, method="lbfgs", maxiter=300)
+
+        r2_m, r2_c, vfe, vre, vres = pseudo_r2(res)
+
+        # fixed-effects-only prediction
+        y_fe = fixed_pred(res, df)
+        r_fe, _ = pearsonr(df["rsc"], y_fe)
+
+        # full prediction (fixed + random)
+        y_full = res.fittedvalues
+        r_full, _ = pearsonr(df["rsc"], y_full)
+
+        print(f"\n{'═' * 65}")
+        print(f"  {label}")
+        print(f"  AIC = {res.aic:.2f}   BIC = {res.bic:.2f}")
+        print(f"  R²_marg = {r2_m:.4f}   R²_cond = {r2_c:.4f}")
+        print(f"  Fixed-only  r = {r_fe:.4f}   (R² = {r_fe ** 2:.4f})")
+        print(f"  Full        r = {r_full:.4f}  (R² = {r_full ** 2:.4f})")
+        print(f"\n  Fixed effects:")
+        print(f"  {'term':<30} {'coef':>9} {'SE':>9} {'z':>7} {'p':>10}")
+        fe = res.fe_params
+        bse = res.bse_fe
+        for term in fe.index:
+            z = fe[term] / bse[term]
+            p = res.pvalues[term]
+            sig = ("***" if p < 0.001 else "**" if p < 0.01
+            else "*" if p < 0.05 else "")
+            print(f"  {term:<30} {fe[term]:>9.4f} {bse[term]:>9.4f} "
+                  f"{z:>7.2f} {p:>10.4f} {sig}")
+
+        print(f"\n  Random effects:\n{res.cov_re}")
+        print(f"  Residual σ² = {res.scale:.5f}")
+
+        return res, r2_m, r2_c, y_fe, y_full, r_fe, r_full
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Main
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    F_BC = "rsc ~ bc_c + bc2"
+    F_WEIGHT = "rsc ~ bc_c + bc2 + w_c  + bc_w  + w2"
+    F_FR = "rsc ~ bc_c + bc2 + fr_c + bc_fr + fr2"
+    F_BOTH = "rsc ~ bc_c + bc2 + w_c  + fr_c  + bc_w + bc_fr + w2 + fr2"
+
+    MODEL_SPECS = [
+        ("M0_bc", F_BC, "M0: BC only"),
+        ("M1_weight", F_WEIGHT, "M1: BC + weight"),
+        ("M2_fr", F_FR, "M2: BC + FR"),
+        ("M3_both", F_BOTH, "M3: BC + weight + FR"),
+    ]
+
+
+    def run_lme_comparison(corr_df):
+        df = build_stacked(corr_df)
+
+        fits = {}
+        for key, formula, label in MODEL_SPECS:
+            res, r2m, r2c, y_fe, y_full, r_fe, r_full = fit_model(
+                formula, df, label)
+            fits[key] = dict(res=res, r2m=r2m, r2c=r2c,
+                             y_fe=y_fe, y_full=y_full,
+                             r_fe=r_fe, r_full=r_full, label=label)
+
+        # ── summary table ─────────────────────────────────────────────────────────
+        print(f"\n{'═' * 75}")
+        print(f"  {'Model':<25} {'AIC':>10} {'R²_marg':>9} {'R²_cond':>9} "
+              f"{'r_fe':>8} {'r_full':>8}  {'ΔAIC':>8}")
+        best_aic = min(v["res"].aic for v in fits.values())
+        for key, v in fits.items():
+            print(f"  {v['label']:<25} {v['res'].aic:>10.2f} "
+                  f"{v['r2m']:>9.4f} {v['r2c']:>9.4f} "
+                  f"{v['r_fe']:>8.4f} {v['r_full']:>8.4f}  "
+                  f"{v['res'].aic - best_aic:>8.2f}")
+
+        # ── LRTs ──────────────────────────────────────────────────────────────────
+        from scipy.stats import chi2
+        print(f"\n  Likelihood Ratio Tests:")
+        pairs = [
+            ("M0_bc", "M1_weight", "M0 vs M1 (adding weight)"),
+            ("M0_bc", "M2_fr", "M0 vs M2 (adding FR)"),
+            ("M0_bc", "M3_both", "M0 vs M3 (adding both)"),
+            ("M1_weight", "M3_both", "M1 vs M3 (FR on top of weight)"),
+            ("M2_fr", "M3_both", "M2 vs M3 (weight on top of FR)"),
+        ]
+        for null_key, alt_key, desc in pairs:
+            null = fits[null_key]["res"]
+            alt = fits[alt_key]["res"]
+            df_diff = len(alt.fe_params) - len(null.fe_params)
+            stat = 2 * (alt.llf - null.llf)
+            p = chi2.sf(stat, df_diff)
+            print(f"  {desc:<40} χ²({df_diff}) = {stat:7.2f},  p = {p:.4e}")
+
+        # ── plots ──────────────────────────────────────────────────────────────────
+        plot_scatter_grid(df, fits)
+        plot_r2_summary(fits)
+
+        return fits, df
+
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    #  Plots
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    def plot_scatter_grid(df, fits):
+        """
+        4 models × 2 panels (fixed-only | full) = 4 rows × 2 cols
+        Each panel: observed vs predicted, coloured by stim_type
+        """
+        rsc = df["rsc"].values
+        colors = df["stim_type"].map(STIM_COLORS).values
+
+        fig, axes = plt.subplots(4, 2, figsize=(12, 22))
+        fig.suptitle(
+            "Observed vs Predicted R_sc\n"
+            "Left: fixed effects only (honest)   |   "
+            "Right: fixed + random effects",
+            fontsize=13, y=1.01
+        )
+
+        for row, (key, v) in enumerate(fits.items()):
+            model_col = MODEL_COLORS[key]
+
+            for col, (y_hat, pred_type, r_val) in enumerate([
+                (v["y_fe"], "Fixed-effects only", v["r_fe"]),
+                (v["y_full"], "Fixed + random", v["r_full"]),
+            ]):
+                ax = axes[row, col]
+                y_hat_vals = y_hat.values if hasattr(y_hat, "values") else y_hat
+
+                # subsample for speed if large
+                idx = np.random.choice(len(rsc),
+                                       size=min(8000, len(rsc)),
+                                       replace=False)
+                ax.scatter(rsc[idx], y_hat_vals[idx],
+                           c=colors[idx], s=6, alpha=0.3, linewidths=0)
+
+                # unity line across full data range
+                all_vals = np.concatenate([rsc, y_hat_vals])
+                lo, hi = np.percentile(all_vals, [1, 99])
+                ax.plot([lo, hi], [lo, hi], "k--", lw=1.5, zorder=5)
+
+                r2 = r_val ** 2
+                ax.set_xlabel("Observed R_sc", fontsize=9)
+                ax.set_ylabel("Predicted R_sc", fontsize=9)
+                ax.set_title(
+                    f"{v['label']}  —  {pred_type}\n"
+                    f"r = {r_val:.3f}   R² = {r2:.3f}",
+                    fontsize=9
+                )
+
+                # stim_type legend on first row only
+                if row == 0:
+                    for stype, sc in STIM_COLORS.items():
+                        ax.scatter([], [], c=sc, s=20,
+                                   label=stype.replace("_", " "))
+                    ax.legend(fontsize=7, loc="upper left")
+
+        plt.tight_layout()
+        plt.savefig("lme_scatter_grid.png", dpi=150, bbox_inches="tight")
+        plt.show()
+
+
+    def plot_r2_summary(fits):
+        """
+        Side-by-side bar chart: marginal R² and fixed-only r² for each model.
+        """
+        fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+        labels = [v["label"] for v in fits.values()]
+        r2m_vals = [v["r2m"] for v in fits.values()]
+        r2c_vals = [v["r2c"] for v in fits.values()]
+        rfe_vals = [v["r_fe"] ** 2 for v in fits.values()]
+        colors = list(MODEL_COLORS.values())
+
+        x = np.arange(len(labels))
+
+        # Panel A: marginal vs conditional R²
+        ax = axes[0]
+        w = 0.35
+        b1 = ax.bar(x - w / 2, r2m_vals, w, color=colors,
+                    alpha=0.9, label="Marginal R²", edgecolor="white")
+        b2 = ax.bar(x + w / 2, r2c_vals, w, color=colors,
+                    alpha=0.4, label="Conditional R²", edgecolor="white",
+                    hatch="//")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=15, ha="right", fontsize=9)
+        ax.set_ylabel("R²")
+        ax.set_ylim(0, 1)
+        ax.set_title("Marginal vs Conditional R²\nacross models")
+        ax.legend(fontsize=9)
+        for bar, val in zip(b1, r2m_vals):
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.01,
+                    f"{val:.3f}", ha="center", fontsize=8)
+
+        # Panel B: fixed-effects-only R² (honest comparison)
+        ax2 = axes[1]
+        bars = ax2.bar(labels, rfe_vals, color=colors,
+                       alpha=0.9, edgecolor="white")
+        ax2.set_ylabel("R²  (fixed effects only)")
+        ax2.set_ylim(0, max(rfe_vals) * 1.3)
+        ax2.set_title("Fixed-effects-only R²\n(honest population-level fit)")
+        ax2.tick_params(axis="x", labelsize=9)
+        plt.setp(ax2.get_xticklabels(), rotation=15, ha="right")
+        for bar, val in zip(bars, rfe_vals):
+            ax2.text(bar.get_x() + bar.get_width() / 2,
+                     bar.get_height() + 0.001,
+                     f"{val:.4f}", ha="center", fontsize=9)
+
+        fig.suptitle("R² comparison across LME models", fontsize=12)
+        plt.tight_layout()
+        plt.savefig("lme_r2_summary.png", dpi=150)
+        plt.show()
+
+    # ── Entry point ───────────────────────────────────────────────────────────────
+    fits, df = run_lme_comparison(corr_df)
+
+# linear regression model of rsc as function of weight, BC, rate and interaction
+# includes paired and single conditions
+for filler in range(1):
+    import numpy as np
+    import pandas as pd
+    import statsmodels.api as sm
+
+    df = pd.DataFrame(corr_records)
+
+    # ---------------- USER KNOBS ----------------
+    BC_THR = 0.65
+    BC_MODE = "all"  # "all", "hi", "lo"
+
+    # ============================================================
+    # Build combined long-form table (paired + singles)
+    # ============================================================
+
+    rows = []
+
+
+    def push(cond, r_col, rate_col, w_col):
+        sub = df[[r_col, rate_col, w_col, "BC_dir_tuning"]].copy()
+        sub = sub.rename(columns={
+            r_col: "r_sc",
+            rate_col: "rate",
+            w_col: "weight",
+            "BC_dir_tuning": "BC"
+        })
+        sub["cond"] = cond
+        rows.append(sub)
+
+
+    push("paired", "corr", "pairMeanFR_paired_hz", "pair_weight_geommean")
+    push("single_center", "singleCorr_center", "pairMeanFR_single_center_hz", "singleWeightGeom_center")
+    push("single_periph", "singleCorr_periph", "pairMeanFR_single_periph_hz", "singleWeightGeom_periph")
+
+    long = pd.concat(rows, ignore_index=True)
+
+    # numeric cleanup
+    for c in ["r_sc", "rate", "weight", "BC"]:
+        long[c] = pd.to_numeric(long[c], errors="coerce")
+
+    mask = np.isfinite(long["r_sc"]) & np.isfinite(long["rate"]) \
+           & np.isfinite(long["weight"]) & np.isfinite(long["BC"])
+
+    if BC_MODE == "hi":
+        mask &= (long["BC"] > BC_THR)
+    elif BC_MODE == "lo":
+        mask &= (long["BC"] < BC_THR)
+
+    long = long[mask].copy()
+
+    print("Combined N =", len(long))
+
+
+    # ============================================================
+    # Standardize predictors
+    # ============================================================
+
+    def z(x):
+        x = np.asarray(x)
+        return (x - np.mean(x)) / np.std(x)
+
+
+    wz = z(long["weight"])
+    rz = z(long["rate"])
+    bcz = z(long["BC"])
+
+    long["wz"] = wz
+    long["rz"] = rz
+    long["bcz"] = bcz
+    long["w_bc"] = wz * bcz
+    long["r_bc"] = rz * bcz
+
+    y = long["r_sc"].to_numpy()
+
+    # ============================================================
+    # Fit models
+    # ============================================================
+
+    X_main = sm.add_constant(long[["wz", "rz", "bcz"]])
+    X_wint = sm.add_constant(long[["wz", "rz", "bcz", "w_bc"]])
+    X_rint = sm.add_constant(long[["wz", "rz", "bcz", "r_bc"]])
+    X_full = sm.add_constant(long[["wz", "rz", "bcz", "w_bc", "r_bc"]])
+
+    m_main = sm.OLS(y, X_main).fit()
+    m_wint = sm.OLS(y, X_wint).fit()
+    m_rint = sm.OLS(y, X_rint).fit()
+    m_full = sm.OLS(y, X_full).fit()
+
+    # ============================================================
+    # Output
+    # ============================================================
+
+    print("\n=== COMBINED MAIN MODEL ===")
+    print(m_main.summary())
+
+    print("\n=== + weight×BC ===")
+    print(m_wint.summary())
+
+    print("\n=== + rate×BC ===")
+    print(m_rint.summary())
+
+    print("\n=== FULL INTERACTION MODEL ===")
+    print(m_full.summary())
+
+    print("\nR² comparison:")
+    print("main   ", m_main.rsquared)
+    print("+ w×BC ", m_wint.rsquared, " Δ=", m_wint.rsquared - m_main.rsquared)
+    print("+ r×BC ", m_rint.rsquared, " Δ=", m_rint.rsquared - m_main.rsquared)
+    print("full   ", m_full.rsquared)
+
+    print("\nNested F-tests vs main:")
+    print("weight×BC adds signal:", m_full.compare_f_test(m_rint))
+    print("rate×BC adds signal:  ", m_full.compare_f_test(m_wint))
+
+# covariance + denominator interaction models (combined singles + paired)
+for filler in range(1):
+    import numpy as np
+    import pandas as pd
+    import statsmodels.api as sm
+
+    df = pd.DataFrame(corr_records)
+
+    # ---------------- USER KNOBS ----------------
+    BC_THR = 0.65
+    BC_MODE = "all"   # "all","hi","lo"
+
+    # ============================================================
+    # Build long table with cov + rsc + predictors
+    # ============================================================
+
+    rows = []
+
+    def push(cond, cov_col, rsc_col, rate_col, w_col):
+        sub = df[[cov_col, rsc_col, rate_col, w_col, "BC_dir_tuning"]].copy()
+        sub = sub.rename(columns={
+            cov_col: "cov",
+            rsc_col: "r_sc",
+            rate_col: "rate",
+            w_col: "weight",
+            "BC_dir_tuning": "BC"
+        })
+        sub["cond"] = cond
+        rows.append(sub)
+
+    push("paired",        "pairCov",        "corr",
+         "pairMeanFR_paired_hz",        "pair_weight_geommean")
+
+    push("single_center", "singleCenterCov","singleCorr_center",
+         "pairMeanFR_single_center_hz", "singleWeightGeom_center")
+
+    push("single_periph", "singlePeriphCov","singleCorr_periph",
+         "pairMeanFR_single_periph_hz", "singleWeightGeom_periph")
+
+    long = pd.concat(rows, ignore_index=True)
+
+    # numeric cleanup
+    for c in ["cov","r_sc","rate","weight","BC"]:
+        long[c] = pd.to_numeric(long[c], errors="coerce")
+
+    # denominator term from identity: rsc = cov / denom
+    long["denom"] = long["cov"] / long["r_sc"]
+
+    mask = np.isfinite(long["cov"]) & np.isfinite(long["denom"]) \
+           & np.isfinite(long["rate"]) & np.isfinite(long["weight"]) \
+           & np.isfinite(long["BC"]) & (np.abs(long["r_sc"]) > 1e-6)
+
+    if BC_MODE == "hi":
+        mask &= (long["BC"] > BC_THR)
+    elif BC_MODE == "lo":
+        mask &= (long["BC"] < BC_THR)
+
+    long = long[mask].copy()
+
+    print("Combined N (cov/denom) =", len(long))
+
+    # ============================================================
+    # Standardize predictors
+    # ============================================================
+
+    def z(x):
+        x = np.asarray(x)
+        return (x - np.mean(x)) / np.std(x)
+
+    long["wz"]  = z(long["weight"])
+    long["rz"]  = z(long["rate"])
+    long["bcz"] = z(long["BC"])
+    long["w_bc"] = long["wz"] * long["bcz"]
+    long["r_bc"] = long["rz"] * long["bcz"]
+
+    # ============================================================
+    # Helper to run model set
+    # ============================================================
+
+    def run_models(y, label):
+
+        X_main = sm.add_constant(long[["wz","rz","bcz"]])
+        X_wint = sm.add_constant(long[["wz","rz","bcz","w_bc"]])
+        X_rint = sm.add_constant(long[["wz","rz","bcz","r_bc"]])
+        X_full = sm.add_constant(long[["wz","rz","bcz","w_bc","r_bc"]])
+
+        m_main = sm.OLS(y, X_main).fit()
+        m_wint = sm.OLS(y, X_wint).fit()
+        m_rint = sm.OLS(y, X_rint).fit()
+        m_full = sm.OLS(y, X_full).fit()
+
+        print(f"\n================ {label.upper()} MODEL ================")
+        print("\nMAIN")
+        print(m_main.summary())
+
+        print("\nFULL INTERACTION")
+        print(m_full.summary())
+
+        print("\nR² comparison:")
+        print("main   ", m_main.rsquared)
+        print("+ w×BC ", m_wint.rsquared, " Δ=", m_wint.rsquared - m_main.rsquared)
+        print("+ r×BC ", m_rint.rsquared, " Δ=", m_rint.rsquared - m_main.rsquared)
+        print("full   ", m_full.rsquared)
+
+        print("\nNested F-tests vs main:")
+        print("weight×BC adds signal:", m_full.compare_f_test(m_rint))
+        print("rate×BC adds signal:  ", m_full.compare_f_test(m_wint))
+
+    # ============================================================
+    # Run covariance model
+    # ============================================================
+
+    run_models(long["cov"].to_numpy(), "covariance")
+
+    # ============================================================
+    # Run denominator model
+    # ============================================================
+
+    run_models(long["denom"].to_numpy(), "denominator")
 
 # 3d plot
 fig = plt.figure()
